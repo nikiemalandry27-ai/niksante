@@ -1,8 +1,15 @@
 const { Pool } = require('pg');
 
+if (!process.env.DATABASE_URL) {
+  console.error('[DB] Variable DATABASE_URL non définie — vérifiez les variables d\'environnement sur Render');
+  process.exit(1);
+}
+
+console.log('[DB] Connexion à :', process.env.DATABASE_URL.replace(/:\/\/.*@/, '://***@'));
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ssl: { rejectUnauthorized: false },
 });
 
 async function createTables() {

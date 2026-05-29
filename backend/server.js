@@ -128,6 +128,6 @@ createTables()
     });
   })
   .catch((err) => {
-    console.error('[Démarrage] Échec connexion base de données :', err.message);
+    console.error('[Démarrage] Échec connexion base de données :', err);
     process.exit(1);
   });
