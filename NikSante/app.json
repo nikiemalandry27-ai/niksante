@@ -1,0 +1,61 @@
+{
+  "expo": {
+    "name": "NikSanté",
+    "slug": "NikSante",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "niksante",
+    "userInterfaceStyle": "automatic",
+    "description": "Application mobile gratuite de suivi du diabète : enregistrement de glycémie, scanner alimentaire IA, rappels de mesure, tableaux de bord et conseils d'urgence hypoglycémie / hyperglycémie.",
+    "keywords": ["diabète", "glycémie", "suivi diabète", "hypoglycémie", "hyperglycémie", "santé", "insuline"],
+    "primaryColor": "#388E3C",
+    "ios": {
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.niksante.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "NikSanté utilise la caméra pour scanner vos aliments et calculer leur impact glycémique.",
+        "NSPhotoLibraryUsageDescription": "NikSanté peut accéder à vos photos pour analyser vos aliments."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.niksante.app",
+      "versionCode": 1
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png",
+      "name": "NikSanté – Suivi de Glycémie & Diabète",
+      "shortName": "NikSanté",
+      "description": "Application mobile gratuite de suivi du diabète : glycémie, scanner alimentaire IA, rappels et conseils d'urgence.",
+      "themeColor": "#388E3C",
+      "backgroundColor": "#f5f5f5",
+      "lang": "fr"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#208AEF",
+          "android": {
+            "image": "./assets/images/splash-icon.png",
+            "imageWidth": 76
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}

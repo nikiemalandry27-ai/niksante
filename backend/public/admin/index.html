@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NikSanté — Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    .fade-in { animation: fadeIn .3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+<!-- ═══════════════════════════════════════════════════════ LOGIN ══ -->
+<div id="loginScreen" class="min-h-screen flex items-center justify-center px-4">
+  <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-sm fade-in">
+    <div class="text-center mb-8">
+      <div class="text-5xl mb-3">🩸</div>
+      <h1 class="text-2xl font-bold text-gray-900">NikSanté Admin</h1>
+      <p class="text-gray-400 text-sm mt-1">Tableau de bord administrateur</p>
+    </div>
+    <div id="loginError" class="hidden bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl mb-4"></div>
+    <form id="loginForm" class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Identifiant</label>
+        <input id="username" type="text" placeholder="admin"
+          class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Mot de passe</label>
+        <input id="password" type="password"
+          class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent" />
+      </div>
+      <button type="submit"
+        class="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-xl font-semibold text-sm transition-colors mt-2">
+        Se connecter
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════ DASHBOARD ══ -->
+<div id="dashboard" class="hidden min-h-screen">
+
+  <!-- Header -->
+  <header class="bg-white border-b border-gray-100 sticky top-0 z-10">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">🩸</span>
+        <div>
+          <span class="font-bold text-gray-900 text-lg">NikSanté</span>
+          <span class="text-gray-400 text-xs ml-2">Admin Dashboard</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-4 text-sm">
+        <span id="lastUpdate" class="text-gray-400 text-xs hidden md:block"></span>
+        <span id="liveIndicator"
+          class="flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-medium">
+          <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+          Temps réel
+        </span>
+        <button onclick="logout()"
+          class="text-red-500 hover:text-red-700 font-medium transition-colors">
+          Déconnexion
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-6 py-8 space-y-8">
+
+    <!-- ── Cartes résumé ── -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 fade-in">
+        <p class="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-2">👥 Utilisateurs</p>
+        <p id="stat-users" class="text-3xl font-bold text-gray-900">—</p>
+        <p id="stat-users-sub" class="text-xs text-emerald-600 mt-1 font-medium"></p>
+      </div>
+
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 fade-in">
+        <p class="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-2">📊 Mesures</p>
+        <p id="stat-meas" class="text-3xl font-bold text-gray-900">—</p>
+        <p id="stat-meas-sub" class="text-xs text-blue-500 mt-1 font-medium"></p>
+      </div>
+
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 fade-in">
+        <p class="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-2">✅ Actifs (7j)</p>
+        <p id="stat-active" class="text-3xl font-bold text-gray-900">—</p>
+        <p class="text-xs text-gray-400 mt-1">utilisateurs</p>
+      </div>
+
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 fade-in">
+        <p class="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-2">🩸 Glycémie moy.</p>
+        <p id="stat-avg" class="text-3xl font-bold text-gray-900">—</p>
+        <p class="text-xs text-gray-400 mt-1">mg/dL global</p>
+      </div>
+
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 fade-in">
+        <p class="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-2">🍎 Scans IA</p>
+        <p id="stat-scans" class="text-3xl font-bold text-gray-900">—</p>
+        <p class="text-xs text-gray-400 mt-1">alimentaires</p>
+      </div>
+
+      <div class="bg-green-50 border border-green-100 rounded-2xl shadow-sm p-5 fade-in">
+        <p class="text-xs text-green-700 font-semibold uppercase tracking-wide mb-2">🟢 Serveur</p>
+        <p class="text-xl font-bold text-green-700">En ligne</p>
+        <p id="stat-uptime" class="text-xs text-green-600 mt-1"></p>
+      </div>
+
+    </div>
+
+    <!-- ── Graphiques ── -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <h2 class="text-sm font-semibold text-gray-700 mb-5">📈 Activité — 7 derniers jours</h2>
+        <canvas id="activityChart" height="110"></canvas>
+      </div>
+
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <h2 class="text-sm font-semibold text-gray-700 mb-5">🩸 Répartition glycémique</h2>
+        <div class="flex justify-center">
+          <div style="max-width:200px;width:100%">
+            <canvas id="distChart"></canvas>
+          </div>
+        </div>
+        <div id="distLegend" class="flex justify-center gap-5 mt-4 text-xs text-gray-500"></div>
+      </div>
+
+    </div>
+
+    <!-- ── Tableau utilisateurs ── -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+      <div class="flex items-center justify-between mb-5">
+        <h2 class="text-sm font-semibold text-gray-700">👥 Utilisateurs inscrits</h2>
+        <span id="userCount" class="bg-gray-100 text-gray-500 text-xs px-3 py-1 rounded-full font-medium"></span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-gray-100 text-left">
+              <th class="pb-3 pr-6 text-xs text-gray-400 font-semibold uppercase tracking-wide">Nom</th>
+              <th class="pb-3 pr-6 text-xs text-gray-400 font-semibold uppercase tracking-wide">Email</th>
+              <th class="pb-3 pr-6 text-xs text-gray-400 font-semibold uppercase tracking-wide">Mesures</th>
+              <th class="pb-3 pr-6 text-xs text-gray-400 font-semibold uppercase tracking-wide">Moy. glycémie</th>
+              <th class="pb-3 pr-6 text-xs text-gray-400 font-semibold uppercase tracking-wide">Dernière mesure</th>
+              <th class="pb-3 text-xs text-gray-400 font-semibold uppercase tracking-wide">Inscrit le</th>
+            </tr>
+          </thead>
+          <tbody id="usersTable">
+            <tr>
+              <td colspan="6" class="py-10 text-center text-gray-300">
+                <span class="block text-3xl mb-2">⏳</span>Chargement…
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  // ── Config ─────────────────────────────────────────────────────────────────
+  const API_BASE = window.location.origin + '/api';
+  let token      = localStorage.getItem('niksante_admin_token');
+  let charts     = {};
+  let refreshInterval;
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+  token ? showDashboard() : showLogin();
+
+  document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+    const errEl    = document.getElementById('loginError');
+    errEl.classList.add('hidden');
+
+    try {
+      const res  = await fetch(`${API_BASE}/admin/login`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ username, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erreur inconnue');
+      token = data.token;
+      localStorage.setItem('niksante_admin_token', token);
+      showDashboard();
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.classList.remove('hidden');
+    }
+  });
+
+  // ── Navigation ─────────────────────────────────────────────────────────────
+  function showLogin() {
+    document.getElementById('loginScreen').classList.remove('hidden');
+    document.getElementById('dashboard').classList.add('hidden');
+    clearInterval(refreshInterval);
+  }
+
+  function showDashboard() {
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('dashboard').classList.remove('hidden');
+    try { initCharts(); } catch (e) { console.warn('[Admin] Charts non disponibles :', e.message); }
+    loadStats();
+    refreshInterval = setInterval(loadStats, 10_000);
+  }
+
+  function logout() {
+    localStorage.removeItem('niksante_admin_token');
+    token = null;
+    showLogin();
+  }
+
+  // ── Charts ─────────────────────────────────────────────────────────────────
+  function initCharts() {
+    // Détruire les charts existants avant de recréer (cas reconnexion)
+    if (charts.activity) { charts.activity.destroy(); charts.activity = null; }
+    if (charts.dist)     { charts.dist.destroy();     charts.dist     = null; }
+
+    charts.activity = new Chart(document.getElementById('activityChart'), {
+      type: 'bar',
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: 'Mesures glycémiques',
+            data: [],
+            backgroundColor: 'rgba(56,142,60,0.75)',
+            borderRadius: 6,
+            borderSkipped: false,
+          },
+          {
+            label: 'Nouvelles inscriptions',
+            data: [],
+            backgroundColor: 'rgba(21,101,192,0.65)',
+            borderRadius: 6,
+            borderSkipped: false,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 10 } } },
+        scales: {
+          y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } }, grid: { color: '#f3f4f6' } },
+          x: { ticks: { font: { size: 11 } }, grid: { display: false } },
+        },
+      },
+    });
+
+    charts.dist = new Chart(document.getElementById('distChart'), {
+      type: 'doughnut',
+      data: {
+        labels: ['Hypoglycémies', 'Normales', 'Hyperglycémies'],
+        datasets: [{
+          data: [0, 0, 0],
+          backgroundColor: ['#1565C0', '#388E3C', '#F57C00'],
+          borderWidth: 0,
+          hoverOffset: 6,
+        }],
+      },
+      options: {
+        responsive: true,
+        cutout: '68%',
+        plugins: { legend: { display: false }, tooltip: { callbacks: {
+          label: ctx => ` ${ctx.label}: ${ctx.raw} mesure(s)`,
+        }}},
+      },
+    });
+  }
+
+  // ── Fetch stats ─────────────────────────────────────────────────────────────
+  async function loadStats() {
+    try {
+      const res = await fetch(`${API_BASE}/admin/stats`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.status === 401) { logout(); return; }
+      const data = await res.json();
+      updateUI(data);
+    } catch (err) {
+      console.error('[Admin] Erreur chargement stats:', err);
+    }
+  }
+
+  // ── Update UI ──────────────────────────────────────────────────────────────
+  function updateUI({ summary, charts: ch, distribution, users: us, uptimeSeconds }) {
+
+    // Cartes résumé
+    setText('stat-users',    summary.totalUsers);
+    setText('stat-users-sub', `+${summary.todayNewUsers} aujourd'hui · ${summary.weeklyNewUsers} cette semaine`);
+    setText('stat-meas',     summary.totalMeasurements);
+    setText('stat-meas-sub', `+${summary.todayMeasurements} aujourd'hui`);
+    setText('stat-active',   summary.activeUsers);
+    setText('stat-avg',      summary.avgGlucose || '—');
+    setText('stat-scans',    summary.foodScans);
+    setText('stat-uptime',   formatUptime(uptimeSeconds));
+    setText('lastUpdate',    `Mis à jour à ${new Date().toLocaleTimeString('fr-FR')}`);
+
+    // Activity chart
+    if (charts.activity) {
+      const labels = ch.measurementsByDay.map(d => {
+        const dt = new Date(d.date + 'T12:00:00');
+        return dt.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' });
+      });
+      charts.activity.data.labels           = labels;
+      charts.activity.data.datasets[0].data = ch.measurementsByDay.map(d => d.count);
+      charts.activity.data.datasets[1].data = ch.registrationsByDay.map(d => d.count);
+      charts.activity.update('none');
+    }
+
+    // Distribution chart — segment gris si aucune donnée
+    const total = distribution.hypo + distribution.normal + distribution.hyper;
+    if (charts.dist) {
+      if (total === 0) {
+        charts.dist.data.datasets[0].data            = [1];
+        charts.dist.data.datasets[0].backgroundColor = ['#e5e7eb'];
+        charts.dist.data.labels                      = ['Aucune mesure'];
+      } else {
+        charts.dist.data.datasets[0].data            = [distribution.hypo, distribution.normal, distribution.hyper];
+        charts.dist.data.datasets[0].backgroundColor = ['#1565C0', '#388E3C', '#F57C00'];
+        charts.dist.data.labels                      = ['Hypoglycémies', 'Normales', 'Hyperglycémies'];
+      }
+      charts.dist.update('none');
+    }
+
+    // Distribution legend
+    const legendEl = document.getElementById('distLegend');
+    if (total === 0) {
+      legendEl.innerHTML = '<span class="text-gray-300 italic">Aucune mesure enregistrée</span>';
+    } else {
+      const colors = { Hypo: '#1565C0', Normal: '#388E3C', Hyper: '#F57C00' };
+      const distData = [
+        { label: 'Hypo',   value: distribution.hypo },
+        { label: 'Normal', value: distribution.normal },
+        { label: 'Hyper',  value: distribution.hyper },
+      ];
+      legendEl.innerHTML = distData.map(d => {
+        const pct = Math.round(d.value / total * 100);
+        return `<span class="flex items-center gap-1.5">
+          <span style="background:${colors[d.label]}" class="inline-block w-2.5 h-2.5 rounded-full"></span>
+          <span>${d.label} <b>${pct}%</b></span>
+        </span>`;
+      }).join('');
+    }
+
+    // Users table
+    document.getElementById('userCount').textContent = `${us.length} utilisateur${us.length !== 1 ? 's' : ''}`;
+    const tbody = document.getElementById('usersTable');
+
+    if (us.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" class="py-10 text-center text-gray-300">
+        <span class="block text-3xl mb-2">👤</span>Aucun utilisateur inscrit
+      </td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = us.map(u => {
+      const avgColor = !u.avgGlucose ? '#aaa'
+        : u.avgGlucose < 80  ? '#1565C0'
+        : u.avgGlucose <= 140 ? '#388E3C'
+        : '#F57C00';
+
+      return `<tr class="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+        <td class="py-3.5 pr-6 font-semibold text-gray-800">${escHtml(u.name)}</td>
+        <td class="py-3.5 pr-6 text-gray-500 text-xs">${escHtml(u.email)}</td>
+        <td class="py-3.5 pr-6">
+          <span class="bg-green-50 text-green-700 px-2.5 py-0.5 rounded-full text-xs font-bold">
+            ${u.measurementCount}
+          </span>
+        </td>
+        <td class="py-3.5 pr-6">
+          ${u.avgGlucose
+            ? `<span style="color:${avgColor}" class="font-semibold text-sm">${u.avgGlucose} mg/dL</span>`
+            : '<span class="text-gray-300">—</span>'}
+        </td>
+        <td class="py-3.5 pr-6 text-gray-400 text-xs">
+          ${u.lastMeasurement ? new Date(u.lastMeasurement).toLocaleString('fr-FR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '—'}
+        </td>
+        <td class="py-3.5 text-gray-400 text-xs">
+          ${new Date(u.createdAt).toLocaleDateString('fr-FR')}
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  function setText(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function formatUptime(s) {
+    if (!s) return '';
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    if (h > 0) return `Uptime : ${h}h ${m}min`;
+    return `Uptime : ${m}min`;
+  }
+</script>
+</body>
+</html>

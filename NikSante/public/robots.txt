@@ -1,0 +1,46 @@
+# NikSanté — robots.txt
+# Autorise tous les moteurs de recherche et crawlers IA (ChatGPT, Perplexity, etc.)
+
+User-agent: *
+Allow: /
+Allow: /login
+Allow: /register
+
+# Pages nécessitant une authentification — inutile à indexer
+Disallow: /(tabs)/
+Disallow: /dashboard
+Disallow: /add-glucose
+Disallow: /history
+Disallow: /food-scan
+Disallow: /gamification
+Disallow: /mental-health
+Disallow: /profile
+Disallow: /emergency
+
+# Autoriser les crawlers IA spécifiquement
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: Applebot
+Allow: /
+
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+# Sitemap
+Sitemap: https://niksante.app/sitemap.xml

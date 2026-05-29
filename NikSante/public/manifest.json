@@ -1,0 +1,47 @@
+{
+  "name": "NikSanté – Suivi de Glycémie & Diabète",
+  "short_name": "NikSanté",
+  "description": "Application mobile gratuite de suivi du diabète : enregistrement de glycémie, scanner alimentaire IA, rappels de mesure et conseils d'urgence.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f5f5f5",
+  "theme_color": "#388E3C",
+  "lang": "fr",
+  "dir": "ltr",
+  "categories": ["health", "medical", "lifestyle"],
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "label": "Tableau de bord NikSanté"
+    }
+  ],
+  "related_applications": [
+    {
+      "platform": "play",
+      "url": "https://play.google.com/store/apps/details?id=com.niksante.app",
+      "id": "com.niksante.app"
+    },
+    {
+      "platform": "itunes",
+      "url": "https://apps.apple.com/app/niksante/id0000000000"
+    }
+  ],
+  "prefer_related_applications": false
+}
