@@ -1,6 +1,6 @@
 const express        = require('express');
 const authMiddleware = require('../middleware/auth');
-const { stats }      = require('../config/database');
+const { pool }       = require('../config/database');
 
 const router = express.Router();
 router.use(authMiddleware);
@@ -156,7 +156,7 @@ router.post('/detect', async (req, res) => {
       result = simulateDetection();
     }
 
-    stats.foodScans++;
+    pool.query("UPDATE stats SET value = value + 1 WHERE key = 'food_scans'").catch(() => {});
     res.json(result);
   } catch (err) {
     console.error('[FoodDetect] Erreur OpenAI — passage en simulation :', err.message);

@@ -1,93 +1,121 @@
 const express        = require('express');
 const { v4: uuidv4 } = require('uuid');
 const authMiddleware = require('../middleware/auth');
-const { glucose }    = require('../config/database');
+const { pool }       = require('../config/database');
 
 const router = express.Router();
 router.use(authMiddleware);
 
-const VALID_MEAL_CONTEXTS = ['fasting', 'before_meal', 'after_meal', 'bedtime', 'sport', null];
+const VALID_MEAL_CONTEXTS = ['fasting', 'before_meal', 'after_meal', 'bedtime', 'sport'];
+
+// Convertit une ligne PostgreSQL (snake_case) en objet attendu par le frontend
+function toEntry(row) {
+  return {
+    id:          row.id,
+    userId:      row.user_id,
+    value:       row.value,
+    date:        row.date,
+    note:        row.note,
+    mealContext: row.meal_context,
+    createdAt:   row.created_at,
+  };
+}
 
 // GET /api/glucose
-router.get('/', (req, res) => {
-  const entries = glucose.get(req.user.id) || [];
-  res.json(entries);
+router.get('/', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM glucose_entries WHERE user_id = $1 ORDER BY date DESC',
+      [req.user.id]
+    );
+    res.json(result.rows.map(toEntry));
+  } catch (err) {
+    console.error('[Glucose] GET:', err.message);
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
 });
 
 // POST /api/glucose
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   const { value, date, note, mealContext } = req.body;
 
-  // ── Valeur glycémique ──
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 20 || value > 600) {
     return res.status(400).json({ error: 'Valeur glycémique invalide (20–600 mg/dL)' });
   }
 
-  // ── Date ──
   if (date !== undefined) {
     const parsed = new Date(date);
     if (isNaN(parsed.getTime())) {
       return res.status(400).json({ error: 'Date invalide' });
     }
-    // Refuser les dates dans le futur (> 1 min de tolérance)
     if (parsed.getTime() > Date.now() + 60_000) {
       return res.status(400).json({ error: 'La date ne peut pas être dans le futur' });
     }
   }
 
-  // ── Note ──
   if (note !== undefined && note !== null) {
     if (typeof note !== 'string' || note.length > 500) {
       return res.status(400).json({ error: 'Note invalide (max 500 caractères)' });
     }
   }
 
-  // ── Contexte repas ──
-  if (!VALID_MEAL_CONTEXTS.includes(mealContext ?? null)) {
+  if (mealContext !== undefined && mealContext !== null && !VALID_MEAL_CONTEXTS.includes(mealContext)) {
     return res.status(400).json({ error: 'Contexte repas invalide' });
   }
 
-  const entry = {
-    id:          uuidv4(),
-    userId:      req.user.id,
-    value:       Math.round(value),
-    date:        date || new Date().toISOString(),
-    note:        (note?.trim()) || null,
-    mealContext: mealContext || null,
-    createdAt:   new Date().toISOString(),
-  };
-
-  const entries = glucose.get(req.user.id) || [];
-  entries.unshift(entry);
-  glucose.set(req.user.id, entries);
-
-  res.status(201).json(entry);
+  try {
+    const result = await pool.query(
+      `INSERT INTO glucose_entries (id, user_id, value, date, note, meal_context)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [
+        uuidv4(),
+        req.user.id,
+        Math.round(value),
+        date || new Date().toISOString(),
+        note?.trim() || null,
+        mealContext || null,
+      ]
+    );
+    res.status(201).json(toEntry(result.rows[0]));
+  } catch (err) {
+    console.error('[Glucose] POST:', err.message);
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
 });
 
 // DELETE /api/glucose/:id
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
   const { id } = req.params;
 
-  // Validation basique de l'ID (UUID v4)
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
     return res.status(400).json({ error: 'ID invalide' });
   }
 
-  const entries  = glucose.get(req.user.id) || [];
-  const filtered = entries.filter((e) => e.id !== id);
-
-  if (filtered.length === entries.length) {
-    return res.status(404).json({ error: 'Mesure introuvable' });
+  try {
+    const result = await pool.query(
+      'DELETE FROM glucose_entries WHERE id = $1 AND user_id = $2 RETURNING id',
+      [id, req.user.id]
+    );
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Mesure introuvable' });
+    }
+    res.json({ message: 'Mesure supprimée' });
+  } catch (err) {
+    console.error('[Glucose] DELETE:', err.message);
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
-
-  glucose.set(req.user.id, filtered);
-  res.json({ message: 'Mesure supprimée' });
 });
 
 // DELETE /api/glucose
-router.delete('/', (req, res) => {
-  glucose.set(req.user.id, []);
-  res.json({ message: 'Historique vidé' });
+router.delete('/', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM glucose_entries WHERE user_id = $1', [req.user.id]);
+    res.json({ message: 'Historique vidé' });
+  } catch (err) {
+    console.error('[Glucose] DELETE ALL:', err.message);
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
 });
 
 module.exports = router;

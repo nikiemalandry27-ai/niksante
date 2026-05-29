@@ -1,24 +1,30 @@
-const express = require('express');
-const crypto  = require('crypto');
-const jwt     = require('jsonwebtoken');
-const { users, glucose, stats } = require('../config/database');
+const express  = require('express');
+const crypto   = require('crypto');
+const jwt      = require('jsonwebtoken');
+const { pool } = require('../config/database');
 
-const router = express.Router();
+const router     = express.Router();
 const SECRET     = process.env.JWT_SECRET     || 'niksante_dev_secret';
 const ADMIN_USER = process.env.ADMIN_USERNAME || 'admin';
 const ADMIN_PASS = process.env.ADMIN_PASSWORD || 'niksante2024';
 
+const SERVER_START = new Date();
+
 // ---------------------------------------------------------------------------
-// Comparaison timing-safe (protège contre les timing attacks)
+// Helpers
 // ---------------------------------------------------------------------------
 
 function safeEqual(a, b) {
-  // Même longueur de buffer obligatoire pour timingSafeEqual
   const bufA = Buffer.alloc(64);
   const bufB = Buffer.alloc(64);
   bufA.write(a);
   bufB.write(b);
   return crypto.timingSafeEqual(bufA, bufB);
+}
+
+function maskEmail(email) {
+  const [local, domain] = email.split('@');
+  return `${local[0]}${'*'.repeat(Math.min(local.length - 1, 5))}@${domain}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -50,7 +56,6 @@ router.post('/login', (req, res) => {
     return res.status(400).json({ error: 'Données invalides' });
   }
 
-  // Comparaison timing-safe sur les deux champs
   const userOk = safeEqual(username, ADMIN_USER);
   const passOk = safeEqual(password, ADMIN_PASS);
 
@@ -66,88 +71,108 @@ router.post('/login', (req, res) => {
 // GET /api/admin/stats
 // ---------------------------------------------------------------------------
 
-router.get('/stats', adminAuth, (req, res) => {
-  const now     = new Date();
-  const today   = now.toDateString();
-  const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
+router.get('/stats', adminAuth, async (req, res) => {
+  try {
+    const now     = new Date();
+    const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
 
-  const allUsers   = [...users.values()];
-  const allGlucose = [...glucose.values()].flat();
+    const [
+      totalUsersRes,
+      totalMeasRes,
+      todayMeasRes,
+      todayUsersRes,
+      weekUsersRes,
+      avgGlucoseRes,
+      activeUsersRes,
+      foodScansRes,
+      measByDayRes,
+      regByDayRes,
+      distRes,
+      userRowsRes,
+    ] = await Promise.all([
+      pool.query('SELECT COUNT(*) FROM users'),
+      pool.query('SELECT COUNT(*) FROM glucose_entries'),
+      pool.query("SELECT COUNT(*) FROM glucose_entries WHERE DATE(date) = CURRENT_DATE"),
+      pool.query("SELECT COUNT(*) FROM users WHERE DATE(created_at) = CURRENT_DATE"),
+      pool.query('SELECT COUNT(*) FROM users WHERE created_at >= $1', [weekAgo]),
+      pool.query('SELECT ROUND(AVG(value)) as avg FROM glucose_entries'),
+      pool.query('SELECT COUNT(DISTINCT user_id) FROM glucose_entries WHERE date >= $1', [weekAgo]),
+      pool.query("SELECT value FROM stats WHERE key = 'food_scans'"),
+      pool.query(`
+        SELECT TO_CHAR(date AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day, COUNT(*) AS count
+        FROM glucose_entries WHERE date >= $1
+        GROUP BY day ORDER BY day
+      `, [weekAgo]),
+      pool.query(`
+        SELECT TO_CHAR(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day, COUNT(*) AS count
+        FROM users WHERE created_at >= $1
+        GROUP BY day ORDER BY day
+      `, [weekAgo]),
+      pool.query(`
+        SELECT
+          SUM(CASE WHEN value < 80              THEN 1 ELSE 0 END) AS hypo,
+          SUM(CASE WHEN value BETWEEN 80 AND 140 THEN 1 ELSE 0 END) AS normal,
+          SUM(CASE WHEN value > 140             THEN 1 ELSE 0 END) AS hyper
+        FROM glucose_entries
+      `),
+      pool.query(`
+        SELECT u.name, u.email, u.created_at,
+          COUNT(g.id)::int        AS measurement_count,
+          MAX(g.date)             AS last_measurement,
+          ROUND(AVG(g.value))     AS avg_glucose
+        FROM users u
+        LEFT JOIN glucose_entries g ON g.user_id = u.id
+        GROUP BY u.id
+        ORDER BY measurement_count DESC
+      `),
+    ]);
 
-  const totalUsers        = allUsers.length;
-  const totalMeasurements = allGlucose.length;
-  const todayMeasurements = allGlucose.filter(g => new Date(g.date).toDateString() === today).length;
-  const todayNewUsers     = allUsers.filter(u => new Date(u.createdAt).toDateString() === today).length;
-  const weeklyNewUsers    = allUsers.filter(u => new Date(u.createdAt) >= weekAgo).length;
+    // Construit les tableaux des 7 derniers jours
+    const last7 = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(now);
+      d.setDate(d.getDate() - (6 - i));
+      return d.toISOString().split('T')[0];
+    });
 
-  const avgGlucose = allGlucose.length > 0
-    ? Math.round(allGlucose.reduce((s, g) => s + g.value, 0) / allGlucose.length)
-    : 0;
+    const measMap = Object.fromEntries(measByDayRes.rows.map(r => [r.day, parseInt(r.count)]));
+    const regMap  = Object.fromEntries(regByDayRes.rows.map(r  => [r.day, parseInt(r.count)]));
+    const dist    = distRes.rows[0];
 
-  const activeUserIds = new Set(
-    allGlucose.filter(g => new Date(g.date) >= weekAgo).map(g => g.userId)
-  );
-
-  const last7 = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(now);
-    d.setDate(d.getDate() - (6 - i));
-    return d.toISOString().split('T')[0];
-  });
-
-  const measurementsByDay  = last7.map(day => ({
-    date:  day,
-    count: allGlucose.filter(g => g.date.startsWith(day)).length,
-  }));
-  const registrationsByDay = last7.map(day => ({
-    date:  day,
-    count: allUsers.filter(u => u.createdAt.startsWith(day)).length,
-  }));
-
-  const distribution = {
-    hypo:   allGlucose.filter(g => g.value < 80).length,
-    normal: allGlucose.filter(g => g.value >= 80 && g.value <= 140).length,
-    hyper:  allGlucose.filter(g => g.value > 140).length,
-  };
-
-  // Email masqué dans la réponse : j*****@domain.com
-  const maskEmail = (email) => {
-    const [local, domain] = email.split('@');
-    return `${local[0]}${'*'.repeat(Math.min(local.length - 1, 5))}@${domain}`;
-  };
-
-  const userRows = allUsers.map(u => {
-    const entries = glucose.get(u.id) || [];
-    return {
-      name:             u.name,
-      email:            maskEmail(u.email),
-      createdAt:        u.createdAt,
-      measurementCount: entries.length,
-      lastMeasurement:  entries[0]?.date || null,
-      avgGlucose:       entries.length > 0
-        ? Math.round(entries.reduce((s, e) => s + e.value, 0) / entries.length)
-        : null,
-    };
-  }).sort((a, b) => b.measurementCount - a.measurementCount);
-
-  const uptimeSeconds = Math.floor((now - stats.startTime) / 1000);
-
-  res.json({
-    summary: {
-      totalUsers,
-      totalMeasurements,
-      todayMeasurements,
-      todayNewUsers,
-      weeklyNewUsers,
-      avgGlucose,
-      activeUsers:  activeUserIds.size,
-      foodScans:    stats.foodScans,
-    },
-    charts:       { measurementsByDay, registrationsByDay },
-    distribution,
-    users:        userRows,
-    uptimeSeconds,
-    updatedAt:    now.toISOString(),
-  });
+    res.json({
+      summary: {
+        totalUsers:        parseInt(totalUsersRes.rows[0].count),
+        totalMeasurements: parseInt(totalMeasRes.rows[0].count),
+        todayMeasurements: parseInt(todayMeasRes.rows[0].count),
+        todayNewUsers:     parseInt(todayUsersRes.rows[0].count),
+        weeklyNewUsers:    parseInt(weekUsersRes.rows[0].count),
+        avgGlucose:        parseInt(avgGlucoseRes.rows[0].avg) || 0,
+        activeUsers:       parseInt(activeUsersRes.rows[0].count),
+        foodScans:         parseInt(foodScansRes.rows[0]?.value ?? 0),
+      },
+      charts: {
+        measurementsByDay:  last7.map(day => ({ date: day, count: measMap[day] || 0 })),
+        registrationsByDay: last7.map(day => ({ date: day, count: regMap[day]  || 0 })),
+      },
+      distribution: {
+        hypo:   parseInt(dist.hypo   || 0),
+        normal: parseInt(dist.normal || 0),
+        hyper:  parseInt(dist.hyper  || 0),
+      },
+      users: userRowsRes.rows.map(u => ({
+        name:             u.name,
+        email:            maskEmail(u.email),
+        createdAt:        u.created_at,
+        measurementCount: u.measurement_count,
+        lastMeasurement:  u.last_measurement || null,
+        avgGlucose:       u.avg_glucose ? parseInt(u.avg_glucose) : null,
+      })),
+      uptimeSeconds: Math.floor((now - SERVER_START) / 1000),
+      updatedAt:     now.toISOString(),
+    });
+  } catch (err) {
+    console.error('[Admin] Stats:', err.message);
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
 });
 
 module.exports = router;

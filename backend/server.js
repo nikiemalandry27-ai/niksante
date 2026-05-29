@@ -5,10 +5,11 @@ const cors         = require('cors');
 const helmet       = require('helmet');
 const rateLimit    = require('express-rate-limit');
 const path         = require('path');
-const authRoutes   = require('./routes/auth');
-const glucoseRoutes = require('./routes/glucose');
-const foodRoutes   = require('./routes/food');
-const adminRoutes  = require('./routes/admin');
+const { createTables } = require('./config/database');
+const authRoutes       = require('./routes/auth');
+const glucoseRoutes    = require('./routes/glucose');
+const foodRoutes       = require('./routes/food');
+const adminRoutes      = require('./routes/admin');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -116,10 +117,17 @@ app.use((err, _req, res, _next) => {
 });
 
 // ── Démarrage ────────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`\n🩺 NikSanté API démarrée sur http://localhost:${PORT}`);
-  console.log(`   POST /api/auth/register  |  /api/auth/login`);
-  console.log(`   GET  /api/glucose        |  POST /api/glucose`);
-  console.log(`   POST /api/food/detect`);
-  console.log(`   📊   http://localhost:${PORT}/admin\n`);
-});
+createTables()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`\n🩺 NikSanté API démarrée sur http://localhost:${PORT}`);
+      console.log(`   POST /api/auth/register  |  /api/auth/login`);
+      console.log(`   GET  /api/glucose        |  POST /api/glucose`);
+      console.log(`   POST /api/food/detect`);
+      console.log(`   📊   http://localhost:${PORT}/admin\n`);
+    });
+  })
+  .catch((err) => {
+    console.error('[Démarrage] Échec connexion base de données :', err.message);
+    process.exit(1);
+  });
