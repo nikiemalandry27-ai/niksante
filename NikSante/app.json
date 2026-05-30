@@ -8,7 +8,15 @@
     "scheme": "niksante",
     "userInterfaceStyle": "automatic",
     "description": "Application mobile gratuite de suivi du diabète : enregistrement de glycémie, scanner alimentaire IA, rappels de mesure, tableaux de bord et conseils d'urgence hypoglycémie / hyperglycémie.",
-    "keywords": ["diabète", "glycémie", "suivi diabète", "hypoglycémie", "hyperglycémie", "santé", "insuline"],
+    "keywords": [
+      "diabète",
+      "glycémie",
+      "suivi diabète",
+      "hypoglycémie",
+      "hyperglycémie",
+      "santé",
+      "insuline"
+    ],
     "primaryColor": "#388E3C",
     "ios": {
       "icon": "./assets/expo.icon",
@@ -56,6 +64,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "7cc85ca2-aca8-433c-bf36-47d4c258706c"
+      }
+    },
+    "owner": "nikiemalandry"
   }
 }
