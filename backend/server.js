@@ -85,7 +85,6 @@ const globalLimiter = rateLimit({
 });
 
 // ── Middlewares globaux ──────────────────────────────────────────────────────
-app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(globalLimiter);
 
@@ -97,9 +96,11 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
-app.use('/api/auth',    authLimiter, authRoutes);
-app.use('/api/glucose', glucoseRoutes);
-app.use('/api/food',    foodLimiter, foodRoutes);
+// CORS appliqué uniquement aux routes appelées depuis l'app mobile
+app.use('/api/auth',    cors(corsOptions), authLimiter, authRoutes);
+app.use('/api/glucose', cors(corsOptions), glucoseRoutes);
+app.use('/api/food',    cors(corsOptions), foodLimiter, foodRoutes);
+// /api/admin n'a pas besoin de CORS — appelé uniquement depuis la même page serveur
 app.use('/api/admin',   adminRoutes);
 
 // ── 404 catch-all ───────────────────────────────────────────────────────────
