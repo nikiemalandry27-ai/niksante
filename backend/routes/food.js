@@ -132,8 +132,10 @@ router.post('/detect', async (req, res) => {
     return res.status(400).json({ error: 'imageBase64 doit être une chaîne de caractères' });
   }
 
-  // Supprimer le préfixe data URI éventuel avant validation
-  const rawB64 = imageBase64.replace(/^data:image\/[a-z]+;base64,/i, '');
+  // Supprimer le préfixe data URI éventuel et les sauts de ligne (certains encodeurs les insèrent)
+  const rawB64 = imageBase64
+    .replace(/^data:image\/[a-z]+;base64,/i, '')
+    .replace(/[\r\n\s]/g, '');
 
   if (!BASE64_RE.test(rawB64)) {
     return res.status(400).json({ error: 'Format base64 invalide' });
