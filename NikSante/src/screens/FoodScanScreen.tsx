@@ -21,6 +21,7 @@ import {
   Image,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as FileSystem from 'expo-file-system/legacy';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
@@ -43,29 +44,35 @@ export default function FoodScanScreen() {
   const cameraRef  = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
 
-  const [phase,    setPhase]   = useState<Phase>('camera');
-  const [result,   setResult]  = useState<DetectedFood | null>(null);
-  const [photoUri, setPhotoUri] = useState<string | null>(null);
-  const [errMsg,   setErrMsg]  = useState<string | null>(null);
+  const [phase,       setPhase]       = useState<Phase>('camera');
+  const [result,      setResult]      = useState<DetectedFood | null>(null);
+  const [photoUri,    setPhotoUri]    = useState<string | null>(null);
+  const [errMsg,      setErrMsg]      = useState<string | null>(null);
+  const [cameraReady, setCameraReady] = useState(false);
 
   // ── Capture + détection ─────────────────────────────────────────────────
 
   const handleCapture = async () => {
-    if (!cameraRef.current) return;
+    if (!cameraRef.current || !cameraReady) return;
     setErrMsg(null);
-    setPhase('analyzing');
 
     try {
+      // Capture AVANT de démonter la caméra (setPhase change le rendu)
       const photo = await cameraRef.current.takePictureAsync({
-        quality:  0.5,
-        base64:   true,
+        quality: 0.4,
+        skipProcessing: true,
       });
 
       setPhotoUri(photo.uri);
+      setPhase('analyzing'); // Seulement après la capture
 
-      if (!photo.base64) throw new Error('Base64 manquant');
+      const base64 = await FileSystem.readAsStringAsync(photo.uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
 
-      const detected = await foodService.detect(photo.base64);
+      if (!base64) throw new Error('Base64 manquant');
+
+      const detected = await foodService.detect(base64);
       setResult(detected);
       setPhase('result');
     } catch (e: any) {
@@ -217,7 +224,12 @@ export default function FoodScanScreen() {
 
   return (
     <View style={styles.cameraContainer}>
-      <CameraView ref={cameraRef} style={styles.camera} facing="back" />
+      <CameraView
+        ref={cameraRef}
+        style={styles.camera}
+        facing="back"
+        onCameraReady={() => setCameraReady(true)}
+      />
 
       {/* Cadre de visée */}
       <View style={styles.aimFrame}>
@@ -237,10 +249,16 @@ export default function FoodScanScreen() {
 
       {/* Bouton capture */}
       <View style={styles.captureBar}>
-        <TouchableOpacity style={styles.captureBtn} onPress={handleCapture}>
+        <TouchableOpacity
+          style={[styles.captureBtn, !cameraReady && { opacity: 0.4 }]}
+          onPress={handleCapture}
+          disabled={!cameraReady}
+        >
           <View style={styles.captureBtnInner} />
         </TouchableOpacity>
-        <ThemedText style={styles.captureHint}>Appuyez pour analyser</ThemedText>
+        <ThemedText style={styles.captureHint}>
+          {cameraReady ? 'Appuyez pour analyser' : 'Caméra en cours…'}
+        </ThemedText>
       </View>
     </View>
   );
