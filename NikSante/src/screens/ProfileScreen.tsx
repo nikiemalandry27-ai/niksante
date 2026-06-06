@@ -21,6 +21,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import Constants from 'expo-constants';
+
 import { useAuthStore }    from '@/store/authStore';
 import { useGlucoseStore } from '@/store/glucoseStore';
 import { getGlucoseStatus, getStatusColor } from '@/utils/glucoseHelper';
@@ -363,7 +365,7 @@ export default function ProfileScreen() {
 
         {/* ── Version ── */}
         <View style={styles.versionSection}>
-          <ThemedText style={styles.versionText}>NikSanté v1.0.0</ThemedText>
+          <ThemedText style={styles.versionText}>NikSanté v{Constants.expoConfig?.version ?? '1.0.0'}</ThemedText>
           <ThemedText style={styles.versionSub}>
             Application de suivi du diabète
           </ThemedText>
