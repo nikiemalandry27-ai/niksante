@@ -59,24 +59,33 @@ Réponds UNIQUEMENT avec un objet JSON valide (sans markdown) :
   "confidence": <0.0 à 1.0>
 }`;
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'text', text: prompt },
-          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}`, detail: 'low' } },
-        ],
-      }],
-      max_tokens: 300,
-    }),
-  });
+  const controller = new AbortController();
+  const timeoutId  = setTimeout(() => controller.abort(), 25_000);
+
+  let response;
+  try {
+    response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}`, detail: 'low' } },
+          ],
+        }],
+        max_tokens: 300,
+      }),
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
     const errBody = await response.text();
@@ -151,7 +160,7 @@ router.post('/detect', async (req, res) => {
     let result;
 
     if (process.env.OPENAI_API_KEY) {
-      result = await detectWithOpenAI(imageBase64);
+      result = await detectWithOpenAI(rawB64);
     } else {
       // Simulation réaliste avec délai pour reproduire le comportement réel
       await new Promise((r) => setTimeout(r, 1200));

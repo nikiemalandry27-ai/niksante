@@ -69,7 +69,9 @@ export default function FoodScanScreen() {
       setResult(detected);
       setPhase('result');
     } catch (e: any) {
-      setErrMsg('Détection impossible. Vérifiez votre connexion et réessayez.');
+      console.error('[FoodScan] Erreur:', e?.message, e?.response?.status, e?.response?.data);
+      const msg = e?.response?.data?.error ?? e?.message ?? 'Erreur inconnue';
+      setErrMsg(`Détection impossible : ${msg}`);
       setPhase('camera');
     }
   };
