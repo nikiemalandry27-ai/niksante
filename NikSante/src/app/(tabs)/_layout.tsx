@@ -5,23 +5,31 @@
  */
 
 import { Tabs } from 'expo-router';
-import { Image, Text, useColorScheme } from 'react-native';
+import { Image, Platform, Text, useColorScheme } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabsLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const insets = useSafeAreaInsets();
+
+  // Sur Android, on garantit au minimum 20dp pour couvrir la barre de navigation
+  const bottomPad = Platform.OS === 'android'
+    ? Math.max(insets.bottom, 58)
+    : (insets.bottom || 6);
 
   const tabBarStyle = {
     backgroundColor: isDark ? '#1a1a1a' : '#fff',
     borderTopColor:  isDark ? '#333' : '#eee',
     borderTopWidth:  1,
-    paddingBottom:   6,
-    paddingTop:      4,
-    height:          64,
+    paddingTop:      6,
+    paddingBottom:   bottomPad,
+    height:          60 + bottomPad,
   } as const;
 
   return (
     <Tabs
+      safeAreaInsets={{ bottom: 0 }}
       screenOptions={{
         headerShown:             false,
         tabBarActiveTintColor:   '#388E3C',
