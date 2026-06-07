@@ -145,4 +145,42 @@ export const foodService = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Glycemic Analysis Service
+// ---------------------------------------------------------------------------
+
+export interface GlycemicResult {
+  food:                  string;
+  category_resolved:     string;
+  category_description:  string;
+  glycemic_index:        number;
+  carbs_used:            number;
+  glycemic_load:         number;
+  label_carbs_per_100g:  number | null;
+  label_sugars_per_100g: number | null;
+  carbs_source:          'label_ocr' | 'category_db';
+  extraction_source:     'label' | 'partial' | 'no_label';
+  impact_mg_dl:          { min: number; max: number };
+  impact_level:          'None' | 'Low' | 'Moderate' | 'High';
+  confidence_score:      number;
+  advice:                string;
+}
+
+export const glycemicService = {
+  analyzeImage: async (
+    imageBase64:        string,
+    quantity_grams      = 150,
+    diabetic            = true,
+    insulin_sensitivity = 'normal',
+  ): Promise<GlycemicResult> => {
+    const { data } = await api.post<GlycemicResult>('/glycemic/analyze-image', {
+      imageBase64,
+      quantity_grams,
+      diabetic,
+      insulin_sensitivity,
+    });
+    return data;
+  },
+};
+
 export default api;

@@ -1,16 +1,3 @@
-/**
- * NikSanté — FoodScanScreen
- *
- * Scanne un aliment avec la caméra → détection IA → infos nutritionnelles
- * + impact glycémique estimé pour les patients diabétiques.
- *
- * Flux :
- *  1. Demande de permission caméra
- *  2. Prévisualisation caméra + bouton capture
- *  3. Animation "Analyse en cours…"
- *  4. Résultats : aliment détecté + nutrition + conseils
- */
-
 import { useRef, useState } from 'react';
 import {
   View,
@@ -23,9 +10,8 @@ import {
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as FileSystem from 'expo-file-system/legacy';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 
-import { foodService, DetectedFood } from '@/services/api';
+import { glycemicService, GlycemicResult } from '@/services/api';
 import { ThemedText } from '@/components/themed-text';
 import { s, fs, vs } from '@/utils/responsive';
 
@@ -35,36 +21,52 @@ import { s, fs, vs } from '@/utils/responsive';
 
 type Phase = 'camera' | 'analyzing' | 'result';
 
+function impactColor(level: GlycemicResult['impact_level']): string {
+  switch (level) {
+    case 'None':     return '#9E9E9E';
+    case 'Low':      return '#388E3C';
+    case 'Moderate': return '#F57C00';
+    case 'High':     return '#B71C1C';
+  }
+}
+
+function impactLabel(level: GlycemicResult['impact_level']): string {
+  switch (level) {
+    case 'None':     return 'Nul';
+    case 'Low':      return 'Faible';
+    case 'Moderate': return 'Modéré';
+    case 'High':     return 'Élevé';
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Composant
 // ---------------------------------------------------------------------------
 
 export default function FoodScanScreen() {
-  const router     = useRouter();
   const cameraRef  = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
 
   const [phase,       setPhase]       = useState<Phase>('camera');
-  const [result,      setResult]      = useState<DetectedFood | null>(null);
+  const [result,      setResult]      = useState<GlycemicResult | null>(null);
   const [photoUri,    setPhotoUri]    = useState<string | null>(null);
   const [errMsg,      setErrMsg]      = useState<string | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
 
-  // ── Capture + détection ─────────────────────────────────────────────────
+  // ── Capture + analyse ───────────────────────────────────────────────────
 
   const handleCapture = async () => {
     if (!cameraRef.current || !cameraReady) return;
     setErrMsg(null);
 
     try {
-      // Capture AVANT de démonter la caméra (setPhase change le rendu)
       const photo = await cameraRef.current.takePictureAsync({
         quality: 0.4,
         skipProcessing: true,
       });
 
       setPhotoUri(photo.uri);
-      setPhase('analyzing'); // Seulement après la capture
+      setPhase('analyzing');
 
       const base64 = await FileSystem.readAsStringAsync(photo.uri, {
         encoding: FileSystem.EncodingType.Base64,
@@ -72,8 +74,8 @@ export default function FoodScanScreen() {
 
       if (!base64) throw new Error('Base64 manquant');
 
-      const detected = await foodService.detect(base64);
-      setResult(detected);
+      const analyzed = await glycemicService.analyzeImage(base64);
+      setResult(analyzed);
       setPhase('result');
     } catch (e: any) {
       console.error('[FoodScan] Erreur:', e?.message, e?.response?.status, e?.response?.data);
@@ -137,77 +139,94 @@ export default function FoodScanScreen() {
   // ── Résultats ────────────────────────────────────────────────────────────
 
   if (phase === 'result' && result) {
-    const estimatedRiseMin = Math.round(result.carbs * 2.5);
-    const estimatedRiseMax = Math.round(result.carbs * 4.5);
+    const color = impactColor(result.impact_level);
 
     return (
       <SafeAreaView style={styles.container}>
-        {/* Miniature photo */}
         {photoUri && (
           <Image source={{ uri: photoUri }} style={styles.resultPhoto} />
         )}
 
         <ScrollView showsVerticalScrollIndicator={false}>
+
           {/* Aliment détecté */}
-          <View style={[styles.detectedCard, { borderLeftColor: result.impactColor }]}>
+          <View style={[styles.detectedCard, { borderLeftColor: color }]}>
             <View style={styles.detectedHeader}>
               <View style={{ flex: 1 }}>
-                <ThemedText style={styles.detectedLabel}>ALIMENT DÉTECTÉ</ThemedText>
-                <ThemedText style={styles.detectedName}>{result.name}</ThemedText>
+                <ThemedText style={styles.sectionLabel}>ALIMENT DÉTECTÉ</ThemedText>
+                <ThemedText style={styles.detectedName}>{result.food}</ThemedText>
+                <ThemedText style={styles.categoryDesc}>{result.category_description}</ThemedText>
               </View>
-              <View style={[styles.confidenceBadge, { backgroundColor: result.impactColor + '20', borderColor: result.impactColor }]}>
-                <ThemedText style={[styles.confidenceText, { color: result.impactColor }]}>
-                  {Math.round(result.confidence * 100)}%
+              <View style={[styles.confidenceBadge, { backgroundColor: color + '20', borderColor: color }]}>
+                <ThemedText style={[styles.confidenceText, { color }]}>
+                  {Math.round(result.confidence_score * 100)}%
                 </ThemedText>
               </View>
             </View>
-
           </View>
 
           {/* Impact glycémique */}
-          <View style={[styles.impactCard, { borderLeftColor: result.impactColor }]}>
-            <ThemedText style={styles.impactLabel}>IMPACT GLYCÉMIQUE ESTIMÉ</ThemedText>
+          <View style={[styles.impactCard, { borderLeftColor: color }]}>
+            <ThemedText style={styles.sectionLabel}>IMPACT GLYCÉMIQUE ESTIMÉ</ThemedText>
             <View style={styles.impactRow}>
-              <ThemedText style={[styles.impactValue, { color: result.impactColor }]}>
-                {result.carbs === 0 ? 'Nul' : `+${estimatedRiseMin}–${estimatedRiseMax} mg/dL`}
+              <ThemedText style={[styles.impactValue, { color }]}>
+                {result.impact_level === 'None'
+                  ? 'Nul'
+                  : `+${result.impact_mg_dl.min}–${result.impact_mg_dl.max} mg/dL`}
               </ThemedText>
-              <View style={[styles.impactBadge, { backgroundColor: result.impactColor + '20', borderColor: result.impactColor }]}>
-                <ThemedText style={[styles.impactBadgeText, { color: result.impactColor }]}>
-                  {result.impact}
+              <View style={[styles.impactBadge, { backgroundColor: color + '20', borderColor: color }]}>
+                <ThemedText style={[styles.impactBadgeText, { color }]}>
+                  {impactLabel(result.impact_level)}
                 </ThemedText>
               </View>
             </View>
-            <ThemedText style={styles.impactTips}>💡 {result.tips}</ThemedText>
+            <ThemedText style={styles.impactTips}>💡 {result.advice}</ThemedText>
           </View>
 
-          {/* Valeurs nutritionnelles */}
+          {/* Données glycémiques */}
           <View style={styles.nutriCard}>
-            <ThemedText style={styles.nutriTitle}>Valeurs nutritionnelles (portion standard)</ThemedText>
+            <ThemedText style={styles.nutriTitle}>Données glycémiques (portion {150}g)</ThemedText>
             <View style={styles.nutriGrid}>
-              <NutriBox label="Glucides"  value={`${result.carbs}g`}    color="#F57C00" />
-              <NutriBox label="Calories"  value={`${result.calories} kcal`} color="#7B1FA2" />
-              <NutriBox label="Protéines" value={`${result.proteins}g`}  color="#1565C0" />
-              <NutriBox label="Lipides"   value={`${result.fats}g`}      color="#388E3C" />
+              <NutriBox
+                label="Glucides"
+                value={`${result.carbs_used}g`}
+                color="#F57C00"
+              />
+              <NutriBox
+                label="Index GI"
+                value={`${result.glycemic_index}`}
+                color={result.glycemic_index < 40 ? '#388E3C' : result.glycemic_index < 70 ? '#F57C00' : '#B71C1C'}
+              />
+              <NutriBox
+                label="Charge GL"
+                value={`${result.glycemic_load.toFixed(1)}`}
+                color="#7B1FA2"
+              />
+              <NutriBox
+                label="Source"
+                value={result.carbs_source === 'label_ocr' ? 'Étiquette' : 'Base'}
+                color="#1565C0"
+              />
             </View>
 
-            {result.gi > 0 && (
+            {result.glycemic_index > 0 && (
               <View style={styles.giRow}>
                 <ThemedText style={styles.giLabel}>Index glycémique</ThemedText>
                 <View style={styles.giBar}>
                   <View style={[
                     styles.giFill,
                     {
-                      width: `${result.gi}%` as any,
-                      backgroundColor: result.gi < 40 ? '#388E3C' : result.gi < 70 ? '#F57C00' : '#B71C1C',
+                      width: `${result.glycemic_index}%` as any,
+                      backgroundColor: result.glycemic_index < 40 ? '#388E3C' : result.glycemic_index < 70 ? '#F57C00' : '#B71C1C',
                     }
                   ]} />
                 </View>
-                <ThemedText style={styles.giValue}>{result.gi}/100</ThemedText>
+                <ThemedText style={styles.giValue}>{result.glycemic_index}/100</ThemedText>
               </View>
             )}
           </View>
 
-          {/* Boutons */}
+          {/* Bouton rescan */}
           <View style={styles.actions}>
             <TouchableOpacity style={styles.scanAgainBtn} onPress={handleReset}>
               <ThemedText style={styles.scanAgainText}>📷  Scanner un autre aliment</ThemedText>
@@ -231,7 +250,6 @@ export default function FoodScanScreen() {
         onCameraReady={() => setCameraReady(true)}
       />
 
-      {/* Cadre de visée */}
       <View style={styles.aimFrame}>
         <View style={[styles.corner, styles.cornerTL]} />
         <View style={[styles.corner, styles.cornerTR]} />
@@ -240,14 +258,12 @@ export default function FoodScanScreen() {
         <ThemedText style={styles.aimText}>Pointez vers un aliment</ThemedText>
       </View>
 
-      {/* Message d'erreur */}
       {errMsg && (
         <View style={styles.errorBanner}>
           <ThemedText style={styles.errorText}>{errMsg}</ThemedText>
         </View>
       )}
 
-      {/* Bouton capture */}
       <View style={styles.captureBar}>
         <TouchableOpacity
           style={[styles.captureBtn, !cameraReady && { opacity: 0.4 }]}
@@ -284,7 +300,6 @@ function NutriBox({ label, value, color }: { label: string; value: string; color
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
 
-  // Permission
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: s(32), backgroundColor: '#f5f5f5' },
   permEmoji: { fontSize: fs(64), marginBottom: vs(20) },
   permTitle: { fontSize: fs(20), fontWeight: 'bold', color: '#1a1a1a', marginBottom: vs(10), textAlign: 'center' },
@@ -292,13 +307,11 @@ const styles = StyleSheet.create({
   permBtn:   { backgroundColor: '#388E3C', borderRadius: 12, paddingVertical: vs(15), paddingHorizontal: s(32) },
   permBtnText: { color: '#fff', fontWeight: 'bold', fontSize: fs(16) },
 
-  // Analyse
   analyzePhoto: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.4 },
   analyzeOverlay: { alignItems: 'center', gap: vs(16) },
   analyzeText:    { color: '#fff', fontSize: fs(20), fontWeight: 'bold', marginTop: vs(16) },
   analyzeSubText: { color: '#aaa', fontSize: fs(13), textAlign: 'center', lineHeight: vs(20), maxWidth: s(260) },
 
-  // Caméra
   cameraContainer: { flex: 1 },
   camera:          { flex: 1 },
 
@@ -329,27 +342,27 @@ const styles = StyleSheet.create({
   captureBtnInner: { width: s(54), height: s(54), borderRadius: s(27), backgroundColor: '#fff' },
   captureHint: { color: 'rgba(255,255,255,0.8)', fontSize: fs(12), fontWeight: '600' },
 
-  // Résultats
-  resultPhoto:  { width: '100%', height: vs(200) },
+  resultPhoto: { width: '100%', height: vs(200) },
 
   detectedCard: {
     margin: s(16), backgroundColor: '#fff', borderRadius: 16, padding: s(16), borderLeftWidth: 5,
     elevation: 3, shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 4,
   },
-  detectedHeader:  { flexDirection: 'row', alignItems: 'center' },
-  detectedLabel:   { fontSize: fs(10), color: '#aaa', fontWeight: '700', letterSpacing: 0.8, marginBottom: vs(4) },
-  detectedName:    { fontSize: fs(24), fontWeight: 'bold', color: '#1a1a1a' },
-  confidenceBadge: { borderRadius: 20, borderWidth: 1, paddingVertical: vs(6), paddingHorizontal: s(12) },
+  detectedHeader:  { flexDirection: 'row', alignItems: 'flex-start' },
+  sectionLabel:    { fontSize: fs(10), color: '#aaa', fontWeight: '700', letterSpacing: 0.8, marginBottom: vs(4) },
+  detectedName:    { fontSize: fs(22), fontWeight: 'bold', color: '#1a1a1a', marginBottom: vs(4) },
+  categoryDesc:    { fontSize: fs(12), color: '#666', lineHeight: vs(18) },
+  confidenceBadge: { borderRadius: 20, borderWidth: 1, paddingVertical: vs(6), paddingHorizontal: s(12), marginLeft: s(8) },
   confidenceText:  { fontSize: fs(16), fontWeight: 'bold' },
+
   impactCard: {
     marginHorizontal: s(16), marginBottom: vs(12), backgroundColor: '#fff', borderRadius: 16,
     padding: s(16), borderLeftWidth: 5,
     elevation: 2, shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3,
   },
-  impactLabel:     { fontSize: fs(10), color: '#aaa', fontWeight: '700', letterSpacing: 0.8, marginBottom: vs(8) },
-  impactRow:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: vs(10) },
+  impactRow:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: vs(10), marginTop: vs(8) },
   impactValue:     { fontSize: fs(22), fontWeight: 'bold' },
   impactBadge:     { borderRadius: 20, borderWidth: 1, paddingVertical: vs(4), paddingHorizontal: s(10) },
   impactBadgeText: { fontSize: fs(12), fontWeight: '700' },

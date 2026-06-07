@@ -10,6 +10,7 @@ const authRoutes       = require('./routes/auth');
 const glucoseRoutes    = require('./routes/glucose');
 const foodRoutes       = require('./routes/food');
 const adminRoutes      = require('./routes/admin');
+const glycemicRoutes   = require('./glycemic/router');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -99,9 +100,10 @@ app.get('/health', (_req, res) => {
 // CORS appliqué uniquement aux routes appelées depuis l'app mobile
 app.use('/api/auth',    cors(corsOptions), authLimiter, authRoutes);
 app.use('/api/glucose', cors(corsOptions), glucoseRoutes);
-app.use('/api/food',    cors(corsOptions), foodLimiter, foodRoutes);
+app.use('/api/food',     cors(corsOptions), foodLimiter, foodRoutes);
+app.use('/api/glycemic', cors(corsOptions), foodLimiter, glycemicRoutes);
 // /api/admin n'a pas besoin de CORS — appelé uniquement depuis la même page serveur
-app.use('/api/admin',   adminRoutes);
+app.use('/api/admin',    adminRoutes);
 
 // ── 404 catch-all ───────────────────────────────────────────────────────────
 app.use((_req, res) => {
@@ -125,6 +127,7 @@ createTables()
       console.log(`   POST /api/auth/register  |  /api/auth/login`);
       console.log(`   GET  /api/glucose        |  POST /api/glucose`);
       console.log(`   POST /api/food/detect`);
+      console.log(`   POST /api/glycemic/analyze-image`);
       console.log(`   📊   http://localhost:${PORT}/admin\n`);
     });
   })
