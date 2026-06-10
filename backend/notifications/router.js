@@ -1,7 +1,25 @@
 const express = require('express');
 const router  = express.Router();
+const jwt     = require('jsonwebtoken');
 const { pool } = require('../config/database');
 const authMiddleware = require('../middleware/auth');
+
+const SECRET = process.env.JWT_SECRET || 'niksante_dev_secret';
+
+// Accepte soit X-Admin-Key, soit un token JWT admin (pour la page web admin)
+function adminOrKey(req, res, next) {
+  const key = req.headers['x-admin-key'];
+  if (key && key === process.env.ADMIN_NOTIFICATION_KEY) return next();
+
+  const auth = req.headers.authorization;
+  if (auth && auth.startsWith('Bearer ')) {
+    try {
+      const payload = jwt.verify(auth.slice(7), SECRET);
+      if (payload.role === 'admin') return next();
+    } catch {}
+  }
+  return res.status(403).json({ error: 'Non autorisé' });
+}
 
 // Chargement optionnel de expo-server-sdk
 let expo = null;
@@ -51,12 +69,7 @@ router.post('/register', authMiddleware, async (req, res) => {
 //     -H "X-Admin-Key: votre-cle-secrete" \
 //     -d '{"version":"1.1.0","changelog":"Mesure cardiaque PPG, conversion mmol/L..."}'
 
-router.post('/send-update', async (req, res) => {
-  // Vérification clé admin
-  const key = req.headers['x-admin-key'];
-  if (!key || key !== process.env.ADMIN_NOTIFICATION_KEY) {
-    return res.status(403).json({ error: 'Clé admin invalide ou absente' });
-  }
+router.post('/send-update', adminOrKey, async (req, res) => {
 
   if (!expo) {
     return res.status(503).json({ error: 'expo-server-sdk non installé sur le serveur' });
