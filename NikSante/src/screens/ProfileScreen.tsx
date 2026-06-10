@@ -52,58 +52,103 @@ const REMINDER_SHOWN_KEY    = '@niksante_reminders_shown';
 // Textes légaux
 // ---------------------------------------------------------------------------
 
-const PRIVACY_POLICY = `Dernière mise à jour : juin 2026
+const PRIVACY_POLICY = `Dernière mise à jour : 30 mai 2026
 
-NikSanté s'engage à protéger vos données personnelles.
+NikSanté (« l'Application ») est une application mobile de suivi du diabète développée par Nikiema Landry. Cette politique explique comment nous collectons, utilisons et protégeons vos données personnelles.
 
 1. DONNÉES COLLECTÉES
-Nous collectons uniquement les données nécessaires au fonctionnement de l'application : adresse e-mail, mesures de glycémie et préférences de l'application. Aucune donnée n'est vendue à des tiers.
+Lors de l'utilisation de NikSanté, nous collectons les informations suivantes :
+
+• Informations de compte : nom, adresse e-mail, mot de passe (chiffré)
+• Données de santé : mesures de glycémie, date et heure des mesures, notes et contexte repas
+• Données d'analyse alimentaire : photos ou descriptions d'aliments soumises au scanner IA
 
 2. UTILISATION DES DONNÉES
-Vos données sont utilisées exclusivement pour vous fournir les fonctionnalités de l'application (historique glycémique, statistiques, conseils personnalisés).
+Vos données sont utilisées exclusivement pour :
+
+• Afficher votre historique de glycémie et vos statistiques personnelles
+• Analyser vos aliments via l'intelligence artificielle (OpenAI)
+• Vous fournir des alertes et conseils adaptés à votre situation
+
+Vos données ne sont jamais vendues ni partagées avec des tiers à des fins commerciales.
 
 3. STOCKAGE ET SÉCURITÉ
-Vos données sont stockées de manière sécurisée sur nos serveurs hébergés chez Render (États-Unis). Les mots de passe sont hachés (bcrypt). Les tokens d'authentification sont chiffrés.
+Vos données sont stockées sur une base de données PostgreSQL sécurisée hébergée sur Render (Union européenne — Francfort). Les mots de passe sont chiffrés avec bcrypt. Les communications sont chiffrées via HTTPS.
 
 4. PARTAGE DES DONNÉES
-Aucune donnée personnelle n'est partagée avec des tiers sans votre consentement explicite. Les rapports exportés (PDF/texte) sont générés localement et partagés uniquement à votre initiative.
+Les seuls tiers qui peuvent accéder à vos données de façon limitée sont :
+
+• OpenAI : les images d'aliments soumises au scanner sont analysées via l'API OpenAI. Ces données sont soumises à la politique de confidentialité d'OpenAI.
+• Render : hébergeur du backend et de la base de données.
 
 5. VOS DROITS
-Conformément au RGPD, vous disposez d'un droit d'accès, de rectification et de suppression de vos données. Pour exercer ces droits, contactez-nous à : support@niksante.app
+Conformément au RGPD et aux lois applicables, vous disposez des droits suivants :
 
-6. DONNÉES DE SANTÉ
-Les informations glycémiques sont des données de santé sensibles. Elles sont traitées avec le plus grand soin et ne sont jamais utilisées à des fins publicitaires.
+• Accès : consulter toutes vos données depuis l'application
+• Suppression : supprimer votre historique de glycémie depuis l'application
+• Suppression du compte : contactez-nous à l'adresse ci-dessous pour supprimer définitivement votre compte et toutes vos données
+
+6. AVERTISSEMENT MÉDICAL
+NikSanté est un outil d'aide au suivi personnel et ne remplace en aucun cas l'avis d'un professionnel de santé. Ne prenez aucune décision médicale basée uniquement sur les informations fournies par l'application.
 
 7. CONTACT
-Pour toute question relative à la confidentialité : support@niksante.app`;
+Pour toute question concernant cette politique ou pour exercer vos droits, contactez-nous à : nikiemalandry54@gmail.com`;
 
 const TERMS_OF_USE = `Dernière mise à jour : juin 2026
 
-En utilisant NikSanté, vous acceptez les présentes conditions.
+En utilisant l'application NikSanté, vous acceptez les présentes conditions d'utilisation. Veuillez les lire attentivement.
 
-1. NATURE DE L'APPLICATION
-NikSanté est une application de suivi et d'information sur la glycémie. Elle ne constitue pas un dispositif médical et ne remplace en aucun cas l'avis d'un professionnel de santé.
+1. DESCRIPTION DU SERVICE
+NikSanté est une application mobile gratuite permettant aux personnes diabétiques ou souhaitant surveiller leur glycémie de :
 
-2. AVERTISSEMENT MÉDICAL
-Les informations fournies par NikSanté (conseils, analyses, estimations) sont données à titre indicatif uniquement. Consultez toujours votre médecin ou diabétologue pour toute décision médicale.
+• Enregistrer et visualiser leurs mesures de glycémie
+• Scanner des aliments pour estimer leur impact glycémique via l'IA
+• Mesurer leur fréquence cardiaque indicative via la caméra
+• Recevoir des alertes en cas de valeurs anormales
 
-3. UTILISATION DE L'IA
-Le scanner alimentaire et les estimations d'impact glycémique utilisent l'intelligence artificielle. Ces estimations peuvent contenir des erreurs. Vérifiez toujours les résultats.
+2. AVERTISSEMENT MÉDICAL IMPORTANT
+NikSanté n'est pas un dispositif médical certifié. L'application est un outil d'aide à la gestion personnelle du diabète et ne remplace pas :
 
-4. RESPONSABILITÉ
-NikSanté ne peut être tenu responsable de toute décision médicale prise sur la base des informations fournies par l'application.
+• L'avis ou le suivi d'un médecin ou professionnel de santé
+• Un glucomètre médical homologué
+• Un tensiomètre ou cardiofréquencemètre médical certifié
+• Un traitement médical prescrit
 
-5. COMPTE UTILISATEUR
-Vous êtes responsable de la confidentialité de vos identifiants. Ne partagez pas votre compte avec d'autres personnes.
+En cas d'urgence médicale, contactez immédiatement les services d'urgence de votre pays.
 
-6. PROPRIÉTÉ INTELLECTUELLE
-Tous les contenus de l'application (textes, algorithmes, design) sont la propriété de NikSanté.
+3. CONDITIONS D'ACCÈS
+Pour utiliser NikSanté, vous devez :
 
-7. MODIFICATIONS
-Ces conditions peuvent être modifiées à tout moment. Les utilisateurs seront notifiés des changements importants.
+• Avoir au moins 13 ans (ou l'âge légal requis dans votre pays)
+• Créer un compte avec des informations exactes
+• Être responsable de la confidentialité de votre mot de passe
 
-8. CONTACT
-Pour toute question : support@niksante.app`;
+4. UTILISATION ACCEPTABLE
+Vous vous engagez à ne pas :
+
+• Utiliser l'application à des fins illégales
+• Tenter d'accéder aux données d'autres utilisateurs
+• Perturber le fonctionnement des serveurs ou de la base de données
+
+5. MESURE DE FRÉQUENCE CARDIAQUE
+La fonctionnalité de mesure de fréquence cardiaque utilise la caméra et le flash du téléphone (photopléthysmographie — PPG). Cette mesure est purement indicative :
+
+• Elle ne remplace pas un dispositif médical homologué
+• La précision peut varier selon les conditions d'éclairage, les mouvements et les caractéristiques individuelles
+• Ne pas l'utiliser pour toute décision médicale relative au cœur
+• En cas de symptômes cardiaques, consultez immédiatement un médecin
+
+6. DISPONIBILITÉ DU SERVICE
+NikSanté est fourni "tel quel". Nous nous efforçons de maintenir le service disponible en permanence mais ne garantissons pas une disponibilité ininterrompue. Le service peut être suspendu pour maintenance ou mise à jour.
+
+7. LIMITATION DE RESPONSABILITÉ
+Dans les limites autorisées par la loi, Nikiema Landry ne pourra être tenu responsable des dommages directs ou indirects résultant de l'utilisation ou de l'impossibilité d'utiliser l'application, ni des décisions prises sur la base des informations fournies par l'application.
+
+8. MODIFICATIONS
+Nous nous réservons le droit de modifier ces conditions à tout moment. Les utilisateurs seront informés des changements importants via l'application.
+
+9. CONTACT
+Pour toute question : nikiemalandry54@gmail.com`;
 
 export default function ProfileScreen() {
   const router = useRouter();
