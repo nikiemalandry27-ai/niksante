@@ -546,12 +546,12 @@ const CHAPTERS: Chapter[] = [
           'Attendre 15 minutes et remesurer',
           'Si toujours < 70 mg/dL : répéter la prise de sucre',
           'Stabiliser avec une collation complexe (pain + fromage)',
-          'Inconscience : glucagon IM/SC (kit Glucagen) — appeler le 15',
+          'Inconscience : glucagon IM/SC (kit Glucagen) — appeler les secours',
         ],
       },
       {
         type: 'warning',
-        text: "Ne JAMAIS forcer une personne inconsciente à boire ou manger. La mettre en position latérale de sécurité (PLS) et appeler le 15 (SAMU).",
+        text: "Ne JAMAIS forcer une personne inconsciente à boire ou manger. La mettre en position latérale de sécurité (PLS) et appeler les secours.",
       },
       {
         type: 'list',
@@ -573,12 +573,12 @@ const CHAPTERS: Chapter[] = [
           "Survient quand l'organisme manque d'insuline et brûle les graisses (cétones)",
           'Signes : nausées, vomissements, douleurs abdominales, haleine fruitée (acétonée), hyperventilation',
           'Glycémie souvent > 300 mg/dL + présence de cétones dans les urines',
-          'APPELER LE 15 IMMÉDIATEMENT — hospitalisation en urgence nécessaire',
+          'APPELER LES SECOURS IMMÉDIATEMENT — hospitalisation en urgence nécessaire',
         ],
       },
       {
         type: 'list',
-        title: 'Quand appeler le 15 (SAMU) ?',
+        title: 'Quand appeler les secours ?',
         items: [
           'Perte de conscience ou convulsions',
           'Impossibilité de faire avaler du sucre',
