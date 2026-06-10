@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "niksante",
     "userInterfaceStyle": "automatic",
-    "description": "Application mobile gratuite de suivi du diabète : enregistrement de glycémie, scanner alimentaire IA, rappels de mesure, tableaux de bord et conseils d'urgence hypoglycémie / hyperglycémie.",
+    "description": "Application mobile gratuite de suivi du diabète : enregistrement de glycémie, scanner alimentaire IA, mesure de fréquence cardiaque, rappels de mesure, tableaux de bord et conseils d'urgence hypoglycémie / hyperglycémie.",
     "keywords": [
       "diabète",
       "glycémie",
