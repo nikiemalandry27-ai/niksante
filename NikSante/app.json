@@ -51,6 +51,13 @@
     "plugins": [
       "expo-router",
       [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "NikSanté utilise la caméra pour scanner vos aliments et mesurer votre fréquence cardiaque.",
+          "enableMicrophonePermission": false
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#208AEF",

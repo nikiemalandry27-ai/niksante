@@ -1,11 +1,10 @@
 /**
  * NikSanté — HeartRateScreen
  *
- * Estimation indicative de la fréquence cardiaque via la caméra (PPG passif).
- * L'utilisateur place son doigt sur la caméra arrière avec le flash activé.
- * La variation de luminosité entre les images est analysée pour détecter les pulsations.
+ * Mesure PPG réelle via react-native-vision-camera frame processors.
+ * La caméra arrière + flash analysent la luminosité au doigt à ~30fps.
  *
- * ⚠️ FONCTIONNALITÉ INDICATIVE UNIQUEMENT — PAS UN DISPOSITIF MÉDICAL.
+ * ⚠️ ESTIMATION INDICATIVE — PAS UN DISPOSITIF MÉDICAL.
  */
 
 import { useRef, useState, useCallback } from 'react';
@@ -17,8 +16,13 @@ import {
   ScrollView,
   Animated,
 } from 'react-native';
-import { CameraView, useCameraPermissions } from 'expo-camera';
-import * as FileSystem from 'expo-file-system/legacy';
+import {
+  Camera,
+  useCameraDevice,
+  useCameraPermission,
+  useFrameProcessor,
+} from 'react-native-vision-camera';
+import { runOnJS } from 'react-native-worklets-core';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
@@ -31,7 +35,7 @@ import { s, fs, vs } from '@/utils/responsive';
 type Phase = 'disclaimer' | 'instruction' | 'measuring' | 'processing' | 'result' | 'error';
 
 interface Sample {
-  size:      number;
+  value:     number;  // average pixel brightness (Y channel)
   timestamp: number;
 }
 
@@ -51,39 +55,42 @@ function movingAverage(arr: number[], window: number): number[] {
 function analyzePPG(samples: Sample[]): {
   bpm:        number | null;
   confidence: number;
+  fps:        number;
   message:    string;
 } {
-  if (samples.length < 15) {
-    return { bpm: null, confidence: 0, message: 'Pas assez de données — gardez le doigt sur la caméra' };
+  if (samples.length < 30) {
+    return { bpm: null, confidence: 0, fps: 0, message: 'Pas assez de données — gardez le doigt immobile sur la caméra' };
   }
 
-  const sizes      = samples.map((s) => s.size);
+  const values     = samples.map((s) => s.value);
   const timestamps = samples.map((s) => s.timestamp);
 
-  // Check signal presence: std must be significant
-  const mean = sizes.reduce((a, b) => a + b, 0) / sizes.length;
-  const std  = Math.sqrt(sizes.map((v) => (v - mean) ** 2).reduce((a, b) => a + b, 0) / sizes.length);
+  // Actual FPS
+  const durationSec = (timestamps[timestamps.length - 1] - timestamps[0]) / 1000;
+  const fps = Math.round(samples.length / durationSec);
 
-  if (mean === 0 || std / mean < 0.005) {
-    return { bpm: null, confidence: 0, message: 'Doigt non détecté — posez bien votre doigt sur la caméra arrière' };
+  // Signal quality check
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  const std  = Math.sqrt(values.map((v) => (v - mean) ** 2).reduce((a, b) => a + b, 0) / values.length);
+
+  if (std / (mean || 1) < 0.002) {
+    return { bpm: null, confidence: 0, fps, message: 'Doigt non détecté — couvrez bien la caméra et le flash' };
   }
 
-  // Normalize
-  const normalized = sizes.map((v) => (v - mean) / (std || 1));
+  // Normalize and smooth
+  const normalized = values.map((v) => (v - mean) / (std || 1));
+  const smoothed   = movingAverage(normalized, 5);
 
-  // Smooth (window 3)
-  const smoothed = movingAverage(normalized, 3);
-
-  // Peak detection: local maxima above threshold with min distance
-  const threshold    = 0.2;
-  const minDist      = Math.max(2, Math.floor(samples.length / 20));
+  // Peak detection
+  const threshold = 0.15;
+  const minDist   = Math.max(3, Math.floor(fps * 0.35)); // min 350ms between peaks
   const peaks: number[] = [];
 
   for (let i = 1; i < smoothed.length - 1; i++) {
     if (
       smoothed[i] > threshold &&
-      smoothed[i] > smoothed[i - 1] &&
-      smoothed[i] > smoothed[i + 1]
+      smoothed[i] >= smoothed[i - 1] &&
+      smoothed[i] >= smoothed[i + 1]
     ) {
       if (peaks.length === 0 || i - peaks[peaks.length - 1] >= minDist) {
         peaks.push(i);
@@ -91,38 +98,42 @@ function analyzePPG(samples: Sample[]): {
     }
   }
 
-  if (peaks.length < 3) {
+  if (peaks.length < 4) {
     return {
       bpm:        null,
       confidence: 0,
-      message:    'Signal insuffisant — restez immobile, éclairez bien le doigt',
+      fps,
+      message:    'Signal insuffisant — restez immobile, appuyez doucement sur la caméra',
     };
   }
 
   // RR intervals using actual timestamps
   const intervals: number[] = [];
   for (let i = 1; i < peaks.length; i++) {
-    const dt = (timestamps[peaks[i]] - timestamps[peaks[i - 1]]) / 1000; // seconds
-    if (dt > 0.2 && dt < 3.0) intervals.push(dt);
+    const dt = (timestamps[peaks[i]] - timestamps[peaks[i - 1]]) / 1000;
+    if (dt > 0.25 && dt < 2.5) intervals.push(dt);
   }
 
-  if (intervals.length < 2) {
-    return { bpm: null, confidence: 0, message: 'Intervalles irréguliers — réessayez en restant immobile' };
+  if (intervals.length < 3) {
+    return { bpm: null, confidence: 0, fps, message: 'Intervalles irréguliers — réessayez en restant immobile' };
   }
 
-  // Median RR interval (robust to outliers)
-  const sorted = [...intervals].sort((a, b) => a - b);
+  // Median RR interval
+  const sorted   = [...intervals].sort((a, b) => a - b);
   const medianRR = sorted[Math.floor(sorted.length / 2)];
   const bpm      = Math.round(60 / medianRR);
 
   if (bpm < 40 || bpm > 200) {
-    return { bpm: null, confidence: 0, message: 'Résultat hors plage physiologique — réessayez' };
+    return { bpm: null, confidence: 0, fps, message: 'Résultat hors plage physiologique — réessayez' };
   }
 
-  // Confidence based on peak count and signal quality
-  const confidence = Math.min(95, peaks.length * 12 + Math.round(std / mean * 500));
+  // RMSSD-based confidence
+  const diffs = intervals.map((v, i, arr) => i > 0 ? Math.abs(v - arr[i - 1]) : 0).slice(1);
+  const rmssd = Math.sqrt(diffs.map((d) => d ** 2).reduce((a, b) => a + b, 0) / (diffs.length || 1));
+  const variabilityPenalty = Math.min(40, Math.round(rmssd * 200));
+  const confidence = Math.min(97, 55 + peaks.length * 4 - variabilityPenalty);
 
-  return { bpm, confidence, message: 'Mesure effectuée' };
+  return { bpm, confidence, fps, message: 'Mesure effectuée' };
 }
 
 // ---------------------------------------------------------------------------
@@ -130,76 +141,84 @@ function analyzePPG(samples: Sample[]): {
 // ---------------------------------------------------------------------------
 
 export default function HeartRateScreen() {
-  const router    = useRouter();
-  const cameraRef = useRef<CameraView>(null);
-  const [permission, requestPermission] = useCameraPermissions();
+  const router = useRouter();
+  const device = useCameraDevice('back');
+  const { hasPermission, requestPermission } = useCameraPermission();
 
   const [phase,       setPhase]       = useState<Phase>('disclaimer');
   const [countdown,   setCountdown]   = useState(15);
   const [bpm,         setBpm]         = useState<number | null>(null);
   const [confidence,  setConfidence]  = useState(0);
+  const [fps,         setFps]         = useState(0);
   const [errorMsg,    setErrorMsg]    = useState('');
-  const [cameraReady, setCameraReady] = useState(false);
+  const [sampleCount, setSampleCount] = useState(0);
 
-  const samplesRef      = useRef<Sample[]>([]);
-  const measuringRef    = useRef(false);
-  const countdownRef    = useRef<NodeJS.Timeout>();
-  const heartbeatAnim   = useRef(new Animated.Value(1)).current;
+  const samplesRef   = useRef<Sample[]>([]);
+  const measuringRef = useRef(false);
+  const countdownRef = useRef<NodeJS.Timeout>();
+  const heartAnim    = useRef(new Animated.Value(1)).current;
 
-  // ── Animation battement ──────────────────────────────────────────────────
+  // ── Heartbeat animation ───────────────────────────────────────────────────
 
   const startHeartbeat = useCallback(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(heartbeatAnim, { toValue: 1.18, duration: 400, useNativeDriver: true }),
-        Animated.timing(heartbeatAnim, { toValue: 1.0,  duration: 600, useNativeDriver: true }),
+        Animated.timing(heartAnim, { toValue: 1.2,  duration: 350, useNativeDriver: true }),
+        Animated.timing(heartAnim, { toValue: 1.0,  duration: 650, useNativeDriver: true }),
       ])
     ).start();
-  }, [heartbeatAnim]);
+  }, [heartAnim]);
 
-  // ── Capture loop ─────────────────────────────────────────────────────────
+  // ── Frame callback (called from worklet via runOnJS) ──────────────────────
 
-  const captureFrame = useCallback(async () => {
-    if (!measuringRef.current || !cameraRef.current) return;
-
-    try {
-      const photo = await cameraRef.current.takePictureAsync({
-        quality:         0.05,
-        skipProcessing:  true,
-      });
-
-      const info = await FileSystem.getInfoAsync(photo.uri);
-      const size = (info as any).size ?? 0;
-
-      samplesRef.current.push({ size, timestamp: Date.now() });
-
-      // Clean up the temporary file
-      await FileSystem.deleteAsync(photo.uri, { idempotent: true });
-    } catch {}
-
-    if (measuringRef.current) {
-      setTimeout(captureFrame, 280);
+  const onFrame = useCallback((brightness: number) => {
+    if (!measuringRef.current) return;
+    samplesRef.current.push({ value: brightness, timestamp: Date.now() });
+    if (samplesRef.current.length % 10 === 0) {
+      setSampleCount(samplesRef.current.length);
     }
   }, []);
 
-  // ── Start measurement ────────────────────────────────────────────────────
+  // ── Frame processor — runs at camera FPS (~30fps) ─────────────────────────
+
+  const frameProcessor = useFrameProcessor((frame) => {
+    'worklet';
+    try {
+      const buffer = frame.toArrayBuffer();
+      const data   = new Uint8Array(buffer);
+
+      // Sample Y channel (luminance) uniformly — YUV_420: Y plane = first w*h bytes
+      const totalPixels = frame.width * frame.height;
+      const step        = Math.max(1, Math.floor(totalPixels / 400));
+
+      let sum   = 0;
+      let count = 0;
+      for (let i = 0; i < totalPixels; i += step) {
+        sum += data[i];
+        count++;
+      }
+
+      runOnJS(onFrame)(count > 0 ? sum / count : 0);
+    } catch {
+      // skip frame on read error
+    }
+  }, [onFrame]);
+
+  // ── Start measurement ─────────────────────────────────────────────────────
 
   const startMeasurement = useCallback(async () => {
-    if (!permission?.granted) {
+    if (!hasPermission) {
       await requestPermission();
       return;
     }
 
-    samplesRef.current  = [];
+    samplesRef.current   = [];
     measuringRef.current = true;
+    setSampleCount(0);
     setPhase('measuring');
     setCountdown(15);
     startHeartbeat();
 
-    // Start capture loop
-    captureFrame();
-
-    // Countdown tick
     let remaining = 15;
     countdownRef.current = setInterval(() => {
       remaining -= 1;
@@ -207,56 +226,57 @@ export default function HeartRateScreen() {
       if (remaining <= 0) {
         clearInterval(countdownRef.current);
         measuringRef.current = false;
-        heartbeatAnim.stopAnimation();
+        heartAnim.stopAnimation();
         setPhase('processing');
 
-        // Analyze after a short delay for last frames
         setTimeout(() => {
           const result = analyzePPG(samplesRef.current);
           if (result.bpm !== null) {
             setBpm(result.bpm);
             setConfidence(result.confidence);
+            setFps(result.fps);
             setPhase('result');
           } else {
             setErrorMsg(result.message);
             setPhase('error');
           }
-        }, 600);
+        }, 400);
       }
     }, 1000);
-  }, [permission, captureFrame, startHeartbeat, heartbeatAnim, requestPermission]);
+  }, [hasPermission, requestPermission, startHeartbeat, heartAnim]);
 
-  const handleRetry = () => {
+  const handleRetry = useCallback(() => {
     clearInterval(countdownRef.current);
     measuringRef.current = false;
-    heartbeatAnim.stopAnimation();
-    heartbeatAnim.setValue(1);
+    heartAnim.stopAnimation();
+    heartAnim.setValue(1);
     setBpm(null);
     setErrorMsg('');
     setPhase('instruction');
-  };
+  }, [heartAnim]);
 
-  // ── Permission requise ────────────────────────────────────────────────────
+  // ── Permission ────────────────────────────────────────────────────────────
 
-  if (!permission) {
-    return (
-      <SafeAreaView style={styles.centered}>
-        <ActivityIndicator color="#E53935" />
-      </SafeAreaView>
-    );
-  }
-
-  if (!permission.granted) {
+  if (!hasPermission) {
     return (
       <SafeAreaView style={styles.centered}>
         <ThemedText style={styles.bigEmoji}>📷</ThemedText>
         <ThemedText style={styles.permTitle}>Accès caméra requis</ThemedText>
         <ThemedText style={styles.permSub}>
-          La mesure de fréquence cardiaque nécessite l'accès à la caméra.
+          La mesure de fréquence cardiaque nécessite l'accès à la caméra arrière.
         </ThemedText>
         <TouchableOpacity style={styles.primaryBtn} onPress={requestPermission}>
           <ThemedText style={styles.primaryBtnText}>Autoriser la caméra</ThemedText>
         </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
+  if (!device) {
+    return (
+      <SafeAreaView style={styles.centered}>
+        <ActivityIndicator color="#E53935" />
+        <ThemedText style={styles.processingText}>Caméra non disponible</ThemedText>
       </SafeAreaView>
     );
   }
@@ -273,9 +293,9 @@ export default function HeartRateScreen() {
           <ThemedText style={styles.headerTitle}>Fréquence cardiaque</ThemedText>
           <View style={{ width: s(60) }} />
         </View>
-        <ScrollView contentContainerStyle={styles.disclaimerContent}>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
           <ThemedText style={styles.bigEmoji}>❤️</ThemedText>
-          <ThemedText style={styles.disclaimerTitle}>Avant de commencer</ThemedText>
+          <ThemedText style={styles.pageTitle}>Avant de commencer</ThemedText>
 
           <View style={styles.warningBox}>
             <ThemedText style={styles.warningTitle}>⚠️ Avertissement important</ThemedText>
@@ -289,7 +309,7 @@ export default function HeartRateScreen() {
           <View style={styles.infoCard}>
             <ThemedText style={styles.infoTitle}>Comment ça fonctionne</ThemedText>
             <ThemedText style={styles.infoText}>
-              La caméra arrière et le flash détectent les variations de luminosité dues aux pulsations sanguines (PPG). La précision dépend de la stabilité du doigt et des conditions d'éclairage.
+              La caméra arrière et le flash analysent en temps réel les variations de luminosité dues aux pulsations sanguines (photopléthysmographie — PPG). La mesure dure 15 secondes à ~30 images/seconde.
             </ThemedText>
           </View>
 
@@ -313,15 +333,15 @@ export default function HeartRateScreen() {
           <ThemedText style={styles.headerTitle}>Fréquence cardiaque</ThemedText>
           <View style={{ width: s(60) }} />
         </View>
-        <ScrollView contentContainerStyle={styles.disclaimerContent}>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
           <ThemedText style={styles.bigEmoji}>👆</ThemedText>
-          <ThemedText style={styles.disclaimerTitle}>Instructions</ThemedText>
+          <ThemedText style={styles.pageTitle}>Instructions</ThemedText>
 
           {[
             { step: '1', text: 'Placez le bout de votre index sur la caméra arrière' },
-            { step: '2', text: 'Couvrez complètement la caméra et le flash' },
-            { step: '3', text: 'Appuyez doucement — ne bloquez pas le flash' },
-            { step: '4', text: 'Restez immobile pendant 15 secondes' },
+            { step: '2', text: 'Couvrez complètement la caméra et le flash avec le doigt' },
+            { step: '3', text: 'Appuyez doucement — ne bloquez pas la lumière du flash' },
+            { step: '4', text: 'Restez absolument immobile pendant 15 secondes' },
           ].map((item) => (
             <View key={item.step} style={styles.stepRow}>
               <View style={styles.stepBadge}>
@@ -331,26 +351,9 @@ export default function HeartRateScreen() {
             </View>
           ))}
 
-          <TouchableOpacity
-            style={[styles.primaryBtn, !cameraReady && { opacity: 0.5 }]}
-            onPress={startMeasurement}
-            disabled={!cameraReady}
-          >
-            <ThemedText style={styles.primaryBtnText}>
-              {cameraReady ? '▶  Démarrer la mesure (15 s)' : 'Caméra en initialisation…'}
-            </ThemedText>
+          <TouchableOpacity style={styles.primaryBtn} onPress={startMeasurement}>
+            <ThemedText style={styles.primaryBtnText}>▶  Démarrer la mesure (15 s)</ThemedText>
           </TouchableOpacity>
-
-          {/* Hidden camera to warm up */}
-          <View style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
-            <CameraView
-              ref={cameraRef}
-              style={{ width: 1, height: 1 }}
-              facing="back"
-              enableTorch
-              onCameraReady={() => setCameraReady(true)}
-            />
-          </View>
         </ScrollView>
       </SafeAreaView>
     );
@@ -360,19 +363,23 @@ export default function HeartRateScreen() {
 
   if (phase === 'measuring') {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: '#1a0000' }]}>
-        {/* Hidden camera running */}
-        <View style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
-          <CameraView
-            ref={cameraRef}
-            style={{ width: 1, height: 1 }}
-            facing="back"
-            enableTorch
+      <SafeAreaView style={[styles.container, { backgroundColor: '#0d0000' }]}>
+        {/* Camera active — frame processor running */}
+        <View style={StyleSheet.absoluteFillObject}>
+          <Camera
+            style={StyleSheet.absoluteFillObject}
+            device={device}
+            isActive
+            torch="on"
+            pixelFormat="yuv"
+            frameProcessor={frameProcessor}
           />
+          {/* Dark overlay so UI is readable */}
+          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.88)' }]} />
         </View>
 
         <View style={styles.measuringContent}>
-          <Animated.Text style={[styles.heartIcon, { transform: [{ scale: heartbeatAnim }] }]}>
+          <Animated.Text style={[styles.heartIcon, { transform: [{ scale: heartAnim }] }]}>
             ❤️
           </Animated.Text>
 
@@ -380,12 +387,10 @@ export default function HeartRateScreen() {
           <ThemedText style={styles.countdownLabel}>secondes restantes</ThemedText>
 
           <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${((15 - countdown) / 15) * 100}%` }]} />
+            <View style={[styles.progressFill, { width: `${((15 - countdown) / 15) * 100}%` as any }]} />
           </View>
 
-          <ThemedText style={styles.measuringHint}>
-            {samplesRef.current.length} échantillons capturés
-          </ThemedText>
+          <ThemedText style={styles.measuringHint}>{sampleCount} trames analysées</ThemedText>
           <ThemedText style={styles.measuringHint}>Gardez le doigt immobile sur la caméra</ThemedText>
         </View>
       </SafeAreaView>
@@ -398,7 +403,8 @@ export default function HeartRateScreen() {
     return (
       <SafeAreaView style={[styles.centered, { backgroundColor: '#f5f5f5' }]}>
         <ActivityIndicator size="large" color="#E53935" />
-        <ThemedText style={styles.processingText}>Analyse du signal…</ThemedText>
+        <ThemedText style={styles.processingText}>Analyse du signal PPG…</ThemedText>
+        <ThemedText style={styles.processingSubText}>{sampleCount} échantillons traités</ThemedText>
       </SafeAreaView>
     );
   }
@@ -415,14 +421,23 @@ export default function HeartRateScreen() {
           <ThemedText style={styles.headerTitle}>Résultat</ThemedText>
           <View style={{ width: s(60) }} />
         </View>
-        <View style={styles.resultContent}>
+        <ScrollView contentContainerStyle={styles.resultContent}>
           <ThemedText style={styles.bigEmoji}>😕</ThemedText>
           <ThemedText style={styles.errorTitle}>Mesure impossible</ThemedText>
           <ThemedText style={styles.errorMsg}>{errorMsg}</ThemedText>
+          <View style={styles.infoCard}>
+            <ThemedText style={styles.infoTitle}>Conseils pour mieux mesurer</ThemedText>
+            <ThemedText style={styles.infoText}>
+              • Couvrez entièrement la caméra et le flash{'\n'}
+              • Appuyez légèrement (trop fort peut bloquer la circulation){'\n'}
+              • Restez dans une pièce éclairée normalement{'\n'}
+              • Évitez tout mouvement du téléphone et du doigt
+            </ThemedText>
+          </View>
           <TouchableOpacity style={styles.primaryBtn} onPress={handleRetry}>
             <ThemedText style={styles.primaryBtnText}>🔄  Réessayer</ThemedText>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -432,6 +447,10 @@ export default function HeartRateScreen() {
   const bpmColor = bpm
     ? bpm < 60 ? '#1565C0' : bpm > 100 ? '#F57C00' : '#388E3C'
     : '#aaa';
+
+  const bpmLabel = bpm
+    ? bpm < 60 ? 'Bradycardie' : bpm > 100 ? 'Tachycardie' : 'Normal'
+    : '';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -444,33 +463,30 @@ export default function HeartRateScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.resultContent}>
-
         <View style={[styles.bpmCard, { borderColor: bpmColor }]}>
           <ThemedText style={styles.bpmLabel}>FRÉQUENCE CARDIAQUE ESTIMÉE</ThemedText>
           <ThemedText style={[styles.bpmValue, { color: bpmColor }]}>{bpm}</ThemedText>
           <ThemedText style={[styles.bpmUnit, { color: bpmColor }]}>BPM</ThemedText>
-          <View style={[styles.bpmBadge, { backgroundColor: bpmColor + '20', borderColor: bpmColor }]}>
-            <ThemedText style={[styles.bpmBadgeText, { color: bpmColor }]}>
-              {bpm! < 60 ? 'Bradycardie' : bpm! > 100 ? 'Tachycardie' : 'Normal'}
-            </ThemedText>
+          <View style={[styles.bpmBadge, { backgroundColor: bpmColor + '18', borderColor: bpmColor }]}>
+            <ThemedText style={[styles.bpmBadgeText, { color: bpmColor }]}>{bpmLabel}</ThemedText>
           </View>
           <ThemedText style={styles.confidenceText}>
-            Confiance : {confidence}% — {samplesRef.current.length} échantillons
+            Confiance : {confidence}%  ·  {sampleCount} trames  ·  ~{fps} fps
           </ThemedText>
         </View>
 
         <View style={styles.warningBox}>
           <ThemedText style={styles.warningText}>
-            ⚠️ Cette fonctionnalité fournit une estimation de la fréquence cardiaque à titre informatif uniquement. Elle ne constitue pas un dispositif médical.
+            ⚠️ Cette estimation est fournie à titre informatif uniquement. Elle ne constitue pas un dispositif médical.
           </ThemedText>
         </View>
 
         <View style={styles.infoCard}>
           <ThemedText style={styles.infoTitle}>Plages de référence indicatives</ThemedText>
           {[
-            { label: 'Bradycardie',  range: '< 60 bpm',     color: '#1565C0' },
-            { label: 'Normal',       range: '60–100 bpm',   color: '#388E3C' },
-            { label: 'Tachycardie',  range: '> 100 bpm',    color: '#F57C00' },
+            { label: 'Bradycardie',  range: '< 60 bpm',    color: '#1565C0' },
+            { label: 'Normal',       range: '60–100 bpm',  color: '#388E3C' },
+            { label: 'Tachycardie',  range: '> 100 bpm',   color: '#F57C00' },
           ].map((row) => (
             <View key={row.label} style={styles.refRow}>
               <View style={[styles.refDot, { backgroundColor: row.color }]} />
@@ -505,10 +521,12 @@ const styles = StyleSheet.create({
   backText:    { color: '#E53935', fontWeight: '600', fontSize: fs(15) },
   headerTitle: { fontSize: fs(17), fontWeight: 'bold', color: '#1a1a1a' },
 
-  disclaimerContent: { alignItems: 'center', paddingHorizontal: s(24), paddingVertical: vs(24), gap: vs(16) },
+  scrollContent: {
+    alignItems: 'center', paddingHorizontal: s(24), paddingVertical: vs(24), gap: vs(16),
+  },
 
-  bigEmoji:       { fontSize: fs(56), marginBottom: vs(4) },
-  disclaimerTitle:{ fontSize: fs(22), fontWeight: 'bold', color: '#1a1a1a', textAlign: 'center' },
+  bigEmoji:  { fontSize: fs(56) },
+  pageTitle: { fontSize: fs(22), fontWeight: 'bold', color: '#1a1a1a', textAlign: 'center' },
 
   warningBox: {
     width: '100%', backgroundColor: '#FFF8E1', borderRadius: 14,
@@ -519,7 +537,8 @@ const styles = StyleSheet.create({
 
   infoCard: {
     width: '100%', backgroundColor: '#fff', borderRadius: 14, padding: s(16),
-    elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3,
+    elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06, shadowRadius: 3,
   },
   infoTitle: { fontSize: fs(13), fontWeight: '700', color: '#555', marginBottom: vs(8) },
   infoText:  { fontSize: fs(13), color: '#555', lineHeight: vs(20) },
@@ -527,7 +546,8 @@ const styles = StyleSheet.create({
   stepRow: {
     width: '100%', flexDirection: 'row', alignItems: 'center', gap: s(14),
     backgroundColor: '#fff', borderRadius: 12, padding: s(14),
-    elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 2,
+    elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04, shadowRadius: 2,
   },
   stepBadge: {
     width: s(32), height: s(32), borderRadius: s(16),
@@ -538,7 +558,7 @@ const styles = StyleSheet.create({
 
   primaryBtn: {
     width: '100%', backgroundColor: '#E53935', borderRadius: 14,
-    paddingVertical: vs(16), alignItems: 'center', marginTop: vs(8),
+    paddingVertical: vs(16), alignItems: 'center',
   },
   primaryBtnText: { color: '#fff', fontWeight: 'bold', fontSize: fs(15) },
 
@@ -546,44 +566,49 @@ const styles = StyleSheet.create({
   permSub:   { fontSize: fs(14), color: '#888', textAlign: 'center', lineHeight: vs(22), marginBottom: vs(24) },
 
   // Measuring
-  measuringContent: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: s(32) },
-  heartIcon:        { fontSize: fs(80), marginBottom: vs(24) },
-  countdownText:    { fontSize: fs(72), fontWeight: 'bold', color: '#E53935' },
-  countdownLabel:   { fontSize: fs(14), color: 'rgba(255,255,255,0.7)', marginBottom: vs(24) },
+  measuringContent: {
+    flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: s(32),
+  },
+  heartIcon:      { fontSize: fs(80), marginBottom: vs(20) },
+  countdownText:  { fontSize: fs(72), fontWeight: 'bold', color: '#E53935' },
+  countdownLabel: { fontSize: fs(14), color: 'rgba(255,255,255,0.65)', marginBottom: vs(24) },
   progressBar: {
-    width: '100%', height: vs(8), backgroundColor: 'rgba(255,255,255,0.2)',
+    width: '100%', height: vs(8), backgroundColor: 'rgba(255,255,255,0.15)',
     borderRadius: 4, overflow: 'hidden', marginBottom: vs(20),
   },
-  progressFill:   { height: vs(8), backgroundColor: '#E53935', borderRadius: 4 },
-  measuringHint:  { fontSize: fs(13), color: 'rgba(255,255,255,0.6)', textAlign: 'center', marginTop: vs(4) },
+  progressFill:  { height: vs(8), backgroundColor: '#E53935', borderRadius: 4 },
+  measuringHint: { fontSize: fs(13), color: 'rgba(255,255,255,0.55)', textAlign: 'center', marginTop: vs(4) },
 
   // Processing
-  processingText: { fontSize: fs(16), color: '#555', marginTop: vs(16) },
+  processingText:    { fontSize: fs(16), color: '#555', marginTop: vs(16) },
+  processingSubText: { fontSize: fs(13), color: '#aaa', marginTop: vs(6) },
 
   // Result
-  resultContent: { alignItems: 'center', paddingHorizontal: s(24), paddingVertical: vs(24), gap: vs(16) },
-
-  bpmCard: {
-    width: '100%', backgroundColor: '#fff', borderRadius: 20,
-    padding: s(24), alignItems: 'center', borderWidth: 2,
-    elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 6,
+  resultContent: {
+    alignItems: 'center', paddingHorizontal: s(24), paddingVertical: vs(24), gap: vs(16),
   },
-  bpmLabel:     { fontSize: fs(11), color: '#aaa', fontWeight: '700', letterSpacing: 0.8, marginBottom: vs(8) },
+  bpmCard: {
+    width: '100%', backgroundColor: '#fff', borderRadius: 20, padding: s(24),
+    alignItems: 'center', borderWidth: 2,
+    elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1, shadowRadius: 6,
+  },
+  bpmLabel:     { fontSize: fs(11), color: '#aaa', fontWeight: '700', letterSpacing: 0.8, marginBottom: vs(6) },
   bpmValue:     { fontSize: fs(72), fontWeight: 'bold', lineHeight: vs(76) },
-  bpmUnit:      { fontSize: fs(18), fontWeight: '600', marginBottom: vs(12) },
+  bpmUnit:      { fontSize: fs(18), fontWeight: '600', marginBottom: vs(10) },
   bpmBadge: {
     borderRadius: 20, borderWidth: 1.5,
-    paddingVertical: vs(6), paddingHorizontal: s(16), marginBottom: vs(12),
+    paddingVertical: vs(5), paddingHorizontal: s(14), marginBottom: vs(10),
   },
   bpmBadgeText:   { fontSize: fs(14), fontWeight: '700' },
-  confidenceText: { fontSize: fs(11), color: '#aaa' },
+  confidenceText: { fontSize: fs(11), color: '#aaa', textAlign: 'center' },
 
   refRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: vs(6), gap: s(10) },
-  refDot: { width: s(10), height: s(10), borderRadius: 5 },
+  refDot:   { width: s(10), height: s(10), borderRadius: 5 },
   refLabel: { flex: 1, fontSize: fs(13), color: '#555' },
   refRange: { fontSize: fs(13), fontWeight: '700' },
 
   // Error
-  errorTitle: { fontSize: fs(20), fontWeight: 'bold', color: '#B71C1C', textAlign: 'center', marginBottom: vs(12) },
-  errorMsg:   { fontSize: fs(14), color: '#555', textAlign: 'center', lineHeight: vs(22), marginBottom: vs(24) },
+  errorTitle: { fontSize: fs(20), fontWeight: 'bold', color: '#B71C1C', textAlign: 'center', marginBottom: vs(4) },
+  errorMsg:   { fontSize: fs(14), color: '#555', textAlign: 'center', lineHeight: vs(22) },
 });
