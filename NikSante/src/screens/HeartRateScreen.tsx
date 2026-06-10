@@ -16,13 +16,26 @@ import {
   ScrollView,
   Animated,
 } from 'react-native';
-import {
-  Camera,
-  useCameraDevice,
-  useCameraPermission,
-  useFrameProcessor,
-} from 'react-native-vision-camera';
-import { runOnJS } from 'react-native-worklets-core';
+// Imports natifs conditionnels — Expo Go ne supporte pas ces modules
+let Camera: any        = null;
+let useCameraDevice: any    = () => null;
+let useCameraPermission: any = () => ({ hasPermission: false, requestPermission: async () => ({ granted: false }) });
+let useFrameProcessor: any  = () => undefined;
+let runOnJS: any       = (fn: any) => fn;
+let nativeAvailable    = false;
+
+try {
+  const vc = require('react-native-vision-camera');
+  const wc = require('react-native-worklets-core');
+  Camera              = vc.Camera;
+  useCameraDevice     = vc.useCameraDevice;
+  useCameraPermission = vc.useCameraPermission;
+  useFrameProcessor   = vc.useFrameProcessor;
+  runOnJS             = wc.runOnJS;
+  nativeAvailable     = true;
+} catch {
+  nativeAvailable = false;
+}
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
@@ -268,6 +281,30 @@ export default function HeartRateScreen() {
         <TouchableOpacity style={styles.primaryBtn} onPress={requestPermission}>
           <ThemedText style={styles.primaryBtnText}>Autoriser la caméra</ThemedText>
         </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
+  // Expo Go : modules natifs non disponibles
+  if (!nativeAvailable) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <ThemedText style={styles.backText}>← Retour</ThemedText>
+          </TouchableOpacity>
+          <ThemedText style={styles.headerTitle}>Fréquence cardiaque</ThemedText>
+          <View style={{ width: s(60) }} />
+        </View>
+        <View style={styles.centered}>
+          <ThemedText style={{ fontSize: fs(48), marginBottom: vs(16) }}>📱</ThemedText>
+          <ThemedText style={[styles.permTitle, { textAlign: 'center' }]}>
+            Disponible dans le build complet
+          </ThemedText>
+          <ThemedText style={[styles.permSub, { textAlign: 'center' }]}>
+            Cette fonctionnalité utilise la caméra en temps réel et nécessite un build natif (EAS Build). Elle n'est pas disponible dans Expo Go.
+          </ThemedText>
+        </View>
       </SafeAreaView>
     );
   }
