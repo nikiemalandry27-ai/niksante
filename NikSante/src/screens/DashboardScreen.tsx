@@ -302,7 +302,7 @@ export default function DashboardScreen() {
         )}
 
         {/* ── Graphique ── */}
-        <GlucoseChart data={glucoseHistory} maxBars={7} />
+        <GlucoseChart data={glucoseHistory} maxBars={7} unit={glucoseUnit} />
 
         {/* ── Historique récent ── */}
         {glucoseHistory.length > 0 && (

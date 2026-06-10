@@ -12,7 +12,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { GlucoseEntry } from '@/store/glucoseStore';
-import { getGlucoseStatus, getStatusColor } from '@/utils/glucoseHelper';
+import { getGlucoseStatus, getStatusColor, formatGlucose, toDisplay, GlucoseUnit } from '@/utils/glucoseHelper';
 import { GLUCOSE_THRESHOLDS } from '@/utils/constants';
 import { ThemedText } from '@/components/themed-text';
 
@@ -23,6 +23,7 @@ import { ThemedText } from '@/components/themed-text';
 interface Props {
   data: GlucoseEntry[];
   maxBars?: number;
+  unit?: GlucoseUnit;
 }
 
 // ---------------------------------------------------------------------------
@@ -41,7 +42,7 @@ function getYMax(values: number[]): number {
 // Composant
 // ---------------------------------------------------------------------------
 
-export default function GlucoseChart({ data, maxBars = 7 }: Props) {
+export default function GlucoseChart({ data, maxBars = 7, unit = 'mg_dl' }: Props) {
   // Afficher les N dernières entrées, du plus ancien au plus récent
   const entries = [...data].slice(0, maxBars).reverse();
 
@@ -96,7 +97,7 @@ export default function GlucoseChart({ data, maxBars = 7 }: Props) {
               <View key={entry.id} style={styles.barWrapper}>
                 {/* Valeur au-dessus */}
                 <ThemedText style={[styles.barValueLabel, { color }]}>
-                  {entry.value}
+                  {formatGlucose(entry.value, unit)}
                 </ThemedText>
 
                 {/* Espace flexible pour aligner les barres par le bas */}
@@ -142,7 +143,7 @@ export default function GlucoseChart({ data, maxBars = 7 }: Props) {
       {/* ── Valeurs de référence ── */}
       <View style={styles.refLabels}>
         <ThemedText style={styles.refLabel}>
-          Hypo &lt; {GLUCOSE_THRESHOLDS.HYPO_ALERT} · Normal {GLUCOSE_THRESHOLDS.NORMAL_MIN}–{GLUCOSE_THRESHOLDS.NORMAL_MAX} · Hyper &gt; {GLUCOSE_THRESHOLDS.NORMAL_MAX}
+          Hypo &lt; {toDisplay(GLUCOSE_THRESHOLDS.HYPO_ALERT, unit)} · Normal {toDisplay(GLUCOSE_THRESHOLDS.NORMAL_MIN, unit)}–{toDisplay(GLUCOSE_THRESHOLDS.NORMAL_MAX, unit)} · Hyper &gt; {toDisplay(GLUCOSE_THRESHOLDS.NORMAL_MAX, unit)}
         </ThemedText>
       </View>
     </View>
