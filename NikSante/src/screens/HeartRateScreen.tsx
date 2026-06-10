@@ -334,26 +334,55 @@ export default function HeartRateScreen() {
           <View style={{ width: s(60) }} />
         </View>
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          <ThemedText style={styles.bigEmoji}>👆</ThemedText>
-          <ThemedText style={styles.pageTitle}>Instructions</ThemedText>
 
+          {/* Illustration */}
+          <View style={styles.illustrationBox}>
+            <ThemedText style={styles.illustrationEmoji}>📱</ThemedText>
+            <ThemedText style={styles.illustrationArrow}>←</ThemedText>
+            <ThemedText style={styles.illustrationEmoji}>👆</ThemedText>
+          </View>
+          <ThemedText style={styles.pageTitle}>Comment mesurer</ThemedText>
+          <ThemedText style={styles.pageSubtitle}>
+            Placez votre doigt sur la caméra arrière pour démarrer
+          </ThemedText>
+
+          {/* Étapes */}
           {[
-            { step: '1', text: 'Placez le bout de votre index sur la caméra arrière' },
-            { step: '2', text: 'Couvrez complètement la caméra et le flash avec le doigt' },
-            { step: '3', text: 'Appuyez doucement — ne bloquez pas la lumière du flash' },
-            { step: '4', text: 'Restez absolument immobile pendant 15 secondes' },
+            { step: '1', icon: '👆', text: 'Posez le bout de votre index sur la caméra arrière', sub: 'La caméra se trouve au dos du téléphone' },
+            { step: '2', icon: '💡', text: 'Couvrez entièrement la caméra ET le flash', sub: 'Le flash doit être caché sous votre doigt' },
+            { step: '3', icon: '🤏', text: 'Appuyez doucement sans serrer', sub: 'Trop de pression bloque la circulation sanguine' },
+            { step: '4', icon: '🧘', text: 'Restez immobile pendant 15 secondes', sub: 'Tout mouvement fausse la mesure' },
           ].map((item) => (
-            <View key={item.step} style={styles.stepRow}>
+            <View key={item.step} style={styles.stepCard}>
               <View style={styles.stepBadge}>
                 <ThemedText style={styles.stepNum}>{item.step}</ThemedText>
               </View>
-              <ThemedText style={styles.stepText}>{item.text}</ThemedText>
+              <View style={styles.stepBody}>
+                <ThemedText style={styles.stepIcon}>{item.icon}</ThemedText>
+                <View style={{ flex: 1 }}>
+                  <ThemedText style={styles.stepText}>{item.text}</ThemedText>
+                  <ThemedText style={styles.stepSub}>{item.sub}</ThemedText>
+                </View>
+              </View>
             </View>
           ))}
+
+          {/* Note importante */}
+          <View style={styles.noteBox}>
+            <ThemedText style={styles.noteTitle}>💡 Conseils pour un bon résultat</ThemedText>
+            <ThemedText style={styles.noteText}>
+              • Posez le téléphone sur une table pour éviter les tremblements{'\n'}
+              • Asseyez-vous et restez calme quelques secondes avant de mesurer{'\n'}
+              • Évitez de parler pendant la mesure{'\n'}
+              • Si le résultat semble incorrect, attendez 1 minute et réessayez
+            </ThemedText>
+          </View>
 
           <TouchableOpacity style={styles.primaryBtn} onPress={startMeasurement}>
             <ThemedText style={styles.primaryBtnText}>▶  Démarrer la mesure (15 s)</ThemedText>
           </TouchableOpacity>
+
+          <View style={{ height: vs(8) }} />
         </ScrollView>
       </SafeAreaView>
     );
@@ -543,6 +572,22 @@ const styles = StyleSheet.create({
   infoTitle: { fontSize: fs(13), fontWeight: '700', color: '#555', marginBottom: vs(8) },
   infoText:  { fontSize: fs(13), color: '#555', lineHeight: vs(20) },
 
+  // Illustration
+  illustrationBox: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: s(12), marginBottom: vs(4),
+  },
+  illustrationEmoji: { fontSize: fs(48) },
+  illustrationArrow: { fontSize: fs(28), color: '#E53935', fontWeight: 'bold' },
+  pageSubtitle: { fontSize: fs(14), color: '#888', textAlign: 'center', marginTop: vs(-8) },
+
+  // Steps
+  stepCard: {
+    width: '100%', backgroundColor: '#fff', borderRadius: 14, padding: s(14),
+    flexDirection: 'row', alignItems: 'flex-start', gap: s(12),
+    elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 3,
+  },
   stepRow: {
     width: '100%', flexDirection: 'row', alignItems: 'center', gap: s(14),
     backgroundColor: '#fff', borderRadius: 12, padding: s(14),
@@ -550,11 +595,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04, shadowRadius: 2,
   },
   stepBadge: {
-    width: s(32), height: s(32), borderRadius: s(16),
+    width: s(30), height: s(30), borderRadius: s(15), marginTop: vs(2),
     backgroundColor: '#E53935', alignItems: 'center', justifyContent: 'center',
   },
-  stepNum:  { color: '#fff', fontWeight: 'bold', fontSize: fs(14) },
-  stepText: { flex: 1, fontSize: fs(14), color: '#333', lineHeight: vs(20) },
+  stepBody: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: s(10) },
+  stepIcon: { fontSize: fs(20), marginTop: vs(1) },
+  stepNum:  { color: '#fff', fontWeight: 'bold', fontSize: fs(13) },
+  stepText: { fontSize: fs(14), color: '#222', fontWeight: '600', lineHeight: vs(20), marginBottom: vs(2) },
+  stepSub:  { fontSize: fs(12), color: '#888', lineHeight: vs(17) },
+
+  // Note box
+  noteBox: {
+    width: '100%', backgroundColor: '#E8F5E9', borderRadius: 14,
+    padding: s(16), borderLeftWidth: 4, borderLeftColor: '#388E3C',
+  },
+  noteTitle: { fontSize: fs(13), fontWeight: '700', color: '#2E7D32', marginBottom: vs(8) },
+  noteText:  { fontSize: fs(13), color: '#388E3C', lineHeight: vs(22) },
 
   primaryBtn: {
     width: '100%', backgroundColor: '#E53935', borderRadius: 14,

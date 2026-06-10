@@ -393,7 +393,6 @@ export default function ProfileScreen() {
             { icon: '🏅', label: 'Récompenses',      desc: 'Badges, points et niveaux',      route: '/gamification'    },
             { icon: '🧠', label: 'Bien-être mental', desc: 'Humeur, respiration & conseils', route: '/mental-health'   },
             { icon: '📚', label: 'Guide Diabète',    desc: 'Tout savoir sur le diabète',     route: '/diabetes-guide'  },
-            { icon: '❤️', label: 'Fréquence cardiaque', desc: 'Estimation indicative via caméra', route: '/heart-rate' },
           ].map((item) => (
             <TouchableOpacity
               key={item.route}
