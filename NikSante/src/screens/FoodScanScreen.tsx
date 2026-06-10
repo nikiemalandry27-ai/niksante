@@ -271,6 +271,13 @@ export default function FoodScanScreen() {
         </View>
       )}
 
+      {/* Conseil étiquette */}
+      <View style={styles.labelTip}>
+        <ThemedText style={styles.labelTipText}>
+          💡 Pour de meilleurs résultats, pointez vers l'étiquette nutritionnelle de l'emballage. Vous pouvez aussi scanner un aliment sans emballage.
+        </ThemedText>
+      </View>
+
       <View style={styles.captureBar}>
         <TouchableOpacity
           style={[styles.captureBtn, !cameraReady && { opacity: 0.4 }]}
@@ -394,6 +401,13 @@ const styles = StyleSheet.create({
     padding: s(12), borderLeftWidth: 3, borderLeftColor: '#F57C00',
   },
   aiWarningText: { fontSize: fs(12), color: '#E65100', lineHeight: vs(18) },
+
+  labelTip: {
+    marginHorizontal: s(16), marginBottom: vs(10),
+    backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 12,
+    padding: s(12),
+  },
+  labelTipText: { fontSize: fs(12), color: '#fff', lineHeight: vs(18), textAlign: 'center' },
 
   actions:       { paddingHorizontal: s(16) },
   scanAgainBtn:  { backgroundColor: '#388E3C', borderRadius: 12, paddingVertical: vs(16), alignItems: 'center' },
