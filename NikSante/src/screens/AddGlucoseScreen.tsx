@@ -136,7 +136,7 @@ export default function AddGlucoseScreen() {
                   style={[styles.input, hasValue && { borderColor: statusColor }]}
                   placeholder={glucoseUnit === 'mmol_l' ? 'Ex : 6.7' : 'Ex : 120'}
                   placeholderTextColor="#bbb"
-                  keyboardType="number-pad"
+                  keyboardType={glucoseUnit === 'mmol_l' ? 'decimal-pad' : 'number-pad'}
                   value={glucoseValue}
                   onChangeText={(v) => setGlucoseValue(v.replace(/[^0-9.]/g, ''))}
                   editable={!loading}

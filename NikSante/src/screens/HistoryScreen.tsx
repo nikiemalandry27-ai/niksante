@@ -107,7 +107,7 @@ export default function HistoryScreen() {
   const handleDelete = (entry: GlucoseEntry) => {
     Alert.alert(
       'Supprimer cette mesure ?',
-      `${entry.value} mg/dL — ${formatDate(entry.date)}`,
+      `${formatGlucose(entry.value, glucoseUnit)} ${unitLabel(glucoseUnit)} — ${formatDate(entry.date)}`,
       [
         { text: 'Annuler', style: 'cancel' },
         {
