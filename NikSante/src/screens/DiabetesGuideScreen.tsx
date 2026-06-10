@@ -23,7 +23,6 @@ type Block =
 
 interface Chapter {
   id:       string;
-  emoji:    string;
   color:    string;
   bg:       string;
   title:    string;
@@ -39,7 +38,6 @@ const CHAPTERS: Chapter[] = [
   // ─────────────────────────────────────────────────────────────────────────
   {
     id: 'what',
-    emoji: '🔬',
     color: '#1565C0',
     bg: '#E3F2FD',
     title: "Qu'est-ce que le diabète ?",
@@ -55,7 +53,7 @@ const CHAPTERS: Chapter[] = [
       },
       {
         type: 'list',
-        title: '🔵 Diabète de type 1 (5–10 % des cas)',
+        title: 'Diabète de type 1 (5–10 % des cas)',
         items: [
           "Maladie auto-immune : le système immunitaire détruit les cellules productrices d'insuline",
           'Apparaît souvent chez les enfants et jeunes adultes (< 40 ans)',
@@ -66,28 +64,28 @@ const CHAPTERS: Chapter[] = [
       },
       {
         type: 'list',
-        title: '🟠 Diabète de type 2 (90 % des cas)',
+        title: 'Diabète de type 2 (90 % des cas)',
         items: [
           "Résistance à l'insuline : les cellules répondent moins bien à l'hormone",
           "Déficit progressif de la sécrétion d'insuline",
           'Se développe lentement, souvent asymptomatique au début',
-          'Fortement lié au surpoids, la sédentarité et l\'alimentation',
+          "Fortement lié au surpoids, la sédentarité et l'alimentation",
           'Peut être contrôlé (parfois en rémission) par le mode de vie',
           'Touche principalement les adultes de plus de 40 ans, mais de plus en plus de jeunes',
         ],
       },
       {
         type: 'list',
-        title: '🟣 Autres formes de diabète',
+        title: 'Autres formes de diabète',
         items: [
-          'Diabète gestationnel : survient pendant la grossesse, disparaît souvent après l\'accouchement',
+          "Diabète gestationnel : survient pendant la grossesse, disparaît souvent après l'accouchement",
           'MODY (Maturity Onset Diabetes of the Young) : forme génétique rare',
           'Diabète secondaire : causé par une autre maladie (pancréatite, cancer du pancréas…)',
         ],
       },
       {
         type: 'tip',
-        text: '💡 En France, environ 4,5 millions de personnes sont diabétiques, dont 1 million s\'ignorent. Le dépistage précoce est essentiel.',
+        text: "En France, environ 4,5 millions de personnes sont diabétiques, dont 1 million s'ignorent. Le dépistage précoce est essentiel.",
       },
     ],
   },
@@ -95,7 +93,6 @@ const CHAPTERS: Chapter[] = [
   // ─────────────────────────────────────────────────────────────────────────
   {
     id: 'symptoms',
-    emoji: '🩺',
     color: '#E53935',
     bg: '#FFEBEE',
     title: 'Reconnaître les symptômes',
@@ -107,33 +104,33 @@ const CHAPTERS: Chapter[] = [
       },
       {
         type: 'list',
-        title: '⚠️ Les 3 symptômes classiques ("3P")',
+        title: 'Les 3 symptômes classiques ("3P")',
         items: [
-          '🚽 Polyurie : urines très fréquentes et abondantes (y compris la nuit)',
-          '🥤 Polydipsie : soif intense et persistante',
-          '🍽️ Polyphagie : faim excessive malgré une alimentation normale',
+          "Polyurie : urines très fréquentes et abondantes (y compris la nuit)",
+          'Polydipsie : soif intense et persistante',
+          'Polyphagie : faim excessive malgré une alimentation normale',
         ],
       },
       {
         type: 'list',
-        title: '🔍 Autres symptômes fréquents',
+        title: 'Autres symptômes fréquents',
         items: [
-          '😴 Fatigue intense, manque d\'énergie, somnolence après les repas',
-          '👁️ Vision floue ou qui change rapidement',
-          '🩹 Plaies et coupures qui cicatrisent lentement',
-          '🦶 Fourmillements, engourdissements ou douleurs dans les mains et les pieds',
-          '🦠 Infections répétées (mycoses génitales, infections urinaires, furoncles)',
-          '⚖️ Amaigrissement inexpliqué (surtout dans le type 1)',
-          '🤢 Nausées, vomissements (en cas de cétose)',
+          "Fatigue intense, manque d'énergie, somnolence après les repas",
+          'Vision floue ou qui change rapidement',
+          'Plaies et coupures qui cicatrisent lentement',
+          'Fourmillements, engourdissements ou douleurs dans les mains et les pieds',
+          'Infections répétées (mycoses génitales, infections urinaires, furoncles)',
+          'Amaigrissement inexpliqué (surtout dans le type 1)',
+          'Nausées, vomissements (en cas de cétose)',
         ],
       },
       {
         type: 'warning',
-        text: "⚠️ Le diabète de type 2 peut évoluer sans symptôme pendant 5 à 10 ans. Une glycémie à jeun est recommandée tous les 3 ans après 45 ans, ou plus tôt si des facteurs de risque sont présents.",
+        text: "Le diabète de type 2 peut évoluer sans symptôme pendant 5 à 10 ans. Une glycémie à jeun est recommandée tous les 3 ans après 45 ans, ou plus tôt si des facteurs de risque sont présents.",
       },
       {
         type: 'list',
-        title: '🎯 Facteurs de risque à surveiller',
+        title: 'Facteurs de risque à surveiller',
         items: [
           'Surpoids ou obésité (IMC > 25)',
           'Tour de taille > 94 cm (homme) ou > 80 cm (femme)',
@@ -150,7 +147,6 @@ const CHAPTERS: Chapter[] = [
   // ─────────────────────────────────────────────────────────────────────────
   {
     id: 'glucose',
-    emoji: '📊',
     color: '#388E3C',
     bg: '#E8F5E9',
     title: 'La glycémie expliquée',
@@ -175,30 +171,30 @@ const CHAPTERS: Chapter[] = [
       },
       {
         type: 'list',
-        title: "🎯 L'HbA1c — Hémoglobine glyquée",
+        title: "L'HbA1c — Hémoglobine glyquée",
         items: [
           'Mesure la glycémie moyenne des 3 derniers mois',
           'Exprimée en pourcentage',
           'Normal : < 5,7 %',
           'Prédiabète : 5,7–6,4 %',
           'Diabète : ≥ 6,5 %',
-          'Objectif thérapeutique habituel : < 7 % (à adapter selon l\'âge et le profil)',
+          "Objectif thérapeutique habituel : < 7 % (à adapter selon l'âge et le profil)",
           'À contrôler tous les 3 mois',
         ],
       },
       {
         type: 'list',
-        title: '⏰ Facteurs influençant la glycémie',
+        title: 'Facteurs influençant la glycémie',
         items: [
-          '📈 Font monter la glycémie : glucides, stress, infections, médicaments corticoïdes, manque de sommeil, phénomène de l\'aube',
-          '📉 Font baisser la glycémie : exercice physique, insuline et médicaments antidiabétiques, jeûne',
-          '🌅 Phénomène de l\'aube : glycémie naturellement plus élevée le matin (hormones du réveil)',
-          '🔁 Effet Somogyi : hyperglycémie rebond après une hypoglycémie nocturne',
+          "Font monter la glycémie : glucides, stress, infections, médicaments corticoïdes, manque de sommeil, phénomène de l'aube",
+          'Font baisser la glycémie : exercice physique, insuline et médicaments antidiabétiques, jeûne',
+          "Phénomène de l'aube : glycémie naturellement plus élevée le matin (hormones du réveil)",
+          'Effet Somogyi : hyperglycémie rebond après une hypoglycémie nocturne',
         ],
       },
       {
         type: 'tip',
-        text: '💡 Le Temps Dans la Cible (TIR — Time In Range) : objectif d\'avoir sa glycémie entre 70 et 180 mg/dL pendant au moins 70 % du temps. Cet indicateur est de plus en plus utilisé pour évaluer l\'équilibre glycémique.',
+        text: "Le Temps Dans la Cible (TIR — Time In Range) : objectif d'avoir sa glycémie entre 70 et 180 mg/dL pendant au moins 70 % du temps. Cet indicateur est de plus en plus utilisé pour évaluer l'équilibre glycémique.",
       },
     ],
   },
@@ -206,7 +202,6 @@ const CHAPTERS: Chapter[] = [
   // ─────────────────────────────────────────────────────────────────────────
   {
     id: 'diet',
-    emoji: '🥗',
     color: '#F57C00',
     bg: '#FFF3E0',
     title: "L'alimentation du diabétique",
@@ -218,55 +213,55 @@ const CHAPTERS: Chapter[] = [
       },
       {
         type: 'list',
-        title: "📊 L'Index Glycémique (IG)",
+        title: "L'Index Glycémique (IG)",
         items: [
           "Mesure la vitesse à laquelle un aliment fait monter la glycémie (de 0 à 100)",
           'IG élevé (> 70) : pain blanc, riz blanc, pomme de terre, sodas → pics glycémiques',
           'IG moyen (55–70) : riz complet, maïs, banane mûre',
           'IG bas (< 55) : légumineuses, légumes, céréales complètes, plupart des fruits → préférer',
-          'La cuisson, la maturité et la transformation modifient l\'IG',
+          "La cuisson, la maturité et la transformation modifient l'IG",
           'IG des pâtes al dente < pâtes bien cuites',
         ],
       },
       {
         type: 'list',
-        title: '✅ Aliments à privilégier',
+        title: 'Aliments à privilégier',
         items: [
-          '🥦 Légumes non féculents (brocoli, épinards, courgettes, tomates) → sans limite',
-          '🫘 Légumineuses (lentilles, pois chiches, haricots) → très bonne source de protéines et fibres',
-          '🐟 Poissons gras (saumon, maquereau) → oméga-3 bénéfiques pour le cœur',
-          '🥚 Œufs, volaille sans peau → faible impact glycémique',
-          '🫐 Fruits entiers (pomme, poire, fruits rouges) → modérément',
-          '🌾 Céréales complètes (avoine, quinoa, sarrasin)',
-          '🫒 Huile d\'olive, avocat, noix → graisses insaturées',
-          '🥛 Produits laitiers nature sans sucre ajouté',
+          'Légumes non féculents (brocoli, épinards, courgettes, tomates) → sans limite',
+          'Légumineuses (lentilles, pois chiches, haricots) → très bonne source de protéines et fibres',
+          'Poissons gras (saumon, maquereau) → oméga-3 bénéfiques pour le cœur',
+          'Œufs, volaille sans peau → faible impact glycémique',
+          'Fruits entiers (pomme, poire, fruits rouges) → modérément',
+          'Céréales complètes (avoine, quinoa, sarrasin)',
+          "Huile d'olive, avocat, noix → graisses insaturées",
+          'Produits laitiers nature sans sucre ajouté',
         ],
       },
       {
         type: 'list',
-        title: '❌ Aliments à limiter ou éviter',
+        title: 'Aliments à limiter ou éviter',
         items: [
-          '🥤 Boissons sucrées, sodas, jus de fruits → pics glycémiques immédiats',
-          '🍬 Confiseries, bonbons, sucre ajouté',
-          '🍞 Pain blanc, viennoiseries, biscuits industriels',
-          '🍟 Aliments frits, fast-food',
-          '🥔 Pomme de terre (IG très élevé surtout en purée)',
-          '🍺 Alcool : risque d\'hypoglycémie, surtout avec insuline',
-          '🍫 Chocolat au lait, desserts sucrés',
+          'Boissons sucrées, sodas, jus de fruits → pics glycémiques immédiats',
+          'Confiseries, bonbons, sucre ajouté',
+          'Pain blanc, viennoiseries, biscuits industriels',
+          'Aliments frits, fast-food',
+          'Pomme de terre (IG très élevé surtout en purée)',
+          "Alcool : risque d'hypoglycémie, surtout avec insuline",
+          'Chocolat au lait, desserts sucrés',
         ],
       },
       {
         type: 'tip',
-        text: "💡 Règle de l'assiette idéale : ½ légumes non féculents + ¼ féculents à IG bas + ¼ protéines maigres. Mangez à des horaires réguliers et évitez de sauter des repas.",
+        text: "Règle de l'assiette idéale : ½ légumes non féculents + ¼ féculents à IG bas + ¼ protéines maigres. Mangez à des horaires réguliers et évitez de sauter des repas.",
       },
       {
         type: 'list',
-        title: '🍷 Alcool et diabète',
+        title: 'Alcool et diabète',
         items: [
           "L'alcool inhibe la production de glucose par le foie",
-          'Risque d\'hypoglycémie retardée (jusqu\'à 24h après)',
+          "Risque d'hypoglycémie retardée (jusqu'à 24h après)",
           'Si vous buvez : mangez toujours en même temps',
-          'Evitez les cocktails sucrés, préférez un verre de vin sec',
+          'Évitez les cocktails sucrés, préférez un verre de vin sec',
           'Informez votre entourage que vous êtes diabétique',
         ],
       },
@@ -276,7 +271,6 @@ const CHAPTERS: Chapter[] = [
   // ─────────────────────────────────────────────────────────────────────────
   {
     id: 'exercise',
-    emoji: '🏃',
     color: '#7B1FA2',
     bg: '#F3E5F5',
     title: "L'activité physique",
@@ -288,45 +282,45 @@ const CHAPTERS: Chapter[] = [
       },
       {
         type: 'list',
-        title: '💪 Bénéfices prouvés de l\'exercice',
+        title: "Bénéfices prouvés de l'exercice",
         items: [
-          "📉 Baisse immédiate et durable de la glycémie (les muscles consomment du glucose)",
-          "🔑 Améliore la sensibilité à l'insuline (moins d'insuline nécessaire)",
-          "❤️ Réduit le risque cardiovasculaire (1ère cause de mortalité chez les diabétiques)",
-          "⚖️ Aide à contrôler le poids",
-          "😊 Améliore l'humeur, réduit le stress et l'anxiété",
-          "💤 Améliore la qualité du sommeil",
-          "🦴 Renforce os et muscles",
+          "Baisse immédiate et durable de la glycémie (les muscles consomment du glucose)",
+          "Améliore la sensibilité à l'insuline (moins d'insuline nécessaire)",
+          "Réduit le risque cardiovasculaire (1ère cause de mortalité chez les diabétiques)",
+          "Aide à contrôler le poids",
+          "Améliore l'humeur, réduit le stress et l'anxiété",
+          "Améliore la qualité du sommeil",
+          "Renforce os et muscles",
         ],
       },
       {
         type: 'list',
-        title: '🏅 Exercices recommandés',
+        title: 'Exercices recommandés',
         items: [
-          '🚶 Marche rapide 30 min/jour : simple, efficace, accessible à tous',
-          '🚴 Vélo, natation, aquagym : exercices à faible impact articulaire',
-          '💃 Danse, yoga : combine mouvement et bien-être mental',
-          '🏋️ Musculation légère : améliore la composition corporelle',
-          '🧘 Tai-chi : bénéfique pour l\'équilibre glycémique et le stress',
-          'Objectif OMS : 150 min d\'activité modérée par semaine minimum',
+          'Marche rapide 30 min/jour : simple, efficace, accessible à tous',
+          'Vélo, natation, aquagym : exercices à faible impact articulaire',
+          'Danse, yoga : combine mouvement et bien-être mental',
+          'Musculation légère : améliore la composition corporelle',
+          "Tai-chi : bénéfique pour l'équilibre glycémique et le stress",
+          "Objectif OMS : 150 min d'activité modérée par semaine minimum",
         ],
       },
       {
         type: 'list',
-        title: '⚠️ Précautions importantes',
+        title: 'Précautions importantes',
         items: [
-          '🩸 Mesurer la glycémie AVANT l\'exercice',
+          "Mesurer la glycémie AVANT l'exercice",
           'Si glycémie < 100 mg/dL : prendre une collation (15g de glucides) avant de commencer',
-          'Si glycémie > 250 mg/dL : reporter l\'exercice et vérifier la présence de cétones',
-          '🧃 Emporter toujours du sucre rapide (jus, bonbons) pendant l\'effort',
-          'Mesurer après l\'exercice et 2h après (risque d\'hypoglycémie retardée)',
-          '💧 Bien s\'hydrater avant, pendant et après',
-          '👟 Inspecter ses pieds avant et après (neuropathie = moins de sensibilité)',
+          "Si glycémie > 250 mg/dL : reporter l'exercice et vérifier la présence de cétones",
+          "Emporter toujours du sucre rapide (jus, bonbons) pendant l'effort",
+          "Mesurer après l'exercice et 2h après (risque d'hypoglycémie retardée)",
+          "Bien s'hydrater avant, pendant et après",
+          'Inspecter ses pieds avant et après (neuropathie = moins de sensibilité)',
         ],
       },
       {
         type: 'warning',
-        text: "⚠️ L'hypoglycémie peut survenir pendant, immédiatement après ou jusqu'à 12–24h après un exercice intense. Soyez vigilant, surtout si vous prenez de l'insuline ou des sulfamides.",
+        text: "L'hypoglycémie peut survenir pendant, immédiatement après ou jusqu'à 12–24h après un exercice intense. Soyez vigilant, surtout si vous prenez de l'insuline ou des sulfamides.",
       },
     ],
   },
@@ -334,7 +328,6 @@ const CHAPTERS: Chapter[] = [
   // ─────────────────────────────────────────────────────────────────────────
   {
     id: 'medications',
-    emoji: '💊',
     color: '#00897B',
     bg: '#E0F2F1',
     title: 'Les médicaments du diabète',
@@ -346,43 +339,43 @@ const CHAPTERS: Chapter[] = [
       },
       {
         type: 'list',
-        title: "💉 Les insulines (type 1 obligatoire, type 2 parfois)",
+        title: "Les insulines (type 1 obligatoire, type 2 parfois)",
         items: [
-          "⚡ Insuline ultra-rapide (Novorapid, Humalog, Apidra) : agit en 10–20 min, dure 3–5h. Se prend juste avant le repas",
-          "⚡ Insuline rapide (Actrapid) : agit en 30 min, dure 6–8h",
-          "🕐 Insuline intermédiaire NPH (Insulatard) : durée 12–16h",
-          "🌙 Insuline lente basale (Lantus, Toujeo, Levemir) : dure 20–24h. Une injection/jour, assure l'insulinémie de base",
-          "🔄 Mélanges pré-mélangés (Mixtard, Novomix) : pratique mais moins flexible",
+          "Insuline ultra-rapide (Novorapid, Humalog, Apidra) : agit en 10–20 min, dure 3–5h. Se prend juste avant le repas",
+          "Insuline rapide (Actrapid) : agit en 30 min, dure 6–8h",
+          "Insuline intermédiaire NPH (Insulatard) : durée 12–16h",
+          "Insuline lente basale (Lantus, Toujeo, Levemir) : dure 20–24h. Une injection/jour, assure l'insulinémie de base",
+          "Mélanges pré-mélangés (Mixtard, Novomix) : pratique mais moins flexible",
         ],
       },
       {
         type: 'list',
-        title: "💊 Médicaments oraux (type 2)",
+        title: "Médicaments oraux (type 2)",
         items: [
-          "🟢 Metformine (Glucophage) : 1ère intention, réduit la production hépatique de glucose, pas d'hypoglycémie, protège le cœur",
-          "🟡 Sulfamides (Diamicron, Amarel) : stimulent la sécrétion d'insuline. Risque d'hypoglycémie",
-          "🔵 DPP-4 / Gliptines (Januvia, Galvus) : bien tolérés, risque hypo faible",
-          "🟣 GLP-1 (Ozempic, Victoza, Trulicity) : injections 1x/semaine, perte de poids significative, protection cardiovasculaire",
-          "🟠 SGLT2 / Gliflozines (Jardiance, Forxiga) : éliminent le glucose par les urines. Protection rénale et cardiaque prouvée",
-          "🔴 Acarbose (Glucor) : ralentit l'absorption des glucides. Gaz intestinaux fréquents",
+          "Metformine (Glucophage) : 1ère intention, réduit la production hépatique de glucose, pas d'hypoglycémie, protège le cœur",
+          "Sulfamides (Diamicron, Amarel) : stimulent la sécrétion d'insuline. Risque d'hypoglycémie",
+          "DPP-4 / Gliptines (Januvia, Galvus) : bien tolérés, risque hypo faible",
+          "GLP-1 (Ozempic, Victoza, Trulicity) : injections 1x/semaine, perte de poids significative, protection cardiovasculaire",
+          "SGLT2 / Gliflozines (Jardiance, Forxiga) : éliminent le glucose par les urines. Protection rénale et cardiaque prouvée",
+          "Acarbose (Glucor) : ralentit l'absorption des glucides. Gaz intestinaux fréquents",
         ],
       },
       {
         type: 'list',
-        title: "💉 Sites d'injection de l'insuline",
+        title: "Sites d'injection de l'insuline",
         items: [
-          '🤰 Abdomen (zone autour du nombril) : absorption la plus rapide et régulière',
-          '🦵 Cuisses (face externe) : absorption plus lente',
-          '💪 Bras (face externe) : absorption intermédiaire',
-          '🍑 Fesses : absorption la plus lente',
+          'Abdomen (zone autour du nombril) : absorption la plus rapide et régulière',
+          'Cuisses (face externe) : absorption plus lente',
+          'Bras (face externe) : absorption intermédiaire',
+          'Fesses : absorption la plus lente',
           'Rotation des sites à chaque injection pour éviter la lipodystrophie',
-          'Laisser l\'alcool sécher avant de piquer',
+          "Laisser l'alcool sécher avant de piquer",
           'Ne jamais injecter dans un muscle',
         ],
       },
       {
         type: 'tip',
-        text: "💡 Conservation de l'insuline : au réfrigérateur (2–8°C) non ouverte. Une fois ouverte : à température ambiante, à l'abri de la chaleur et de la lumière, max 30 jours. Ne jamais congeler.",
+        text: "Conservation de l'insuline : au réfrigérateur (2–8°C) non ouverte. Une fois ouverte : à température ambiante, à l'abri de la chaleur et de la lumière, max 30 jours. Ne jamais congeler.",
       },
     ],
   },
@@ -390,7 +383,6 @@ const CHAPTERS: Chapter[] = [
   // ─────────────────────────────────────────────────────────────────────────
   {
     id: 'monitoring',
-    emoji: '🩸',
     color: '#C62828',
     bg: '#FFEBEE',
     title: 'Surveiller sa glycémie',
@@ -402,20 +394,20 @@ const CHAPTERS: Chapter[] = [
       },
       {
         type: 'list',
-        title: "📅 Quand mesurer sa glycémie ?",
+        title: "Quand mesurer sa glycémie ?",
         items: [
-          '🌅 À jeun le matin (avant tout aliment) : évalue la glycémie basale',
-          '🍽️ Avant les repas : pour adapter la dose d\'insuline ou vérifier l\'équilibre',
-          '🕐 1–2h après le début du repas : évalue l\'impact de ce repas',
-          '🌙 Au coucher : pour détecter un risque d\'hypo nocturne',
-          '🏃 Avant et après l\'exercice physique',
-          '🤒 En cas de maladie, fièvre, stress important',
-          '🚗 Avant de conduire (si insulino-traité)',
+          'À jeun le matin (avant tout aliment) : évalue la glycémie basale',
+          "Avant les repas : pour adapter la dose d'insuline ou vérifier l'équilibre",
+          '1–2h après le début du repas : évalue l\'impact de ce repas',
+          "Au coucher : pour détecter un risque d'hypo nocturne",
+          "Avant et après l'exercice physique",
+          'En cas de maladie, fièvre, stress important',
+          'Avant de conduire (si insulino-traité)',
         ],
       },
       {
         type: 'list',
-        title: "📏 Fréquence recommandée",
+        title: "Fréquence recommandée",
         items: [
           'Diabète type 1 sous insuline : 4 à 8 mesures par jour minimum',
           'Diabète type 2 sous insuline : 2 à 4 mesures par jour',
@@ -425,20 +417,20 @@ const CHAPTERS: Chapter[] = [
       },
       {
         type: 'list',
-        title: "📱 Technique correcte au glucomètre",
+        title: "Technique correcte au glucomètre",
         items: [
-          'Bien se laver les mains à l\'eau tiède (pas d\'alcool → fausse valeur)',
+          "Bien se laver les mains à l'eau tiède (pas d'alcool → fausse valeur)",
           'Piquer sur le côté du bout du doigt (moins douloureux)',
           'La 1ère goutte de sang peut être essuyée pour plus de précision',
           'Ne pas comprimer fort le doigt (dilue le sang)',
-          'Calibrer régulièrement l\'appareil',
+          "Calibrer régulièrement l'appareil",
           'Vérifier la date de péremption des bandelettes',
-          'Stocker les bandelettes à l\'abri de l\'humidité et de la chaleur',
+          "Stocker les bandelettes à l'abri de l'humidité et de la chaleur",
         ],
       },
       {
         type: 'list',
-        title: '📡 Capteurs de glucose en continu (CGM)',
+        title: 'Capteurs de glucose en continu (CGM)',
         items: [
           'FreeStyle Libre (Abbott) : capteur porté 14 jours sur le bras, lecture par scan du smartphone',
           'Dexcom G7 : mesure en continu toutes les 5 min, alertes automatiques hypo/hyper',
@@ -449,7 +441,7 @@ const CHAPTERS: Chapter[] = [
       },
       {
         type: 'tip',
-        text: "💡 Consignez vos mesures dans un carnet ou une application comme NikSanté. Notez le contexte (repas, exercice, stress) pour mieux comprendre les variations de votre glycémie.",
+        text: "Consignez vos mesures dans un carnet ou une application comme NikSanté. Notez le contexte (repas, exercice, stress) pour mieux comprendre les variations de votre glycémie.",
       },
     ],
   },
@@ -457,7 +449,6 @@ const CHAPTERS: Chapter[] = [
   // ─────────────────────────────────────────────────────────────────────────
   {
     id: 'complications',
-    emoji: '⚠️',
     color: '#E65100',
     bg: '#FFF3E0',
     title: 'Complications du diabète',
@@ -469,7 +460,7 @@ const CHAPTERS: Chapter[] = [
       },
       {
         type: 'list',
-        title: '👁️ Rétinopathie diabétique (yeux)',
+        title: 'Rétinopathie diabétique (yeux)',
         items: [
           'Atteinte des petits vaisseaux de la rétine',
           '1ère cause de cécité chez les adultes actifs',
@@ -480,10 +471,10 @@ const CHAPTERS: Chapter[] = [
       },
       {
         type: 'list',
-        title: '🫘 Néphropathie diabétique (reins)',
+        title: 'Néphropathie diabétique (reins)',
         items: [
           'Atteinte des glomérules rénaux (filtres du sang)',
-          '1ère cause d\'insuffisance rénale en France',
+          "1ère cause d'insuffisance rénale en France",
           'Détectée par une microalbuminurie dans les urines',
           'Peut évoluer vers la dialyse ou la transplantation',
           'Prévention : contrôle glycémique + tensionnel + éviter les anti-inflammatoires',
@@ -491,7 +482,7 @@ const CHAPTERS: Chapter[] = [
       },
       {
         type: 'list',
-        title: '⚡ Neuropathie diabétique (nerfs)',
+        title: 'Neuropathie diabétique (nerfs)',
         items: [
           'Atteinte des nerfs périphériques et végétatifs',
           'Symptômes : fourmillements, brûlures, douleurs dans les pieds/mains',
@@ -502,17 +493,17 @@ const CHAPTERS: Chapter[] = [
       },
       {
         type: 'list',
-        title: '❤️ Maladies cardiovasculaires',
+        title: 'Maladies cardiovasculaires',
         items: [
-          'Risque d\'infarctus x2 à x4 chez les diabétiques',
-          'Risque d\'AVC x2',
+          "Risque d'infarctus x2 à x4 chez les diabétiques",
+          "Risque d'AVC x2",
           'Artériopathie des membres inférieurs (douleurs à la marche)',
           'Prévention : contrôle glycémique + tensionnel + statines + activité physique + arrêt tabac',
         ],
       },
       {
         type: 'list',
-        title: '🦶 Pied diabétique',
+        title: 'Pied diabétique',
         items: [
           'Combinaison de neuropathie (perte de sensibilité) + artériopathie (mauvaise cicatrisation)',
           'Risque d\'ulcères chroniques, infections graves, gangrène',
@@ -525,12 +516,12 @@ const CHAPTERS: Chapter[] = [
       {
         type: 'table',
         rows: [
-          { label: '👁️ Fond d\'œil',          value: '1 fois par an',        color: '#1565C0' },
-          { label: '🫘 Créatinine / albumine', value: '1 fois par an',        color: '#1565C0' },
-          { label: '❤️ Bilan cardiovasculaire', value: '1 fois par an',       color: '#1565C0' },
-          { label: '🦶 Examen des pieds',      value: '1 fois par an (podo)', color: '#1565C0' },
-          { label: '🩸 HbA1c',                value: 'Tous les 3 mois',      color: '#388E3C' },
-          { label: '💊 Consultation diabéto',  value: '2 à 4 fois par an',    color: '#388E3C' },
+          { label: "Fond d'œil",              value: '1 fois par an',        color: '#1565C0' },
+          { label: 'Créatinine / albumine',   value: '1 fois par an',        color: '#1565C0' },
+          { label: 'Bilan cardiovasculaire',  value: '1 fois par an',        color: '#1565C0' },
+          { label: 'Examen des pieds',        value: '1 fois par an (podo)', color: '#1565C0' },
+          { label: 'HbA1c',                  value: 'Tous les 3 mois',      color: '#388E3C' },
+          { label: 'Consultation diabéto',   value: '2 à 4 fois par an',    color: '#388E3C' },
         ],
       },
     ],
@@ -539,7 +530,6 @@ const CHAPTERS: Chapter[] = [
   // ─────────────────────────────────────────────────────────────────────────
   {
     id: 'emergencies',
-    emoji: '🚨',
     color: '#B71C1C',
     bg: '#FFEBEE',
     title: 'Urgences glycémiques',
@@ -547,48 +537,48 @@ const CHAPTERS: Chapter[] = [
     blocks: [
       {
         type: 'list',
-        title: '📉 Hypoglycémie (glycémie < 70 mg/dL)',
+        title: 'Hypoglycémie (glycémie < 70 mg/dL)',
         items: [
-          '⚡ Causes : repas sauté, dose d\'insuline trop forte, exercice non prévu, alcool',
-          '😰 Symptômes légers : tremblements, sueurs froides, palpitations, faim, irritabilité',
-          '😵 Symptômes sévères : confusion, vision trouble, convulsions, perte de conscience',
-          '🍬 Traitement : 15g de glucides rapides (3 morceaux de sucre, 150 ml jus, 1 cuillère de miel)',
-          '⏱️ Attendre 15 minutes et remesurer',
-          '🔁 Si toujours < 70 mg/dL : répéter la prise de sucre',
-          '🍞 Stabiliser avec une collation complexe (pain + fromage)',
-          '🚑 Inconscience : glucagon IM/SC (kit Glucagen) — appeler le 15',
+          "Causes : repas sauté, dose d'insuline trop forte, exercice non prévu, alcool",
+          'Symptômes légers : tremblements, sueurs froides, palpitations, faim, irritabilité',
+          'Symptômes sévères : confusion, vision trouble, convulsions, perte de conscience',
+          'Traitement : 15g de glucides rapides (3 morceaux de sucre, 150 ml jus, 1 cuillère de miel)',
+          'Attendre 15 minutes et remesurer',
+          'Si toujours < 70 mg/dL : répéter la prise de sucre',
+          'Stabiliser avec une collation complexe (pain + fromage)',
+          'Inconscience : glucagon IM/SC (kit Glucagen) — appeler le 15',
         ],
       },
       {
         type: 'warning',
-        text: "⚠️ Ne JAMAIS forcer une personne inconsciente à boire ou manger. La mettre en position latérale de sécurité (PLS) et appeler le 15 (SAMU).",
+        text: "Ne JAMAIS forcer une personne inconsciente à boire ou manger. La mettre en position latérale de sécurité (PLS) et appeler le 15 (SAMU).",
       },
       {
         type: 'list',
-        title: '📈 Hyperglycémie (glycémie > 200 mg/dL)',
+        title: 'Hyperglycémie (glycémie > 200 mg/dL)',
         items: [
-          '⚡ Causes : oubli de traitement, infection, stress, excès alimentaire',
-          '🥤 Symptômes : soif intense, urines fréquentes, fatigue, vision floue',
-          '💧 Action : boire de l\'eau, prendre son traitement habituel si prescrit',
-          '🚶 Marche 15–20 min si possible (fait baisser la glycémie)',
-          '🔁 Remesurer après 1–2 heures',
+          "Causes : oubli de traitement, infection, stress, excès alimentaire",
+          'Symptômes : soif intense, urines fréquentes, fatigue, vision floue',
+          "Action : boire de l'eau, prendre son traitement habituel si prescrit",
+          'Marche 15–20 min si possible (fait baisser la glycémie)',
+          'Remesurer après 1–2 heures',
           'Si > 300 mg/dL malgré traitement : consulter rapidement',
         ],
       },
       {
         type: 'list',
-        title: '☠️ Acidocétose diabétique (ACD) — URGENCE',
+        title: 'Acidocétose diabétique (ACD) — URGENCE',
         items: [
           'Surtout dans le diabète de type 1',
-          'Survient quand l\'organisme manque d\'insuline et brûle les graisses (cétones)',
+          "Survient quand l'organisme manque d'insuline et brûle les graisses (cétones)",
           'Signes : nausées, vomissements, douleurs abdominales, haleine fruitée (acétonée), hyperventilation',
           'Glycémie souvent > 300 mg/dL + présence de cétones dans les urines',
-          '🚑 APPELER LE 15 IMMÉDIATEMENT — hospitalisation en urgence nécessaire',
+          'APPELER LE 15 IMMÉDIATEMENT — hospitalisation en urgence nécessaire',
         ],
       },
       {
         type: 'list',
-        title: '🏥 Quand appeler le 15 (SAMU) ?',
+        title: 'Quand appeler le 15 (SAMU) ?',
         items: [
           'Perte de conscience ou convulsions',
           'Impossibilité de faire avaler du sucre',
@@ -604,7 +594,6 @@ const CHAPTERS: Chapter[] = [
   // ─────────────────────────────────────────────────────────────────────────
   {
     id: 'lifestyle',
-    emoji: '🌟',
     color: '#5C6BC0',
     bg: '#E8EAF6',
     title: 'Bien vivre avec le diabète',
@@ -616,35 +605,35 @@ const CHAPTERS: Chapter[] = [
       },
       {
         type: 'list',
-        title: '🧠 Santé mentale et diabète',
+        title: 'Santé mentale et diabète',
         items: [
-          '😟 La détresse diabétique (Diabetes Distress) touche 35–40 % des diabétiques',
-          '😔 Le risque de dépression est 2 à 3 fois plus élevé que dans la population générale',
-          '💬 Parler de ses difficultés à son médecin, un psychologue ou un groupe de soutien',
-          '🧘 Techniques de gestion du stress : respiration, méditation, yoga',
-          '🤝 Rejoindre une association de patients (AFD, Aide aux Jeunes Diabétiques)',
+          'La détresse diabétique (Diabetes Distress) touche 35–40 % des diabétiques',
+          'Le risque de dépression est 2 à 3 fois plus élevé que dans la population générale',
+          'Parler de ses difficultés à son médecin, un psychologue ou un groupe de soutien',
+          'Techniques de gestion du stress : respiration, méditation, yoga',
+          'Rejoindre une association de patients (AFD, Aide aux Jeunes Diabétiques)',
           'Un stress chronique élève la glycémie via le cortisol',
         ],
       },
       {
         type: 'list',
-        title: '✈️ Voyager avec le diabète',
+        title: 'Voyager avec le diabète',
         items: [
-          '💊 Médicaments et matériel en bagage cabine (jamais en soute → température)',
-          '📄 Ordonnance et certificat médical en anglais (et dans la langue du pays)',
-          '🆔 Carte de diabétique / bracelet médical',
-          '🧊 Pochette isotherme pour l\'insuline',
-          '🍬 Sucres rapides toujours accessibles dans le sac à main',
-          'Décalage horaire : adapter les horaires d\'injection avec le médecin',
+          'Médicaments et matériel en bagage cabine (jamais en soute → température)',
+          "Ordonnance et certificat médical en anglais (et dans la langue du pays)",
+          'Carte de diabétique / bracelet médical',
+          "Pochette isotherme pour l'insuline",
+          'Sucres rapides toujours accessibles dans le sac à main',
+          "Décalage horaire : adapter les horaires d'injection avec le médecin",
           'Assurance voyage adaptée aux maladies chroniques',
         ],
       },
       {
         type: 'list',
-        title: '😴 Sommeil et diabète',
+        title: 'Sommeil et diabète',
         items: [
-          'Un manque de sommeil (< 6h) augmente la résistance à l\'insuline',
-          'L\'apnée du sommeil aggrave le diabète (à dépister)',
+          "Un manque de sommeil (< 6h) augmente la résistance à l'insuline",
+          "L'apnée du sommeil aggrave le diabète (à dépister)",
           'Glycémie élevée la nuit peut perturber le sommeil (réveils, nycturie)',
           'Objectif : 7–8h de sommeil par nuit',
           'Éviter les écrans et les repas copieux avant le coucher',
@@ -652,20 +641,20 @@ const CHAPTERS: Chapter[] = [
       },
       {
         type: 'list',
-        title: "📋 Suivi médical annuel recommandé",
+        title: "Suivi médical annuel recommandé",
         items: [
-          '👨‍⚕️ Diabétologue ou médecin traitant : 2 à 4 fois/an',
-          '👁️ Ophtalmologue : 1 fois/an (fond d\'œil)',
-          '🦶 Podologue : 1 fois/an minimum',
-          '🫀 Cardiologue : selon le profil de risque',
-          '🫘 Néphrologue : si atteinte rénale',
-          '🦷 Dentiste : 2 fois/an (infections dentaires aggravent le diabète)',
-          '💉 Vaccinations : grippe, pneumocoque (infections plus graves chez les diabétiques)',
+          'Diabétologue ou médecin traitant : 2 à 4 fois/an',
+          "Ophtalmologue : 1 fois/an (fond d'œil)",
+          'Podologue : 1 fois/an minimum',
+          'Cardiologue : selon le profil de risque',
+          'Néphrologue : si atteinte rénale',
+          'Dentiste : 2 fois/an (infections dentaires aggravent le diabète)',
+          'Vaccinations : grippe, pneumocoque (infections plus graves chez les diabétiques)',
         ],
       },
       {
         type: 'tip',
-        text: "💡 Portez toujours sur vous : une carte mentionnant votre diabète et vos traitements, des sucres rapides, votre glucomètre et votre téléphone. En cas d'urgence, ces informations peuvent sauver votre vie.",
+        text: "Portez toujours sur vous : une carte mentionnant votre diabète et vos traitements, des sucres rapides, votre glucomètre et votre téléphone. En cas d'urgence, ces informations peuvent sauver votre vie.",
       },
     ],
   },
@@ -704,7 +693,7 @@ export default function DiabetesGuideScreen() {
           </ThemedText>
           <View style={styles.heroBadge}>
             <ThemedText style={styles.heroBadgeText}>
-              ℹ️  Informations à titre éducatif — consultez toujours votre médecin
+              Informations à titre éducatif — consultez toujours votre médecin
             </ThemedText>
           </View>
         </View>
@@ -748,7 +737,6 @@ function ChapterCard({
         <View style={[styles.chapterNumBadge, { backgroundColor: chapter.color }]}>
           <ThemedText style={styles.chapterNum}>{index}</ThemedText>
         </View>
-        <ThemedText style={styles.chapterEmoji}>{chapter.emoji}</ThemedText>
         <View style={styles.chapterInfo}>
           <ThemedText style={[styles.chapterTitle, { color: chapter.color }]}>
             {chapter.title}
@@ -880,7 +868,6 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   chapterNum:     { color: '#fff', fontWeight: 'bold', fontSize: fs(12) },
-  chapterEmoji:   { fontSize: fs(22) },
   chapterInfo:    { flex: 1 },
   chapterTitle:   { fontSize: fs(14), fontWeight: 'bold', marginBottom: vs(2) },
   chapterSubtitle:{ fontSize: fs(11), color: '#888' },
