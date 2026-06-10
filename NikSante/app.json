@@ -36,7 +36,8 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.niksante.app",
-      "versionCode": 4
+      "versionCode": 4,
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "output": "static",

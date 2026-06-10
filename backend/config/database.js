@@ -48,6 +48,11 @@ async function createTables() {
     INSERT INTO stats (key, value) VALUES ('food_scans', 0) ON CONFLICT DO NOTHING;
   `);
 
+  // Migration : ajout colonne push_token (idempotent)
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS push_token VARCHAR(255);
+  `);
+
   // Seed glycemic categories (idempotent)
   const categories = [
     ['water',                    0,  0,  'Eau et boissons sans calories'],

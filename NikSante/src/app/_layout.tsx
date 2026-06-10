@@ -9,13 +9,20 @@
  * Pattern Expo Router :  _layout → Slot (rendu des routes enfants)
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { ThemeProvider, DefaultTheme, DarkTheme } from 'expo-router';
 import { useColorScheme, View, ActivityIndicator } from 'react-native';
+import * as Notifications from 'expo-notifications';
 
 import { useAuthStore }     from '@/store/authStore';
 import { useSettingsStore } from '@/store/settingsStore';
+import {
+  registerForPushNotifications,
+  sendTokenToBackend,
+  handleUpdateNotification,
+  handleNotificationResponse,
+} from '@/services/notificationService';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -25,11 +32,39 @@ export default function RootLayout() {
   const { isAuthenticated, isLoading, initAuth } = useAuthStore();
   const initSettings = useSettingsStore((s) => s.initSettings);
 
+  const notifListenerRef    = useRef<Notifications.Subscription | null>(null);
+  const notifResponseRef    = useRef<Notifications.Subscription | null>(null);
+
   // ── 1. Restaurer la session et les préférences au démarrage ──
   useEffect(() => {
     initAuth();
     initSettings();
   }, []);
+
+  // ── 2. Notifications push ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    // Enregistre le token et l'envoie au backend
+    registerForPushNotifications().then((token) => {
+      if (token) sendTokenToBackend(token);
+    });
+
+    // Notif reçue en premier plan (app ouverte)
+    notifListenerRef.current = Notifications.addNotificationReceivedListener(
+      handleUpdateNotification
+    );
+
+    // Tap sur une notif depuis la barre système
+    notifResponseRef.current = Notifications.addNotificationResponseReceivedListener(
+      handleNotificationResponse
+    );
+
+    return () => {
+      notifListenerRef.current?.remove();
+      notifResponseRef.current?.remove();
+    };
+  }, [isAuthenticated]);
 
   // ── 2. Garde de navigation ──
   // Dès que isLoading passe à false on sait si l'utilisateur est connecté.
