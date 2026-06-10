@@ -14,18 +14,20 @@ import {
   Alert,
   Modal,
   Switch,
+  Share,
+  Linking,
   AppState,
   AppStateStatus,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
 import Constants from 'expo-constants';
 
 import { useAuthStore }    from '@/store/authStore';
 import { useGlucoseStore } from '@/store/glucoseStore';
-import { getGlucoseStatus, getStatusColor } from '@/utils/glucoseHelper';
+import { useSettingsStore } from '@/store/settingsStore';
+import { getGlucoseStatus, getStatusColor, formatGlucose, unitLabel } from '@/utils/glucoseHelper';
 import { GLUCOSE_THRESHOLDS } from '@/utils/constants';
 import { getTimeInRange, getConsistencyScore } from '@/utils/glucoseAnalysis';
 import { ThemedText } from '@/components/themed-text';
@@ -46,9 +48,73 @@ const REMINDER_DEFS: Record<ReminderKey, { label: string; hour: number; minute: 
 const REMINDER_STORAGE_KEY  = '@niksante_reminders';
 const REMINDER_SHOWN_KEY    = '@niksante_reminders_shown';
 
+// ---------------------------------------------------------------------------
+// Textes légaux
+// ---------------------------------------------------------------------------
+
+const PRIVACY_POLICY = `Dernière mise à jour : juin 2026
+
+NikSanté s'engage à protéger vos données personnelles.
+
+1. DONNÉES COLLECTÉES
+Nous collectons uniquement les données nécessaires au fonctionnement de l'application : adresse e-mail, mesures de glycémie et préférences de l'application. Aucune donnée n'est vendue à des tiers.
+
+2. UTILISATION DES DONNÉES
+Vos données sont utilisées exclusivement pour vous fournir les fonctionnalités de l'application (historique glycémique, statistiques, conseils personnalisés).
+
+3. STOCKAGE ET SÉCURITÉ
+Vos données sont stockées de manière sécurisée sur nos serveurs hébergés chez Render (États-Unis). Les mots de passe sont hachés (bcrypt). Les tokens d'authentification sont chiffrés.
+
+4. PARTAGE DES DONNÉES
+Aucune donnée personnelle n'est partagée avec des tiers sans votre consentement explicite. Les rapports exportés (PDF/texte) sont générés localement et partagés uniquement à votre initiative.
+
+5. VOS DROITS
+Conformément au RGPD, vous disposez d'un droit d'accès, de rectification et de suppression de vos données. Pour exercer ces droits, contactez-nous à : support@niksante.app
+
+6. DONNÉES DE SANTÉ
+Les informations glycémiques sont des données de santé sensibles. Elles sont traitées avec le plus grand soin et ne sont jamais utilisées à des fins publicitaires.
+
+7. CONTACT
+Pour toute question relative à la confidentialité : support@niksante.app`;
+
+const TERMS_OF_USE = `Dernière mise à jour : juin 2026
+
+En utilisant NikSanté, vous acceptez les présentes conditions.
+
+1. NATURE DE L'APPLICATION
+NikSanté est une application de suivi et d'information sur la glycémie. Elle ne constitue pas un dispositif médical et ne remplace en aucun cas l'avis d'un professionnel de santé.
+
+2. AVERTISSEMENT MÉDICAL
+Les informations fournies par NikSanté (conseils, analyses, estimations) sont données à titre indicatif uniquement. Consultez toujours votre médecin ou diabétologue pour toute décision médicale.
+
+3. UTILISATION DE L'IA
+Le scanner alimentaire et les estimations d'impact glycémique utilisent l'intelligence artificielle. Ces estimations peuvent contenir des erreurs. Vérifiez toujours les résultats.
+
+4. RESPONSABILITÉ
+NikSanté ne peut être tenu responsable de toute décision médicale prise sur la base des informations fournies par l'application.
+
+5. COMPTE UTILISATEUR
+Vous êtes responsable de la confidentialité de vos identifiants. Ne partagez pas votre compte avec d'autres personnes.
+
+6. PROPRIÉTÉ INTELLECTUELLE
+Tous les contenus de l'application (textes, algorithmes, design) sont la propriété de NikSanté.
+
+7. MODIFICATIONS
+Ces conditions peuvent être modifiées à tout moment. Les utilisateurs seront notifiés des changements importants.
+
+8. CONTACT
+Pour toute question : support@niksante.app`;
+
 export default function ProfileScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+
+  // ── Modales ──────────────────────────────────────────────────────────────
+  const [legalModal, setLegalModal] = useState<'privacy' | 'terms' | null>(null);
+
+  // ── Paramètres unité ─────────────────────────────────────────────────────
+  const glucoseUnit    = useSettingsStore((s) => s.glucoseUnit);
+  const setGlucoseUnit = useSettingsStore((s) => s.setGlucoseUnit);
 
   // ── Rappels ──────────────────────────────────────────────────────────────
   const [reminderModal, setReminderModal] = useState(false);
@@ -134,6 +200,28 @@ export default function ProfileScreen() {
     return d.toDateString() === new Date().toDateString();
   }).length;
 
+  // ── Social handlers ──────────────────────────────────────────────────────
+
+  const handleShare = async () => {
+    await Share.share({
+      message:
+        '📱 NikSanté — Application gratuite de suivi du diabète.\n' +
+        'Glycémie, scanner alimentaire IA, guide médical et plus.\n\n' +
+        'Téléchargez-la sur le Play Store :\n' +
+        'https://play.google.com/store/apps/details?id=com.niksante.app',
+    });
+  };
+
+  const handleRate = async () => {
+    const url = 'market://details?id=com.niksante.app';
+    const fallback = 'https://play.google.com/store/apps/details?id=com.niksante.app';
+    try {
+      await Linking.openURL(url);
+    } catch {
+      await Linking.openURL(fallback);
+    }
+  };
+
   // ── Handlers ─────────────────────────────────────────────────────────────
 
   const handleClearHistory = () => {
@@ -205,7 +293,7 @@ export default function ProfileScreen() {
                 styles.avgBadgeText,
                 { color: getStatusColor(getGlucoseStatus(average)) },
               ]}>
-                Moyenne : {average} mg/dL
+                Moyenne : {formatGlucose(average, glucoseUnit)} {unitLabel(glucoseUnit)}
               </ThemedText>
             </View>
           )}
@@ -220,14 +308,14 @@ export default function ProfileScreen() {
             <StatBox label="Aujourd'hui" value={String(todayCount)} unit="mesures" />
             <StatBox
               label="Minimum"
-              value={minVal !== null ? String(minVal) : '—'}
-              unit="mg/dL"
+              value={minVal !== null ? formatGlucose(minVal, glucoseUnit) : '—'}
+              unit={unitLabel(glucoseUnit)}
               color={minVal !== null ? getStatusColor(getGlucoseStatus(minVal)) : '#aaa'}
             />
             <StatBox
               label="Maximum"
-              value={maxVal !== null ? String(maxVal) : '—'}
-              unit="mg/dL"
+              value={maxVal !== null ? formatGlucose(maxVal, glucoseUnit) : '—'}
+              unit={unitLabel(glucoseUnit)}
               color={maxVal !== null ? getStatusColor(getGlucoseStatus(maxVal)) : '#aaa'}
             />
           </View>
@@ -305,6 +393,7 @@ export default function ProfileScreen() {
             { icon: '🏅', label: 'Récompenses',      desc: 'Badges, points et niveaux',      route: '/gamification'    },
             { icon: '🧠', label: 'Bien-être mental', desc: 'Humeur, respiration & conseils', route: '/mental-health'   },
             { icon: '📚', label: 'Guide Diabète',    desc: 'Tout savoir sur le diabète',     route: '/diabetes-guide'  },
+            { icon: '❤️', label: 'Fréquence cardiaque', desc: 'Estimation indicative via caméra', route: '/heart-rate' },
           ].map((item) => (
             <TouchableOpacity
               key={item.route}
@@ -319,6 +408,72 @@ export default function ProfileScreen() {
               <ThemedText style={styles.actionChevron}>›</ThemedText>
             </TouchableOpacity>
           ))}
+        </View>
+
+        {/* ── Unité de mesure ── */}
+        <View style={styles.section}>
+          <ThemedText style={styles.sectionTitle}>Unité de mesure</ThemedText>
+          <View style={[styles.actionRow, styles.actionRowLast]}>
+            <ThemedText style={styles.actionIcon}>📏</ThemedText>
+            <View style={styles.actionInfo}>
+              <ThemedText style={styles.actionLabel}>Unité glycémie</ThemedText>
+              <ThemedText style={styles.actionDesc}>
+                {glucoseUnit === 'mg_dl' ? 'mg/dL (actuel)' : 'mmol/L (actuel)'}
+              </ThemedText>
+            </View>
+            <View style={styles.unitToggleRow}>
+              <ThemedText style={[styles.unitToggleLabel, glucoseUnit === 'mg_dl' && styles.unitToggleActive]}>mg/dL</ThemedText>
+              <Switch
+                value={glucoseUnit === 'mmol_l'}
+                onValueChange={(v) => setGlucoseUnit(v ? 'mmol_l' : 'mg_dl')}
+                trackColor={{ false: '#A5D6A7', true: '#A5D6A7' }}
+                thumbColor="#388E3C"
+              />
+              <ThemedText style={[styles.unitToggleLabel, glucoseUnit === 'mmol_l' && styles.unitToggleActive]}>mmol/L</ThemedText>
+            </View>
+          </View>
+        </View>
+
+        {/* ── Communauté ── */}
+        <View style={styles.section}>
+          <ThemedText style={styles.sectionTitle}>Communauté</ThemedText>
+          <TouchableOpacity style={styles.actionRow} onPress={handleShare}>
+            <ThemedText style={styles.actionIcon}>📤</ThemedText>
+            <View style={styles.actionInfo}>
+              <ThemedText style={styles.actionLabel}>Partager avec des amis</ThemedText>
+              <ThemedText style={styles.actionDesc}>Recommandez NikSanté à vos proches</ThemedText>
+            </View>
+            <ThemedText style={styles.actionChevron}>›</ThemedText>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionRow, styles.actionRowLast]} onPress={handleRate}>
+            <ThemedText style={styles.actionIcon}>⭐</ThemedText>
+            <View style={styles.actionInfo}>
+              <ThemedText style={styles.actionLabel}>Noter l'application</ThemedText>
+              <ThemedText style={styles.actionDesc}>Laissez un avis sur le Play Store</ThemedText>
+            </View>
+            <ThemedText style={styles.actionChevron}>›</ThemedText>
+          </TouchableOpacity>
+        </View>
+
+        {/* ── Légal ── */}
+        <View style={styles.section}>
+          <ThemedText style={styles.sectionTitle}>Informations légales</ThemedText>
+          <TouchableOpacity style={styles.actionRow} onPress={() => setLegalModal('privacy')}>
+            <ThemedText style={styles.actionIcon}>🔒</ThemedText>
+            <View style={styles.actionInfo}>
+              <ThemedText style={styles.actionLabel}>Politique de confidentialité</ThemedText>
+              <ThemedText style={styles.actionDesc}>Gestion de vos données personnelles</ThemedText>
+            </View>
+            <ThemedText style={styles.actionChevron}>›</ThemedText>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionRow, styles.actionRowLast]} onPress={() => setLegalModal('terms')}>
+            <ThemedText style={styles.actionIcon}>📄</ThemedText>
+            <View style={styles.actionInfo}>
+              <ThemedText style={styles.actionLabel}>Conditions d'utilisation</ThemedText>
+              <ThemedText style={styles.actionDesc}>Termes et conditions du service</ThemedText>
+            </View>
+            <ThemedText style={styles.actionChevron}>›</ThemedText>
+          </TouchableOpacity>
         </View>
 
         {/* ── Actions ── */}
@@ -373,6 +528,37 @@ export default function ProfileScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* ── Modal légal ── */}
+      <Modal
+        visible={legalModal !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setLegalModal(null)}
+      >
+        <TouchableOpacity
+          style={modalStyles.backdrop}
+          activeOpacity={1}
+          onPress={() => setLegalModal(null)}
+        />
+        <View style={[modalStyles.sheet, { maxHeight: '80%' }]}>
+          <View style={modalStyles.handle} />
+          <ThemedText style={modalStyles.title}>
+            {legalModal === 'privacy' ? '🔒  Politique de confidentialité' : '📄  Conditions d\'utilisation'}
+          </ThemedText>
+          <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: vs(8) }}>
+            {legalModal === 'privacy' ? (
+              <ThemedText style={modalStyles.legalText}>{PRIVACY_POLICY}</ThemedText>
+            ) : (
+              <ThemedText style={modalStyles.legalText}>{TERMS_OF_USE}</ThemedText>
+            )}
+            <View style={{ height: vs(20) }} />
+          </ScrollView>
+          <TouchableOpacity style={modalStyles.closeBtn} onPress={() => setLegalModal(null)}>
+            <ThemedText style={modalStyles.closeBtnText}>Fermer</ThemedText>
+          </TouchableOpacity>
+        </View>
+      </Modal>
 
       {/* ── Modal rappels ── */}
       <Modal
@@ -639,6 +825,20 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize:   fs(15),
   },
+  unitToggleRow: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           s(6),
+  },
+  unitToggleLabel: {
+    fontSize:   fs(12),
+    color:      '#bbb',
+    fontWeight: '600',
+  },
+  unitToggleActive: {
+    color:      '#388E3C',
+    fontWeight: 'bold',
+  },
   versionSection: {
     alignItems:   'center',
     paddingTop:   vs(8),
@@ -721,13 +921,14 @@ const modalStyles = StyleSheet.create({
   rowLabel: { fontSize: fs(15), fontWeight: '600', color: '#222', marginBottom: vs(2) },
   rowDesc:  { fontSize: fs(12), color: '#aaa' },
   closeBtn: {
-    marginTop: vs(24),
+    marginTop: vs(16),
     backgroundColor: '#388E3C',
     borderRadius: 14,
     paddingVertical: vs(14),
     alignItems: 'center',
   },
   closeBtnText: { color: '#fff', fontWeight: 'bold', fontSize: fs(15) },
+  legalText: { fontSize: fs(13), color: '#444', lineHeight: vs(22) },
 });
 
 const repStyles = StyleSheet.create({

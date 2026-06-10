@@ -23,8 +23,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
 import { useGlucoseStore, GlucoseEntry, MEAL_CONTEXT_META, MealContext } from '@/store/glucoseStore';
-import { getGlucoseStatus, getStatusColor, formatDate } from '@/utils/glucoseHelper';
+import { getGlucoseStatus, getStatusColor, formatDate, formatGlucose, unitLabel } from '@/utils/glucoseHelper';
 import { formatExportText } from '@/utils/glucoseAnalysis';
+import { useSettingsStore } from '@/store/settingsStore';
 import { ThemedText } from '@/components/themed-text';
 import { s, fs, vs } from '@/utils/responsive';
 
@@ -82,6 +83,7 @@ export default function HistoryScreen() {
   const deleteGlucose  = useGlucoseStore((state) => state.deleteGlucose);
 
   const [filter, setFilter] = useState<Filter>('all');
+  const glucoseUnit = useSettingsStore((s) => s.glucoseUnit);
 
   const filtered = useMemo(
     () => filterEntries(glucoseHistory, filter),
@@ -99,7 +101,7 @@ export default function HistoryScreen() {
       Alert.alert('Aucune mesure', 'Il n\'y a rien à exporter pour ce filtre.');
       return;
     }
-    await Share.share({ message: formatExportText(filtered) });
+    await Share.share({ message: formatExportText(filtered, glucoseUnit) });
   };
 
   const handleDelete = (entry: GlucoseEntry) => {
@@ -157,17 +159,17 @@ export default function HistoryScreen() {
         {/* ── Stats du filtre actif ── */}
         {stats && (
           <View style={styles.statsRow}>
-            <StatMini label="Moyenne" value={`${stats.avg}`} unit="mg/dL" color="#388E3C" />
+            <StatMini label="Moyenne" value={formatGlucose(stats.avg, glucoseUnit)} unit={unitLabel(glucoseUnit)} color="#388E3C" />
             <StatMini
               label="Minimum"
-              value={`${stats.min}`}
-              unit="mg/dL"
+              value={formatGlucose(stats.min, glucoseUnit)}
+              unit={unitLabel(glucoseUnit)}
               color={getStatusColor(getGlucoseStatus(stats.min))}
             />
             <StatMini
               label="Maximum"
-              value={`${stats.max}`}
-              unit="mg/dL"
+              value={formatGlucose(stats.max, glucoseUnit)}
+              unit={unitLabel(glucoseUnit)}
               color={getStatusColor(getGlucoseStatus(stats.max))}
             />
             <StatMini label="Total" value={`${filtered.length}`} unit="mesures" color="#555" />
@@ -183,6 +185,7 @@ export default function HistoryScreen() {
               <HistoryItem
                 key={entry.id}
                 entry={entry}
+                unit={glucoseUnit}
                 onDelete={() => handleDelete(entry)}
               />
             ))}
@@ -201,9 +204,11 @@ export default function HistoryScreen() {
 
 function HistoryItem({
   entry,
+  unit,
   onDelete,
 }: {
   entry: GlucoseEntry;
+  unit: import('@/utils/glucoseHelper').GlucoseUnit;
   onDelete: () => void;
 }) {
   const status = getGlucoseStatus(entry.value);
@@ -216,7 +221,7 @@ function HistoryItem({
         {/* Valeur + badge contexte */}
         <View style={styles.itemTopRow}>
           <ThemedText style={[styles.itemValue, { color }]}>
-            {entry.value} <ThemedText style={styles.itemUnit}>mg/dL</ThemedText>
+            {formatGlucose(entry.value, unit)} <ThemedText style={styles.itemUnit}>{unitLabel(unit)}</ThemedText>
           </ThemedText>
           {ctx && (
             <View style={styles.ctxBadge}>

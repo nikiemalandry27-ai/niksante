@@ -226,6 +226,13 @@ export default function FoodScanScreen() {
             )}
           </View>
 
+          {/* Avertissement IA */}
+          <View style={styles.aiWarning}>
+            <ThemedText style={styles.aiWarningText}>
+              ⚠️ L'IA peut faire des erreurs dans l'identification des aliments. Veuillez toujours vérifier le résultat.
+            </ThemedText>
+          </View>
+
           {/* Bouton rescan */}
           <View style={styles.actions}>
             <TouchableOpacity style={styles.scanAgainBtn} onPress={handleReset}>
@@ -380,6 +387,13 @@ const styles = StyleSheet.create({
   giBar:      { flex: 1, height: vs(8), backgroundColor: '#f0f0f0', borderRadius: 4, overflow: 'hidden' },
   giFill:     { height: vs(8), borderRadius: 4 },
   giValue:    { fontSize: fs(12), fontWeight: '700', color: '#555', width: s(40), textAlign: 'right' },
+
+  aiWarning: {
+    marginHorizontal: s(16), marginBottom: vs(12),
+    backgroundColor: '#FFF8E1', borderRadius: 12,
+    padding: s(12), borderLeftWidth: 3, borderLeftColor: '#F57C00',
+  },
+  aiWarningText: { fontSize: fs(12), color: '#E65100', lineHeight: vs(18) },
 
   actions:       { paddingHorizontal: s(16) },
   scanAgainBtn:  { backgroundColor: '#388E3C', borderRadius: 12, paddingVertical: vs(16), alignItems: 'center' },

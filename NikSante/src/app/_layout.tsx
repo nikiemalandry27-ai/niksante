@@ -14,7 +14,8 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { ThemeProvider, DefaultTheme, DarkTheme } from 'expo-router';
 import { useColorScheme, View, ActivityIndicator } from 'react-native';
 
-import { useAuthStore } from '@/store/authStore';
+import { useAuthStore }     from '@/store/authStore';
+import { useSettingsStore } from '@/store/settingsStore';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -22,10 +23,12 @@ export default function RootLayout() {
   const segments    = useSegments();
 
   const { isAuthenticated, isLoading, initAuth } = useAuthStore();
+  const initSettings = useSettingsStore((s) => s.initSettings);
 
-  // ── 1. Restaurer la session depuis SecureStore au démarrage ──
+  // ── 1. Restaurer la session et les préférences au démarrage ──
   useEffect(() => {
     initAuth();
+    initSettings();
   }, []);
 
   // ── 2. Garde de navigation ──

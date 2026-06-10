@@ -11,6 +11,35 @@
 import { GLUCOSE_THRESHOLDS, GlucoseStatus } from './constants';
 
 // ---------------------------------------------------------------------------
+// Unit conversion
+// ---------------------------------------------------------------------------
+
+export type GlucoseUnit = 'mg_dl' | 'mmol_l';
+
+/** Convert a stored mg/dL value to the display unit. */
+export function toDisplay(value: number, unit: GlucoseUnit): number {
+  if (unit === 'mmol_l') return Math.round((value / 18) * 10) / 10;
+  return value;
+}
+
+/** Convert a display-unit value back to mg/dL for storage. */
+export function fromDisplay(displayValue: number, unit: GlucoseUnit): number {
+  if (unit === 'mmol_l') return Math.round(displayValue * 18);
+  return Math.round(displayValue);
+}
+
+/** Format a stored mg/dL value as a display string in the chosen unit. */
+export function formatGlucose(value: number, unit: GlucoseUnit): string {
+  if (unit === 'mmol_l') return (Math.round((value / 18) * 10) / 10).toFixed(1);
+  return String(value);
+}
+
+/** Return the unit label string. */
+export function unitLabel(unit: GlucoseUnit): string {
+  return unit === 'mmol_l' ? 'mmol/L' : 'mg/dL';
+}
+
+// ---------------------------------------------------------------------------
 // getGlucoseStatus
 // ---------------------------------------------------------------------------
 

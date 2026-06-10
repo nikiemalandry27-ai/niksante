@@ -10,9 +10,10 @@
  *
  */
 
+import Constants from 'expo-constants';
 import { GlucoseEntry, MEAL_CONTEXT_META, MealContext } from '@/store/glucoseStore';
 import { GLUCOSE_THRESHOLDS, GlucoseStatus } from './constants';
-import { getGlucoseStatus, formatDate } from './glucoseHelper';
+import { getGlucoseStatus, formatDate, GlucoseUnit, formatGlucose, unitLabel } from './glucoseHelper';
 
 // ---------------------------------------------------------------------------
 // Time In Range (TIR)
@@ -227,7 +228,7 @@ export function getWeeklyStats(entries: GlucoseEntry[]): DayStats[] {
 /**
  * Génère un rapport textuel formaté, prêt à être partagé avec un médecin.
  */
-export function formatExportText(entries: GlucoseEntry[]): string {
+export function formatExportText(entries: GlucoseEntry[], unit: GlucoseUnit = 'mg_dl'): string {
   if (entries.length === 0) {
     return 'NikSanté — Aucune mesure enregistrée.';
   }
@@ -248,6 +249,7 @@ export function formatExportText(entries: GlucoseEntry[]): string {
   const avg     = Math.round(values.reduce((a, b) => a + b, 0) / values.length);
   const minVal  = Math.min(...values);
   const maxVal  = Math.max(...values);
+  const ul      = unitLabel(unit);
 
   // En-tête
   let text = `📊 NikSanté — Rapport glycémique\n`;
@@ -256,9 +258,9 @@ export function formatExportText(entries: GlucoseEntry[]): string {
 
   // Résumé
   text += `RÉSUMÉ (${entries.length} mesures)\n`;
-  text += `• Moyenne     : ${avg} mg/dL\n`;
-  text += `• Minimum     : ${minVal} mg/dL\n`;
-  text += `• Maximum     : ${maxVal} mg/dL\n`;
+  text += `• Moyenne     : ${formatGlucose(avg, unit)} ${ul}\n`;
+  text += `• Minimum     : ${formatGlucose(minVal, unit)} ${ul}\n`;
+  text += `• Maximum     : ${formatGlucose(maxVal, unit)} ${ul}\n`;
   text += `• Score       : ${score.label} (TIR ${tir.inRange}%)\n`;
   text += `• Dans la norme : ${tir.inRange}%\n`;
   text += `• Trop bas      : ${tir.below}%\n`;
@@ -281,7 +283,7 @@ export function formatExportText(entries: GlucoseEntry[]): string {
       : '';
     const note = e.note ? ` — ${e.note}` : '';
 
-    text += `${emoji} ${formatDate(e.date)} — ${e.value} mg/dL${ctx}${note}\n`;
+    text += `${emoji} ${formatDate(e.date)} — ${formatGlucose(e.value, unit)} ${ul}${ctx}${note}\n`;
   }
 
   if (entries.length > 20) {
@@ -289,7 +291,7 @@ export function formatExportText(entries: GlucoseEntry[]): string {
   }
 
   text += `\n${'─'.repeat(36)}\n`;
-  text += `Généré par NikSanté v1.0.0`;
+  text += `Généré par NikSanté v${Constants.expoConfig?.version ?? '1.0.0'}`;
 
   return text;
 }

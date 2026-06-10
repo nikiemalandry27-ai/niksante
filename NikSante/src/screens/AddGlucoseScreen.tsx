@@ -21,8 +21,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
 import { useGlucoseStore, MealContext, MEAL_CONTEXT_META } from '@/store/glucoseStore';
-import { getGlucoseStatus, getAIMessage, getStatusColor } from '@/utils/glucoseHelper';
+import { getGlucoseStatus, getAIMessage, getStatusColor, toDisplay, fromDisplay, unitLabel } from '@/utils/glucoseHelper';
 import { GLUCOSE_THRESHOLDS } from '@/utils/constants';
+import { useSettingsStore } from '@/store/settingsStore';
 import { ThemedText } from '@/components/themed-text';
 import { s, fs, vs } from '@/utils/responsive';
 
@@ -30,12 +31,7 @@ import { s, fs, vs } from '@/utils/responsive';
 // Constantes
 // ---------------------------------------------------------------------------
 
-const QUICK_PRESETS = [
-  { label: '70',  value: 70  },
-  { label: '100', value: 100 },
-  { label: '150', value: 150 },
-  { label: '200', value: 200 },
-];
+const MG_DL_PRESETS = [70, 100, 150, 200];
 
 const MEAL_CONTEXTS = Object.entries(MEAL_CONTEXT_META) as [
   NonNullable<MealContext>,
@@ -50,15 +46,26 @@ export default function AddGlucoseScreen() {
   const router     = useRouter();
   const addGlucose = useGlucoseStore((state) => state.addGlucose);
 
+  const glucoseUnit = useSettingsStore((s) => s.glucoseUnit);
+
   const [glucoseValue, setGlucoseValue] = useState('');
   const [note,         setNote]         = useState('');
   const [mealContext,  setMealContext]  = useState<MealContext>(null);
   const [loading,      setLoading]      = useState(false);
 
-  // Aperçu en temps réel
-  const numValue    = parseInt(glucoseValue, 10);
-  const hasValue    = !isNaN(numValue) && numValue > 0;
-  const status      = hasValue ? getGlucoseStatus(numValue) : 'normal';
+  // Presets in the current display unit
+  const QUICK_PRESETS = MG_DL_PRESETS.map((v) => ({
+    value: v,
+    label: glucoseUnit === 'mmol_l'
+      ? (Math.round((v / 18) * 10) / 10).toFixed(1)
+      : String(v),
+  }));
+
+  // Aperçu en temps réel (convert display → mg/dL for status calc)
+  const numDisplay  = parseFloat(glucoseValue);
+  const hasValue    = !isNaN(numDisplay) && numDisplay > 0;
+  const numMgDl     = hasValue ? fromDisplay(numDisplay, glucoseUnit) : 0;
+  const status      = hasValue ? getGlucoseStatus(numMgDl) : 'normal';
   const statusColor = hasValue ? getStatusColor(status) : '#ccc';
   const aiMessage   = getAIMessage(status);
 
@@ -71,18 +78,20 @@ export default function AddGlucoseScreen() {
       Alert.alert('Valeur manquante', 'Veuillez entrer une valeur de glycémie.');
       return;
     }
-    if (isNaN(numValue) || numValue < 20 || numValue > 600) {
-      Alert.alert('Valeur invalide', 'Entrez une valeur entre 20 et 600 mg/dL.');
+    const minDisplay = glucoseUnit === 'mmol_l' ? 1.1 : 20;
+    const maxDisplay = glucoseUnit === 'mmol_l' ? 33.3 : 600;
+    if (isNaN(numDisplay) || numDisplay < minDisplay || numDisplay > maxDisplay) {
+      Alert.alert('Valeur invalide', `Entrez une valeur entre ${minDisplay} et ${maxDisplay} ${unitLabel(glucoseUnit)}.`);
       return;
     }
 
     setLoading(true);
     try {
-      addGlucose(numValue, new Date(), note.trim() || undefined, mealContext);
+      addGlucose(numMgDl, new Date(), note.trim() || undefined, mealContext);
 
       Alert.alert(
         '✅ Mesure enregistrée',
-        `${numValue} mg/dL${mealContext ? ' — ' + MEAL_CONTEXT_META[mealContext].label : ''}\n\n${aiMessage.message}`,
+        `${glucoseValue} ${unitLabel(glucoseUnit)}${mealContext ? ' — ' + MEAL_CONTEXT_META[mealContext].label : ''}\n\n${aiMessage.message}`,
         [{ text: 'Voir le dashboard', onPress: () => router.navigate('/(tabs)/dashboard') }],
       );
 
@@ -121,17 +130,17 @@ export default function AddGlucoseScreen() {
 
             {/* ── Saisie valeur ── */}
             <View style={styles.inputGroup}>
-              <ThemedText style={styles.label}>Glycémie (mg/dL) *</ThemedText>
+              <ThemedText style={styles.label}>Glycémie ({unitLabel(glucoseUnit)}) *</ThemedText>
               <View style={styles.inputRow}>
                 <TextInput
                   style={[styles.input, hasValue && { borderColor: statusColor }]}
-                  placeholder="Ex : 120"
+                  placeholder={glucoseUnit === 'mmol_l' ? 'Ex : 6.7' : 'Ex : 120'}
                   placeholderTextColor="#bbb"
                   keyboardType="number-pad"
                   value={glucoseValue}
-                  onChangeText={(v) => setGlucoseValue(v.replace(/[^0-9]/g, ''))}
+                  onChangeText={(v) => setGlucoseValue(v.replace(/[^0-9.]/g, ''))}
                   editable={!loading}
-                  maxLength={3}
+                  maxLength={glucoseUnit === 'mmol_l' ? 5 : 3}
                 />
                 {hasValue && (
                   <View style={[styles.badge, { backgroundColor: statusColor + '22', borderColor: statusColor }]}>
@@ -152,15 +161,15 @@ export default function AddGlucoseScreen() {
                     key={p.value}
                     style={[
                       styles.presetBtn,
-                      glucoseValue === String(p.value) && styles.presetBtnActive,
+                      glucoseValue === p.label && styles.presetBtnActive,
                     ]}
-                    onPress={() => setGlucoseValue(String(p.value))}
+                    onPress={() => setGlucoseValue(p.label)}
                     disabled={loading}
                   >
                     <ThemedText
                       style={[
                         styles.presetBtnText,
-                        glucoseValue === String(p.value) && { color: '#388E3C' },
+                        glucoseValue === p.label && { color: '#388E3C' },
                       ]}
                     >
                       {p.label}
@@ -217,17 +226,17 @@ export default function AddGlucoseScreen() {
             <View style={styles.thresholdsCard}>
               <ThemedText style={styles.thresholdsTitle}>Repères cliniques</ThemedText>
               {[
-                { label: 'Hypoglycémie critique', range: `< ${GLUCOSE_THRESHOLDS.HYPO_CRITICAL}`, color: '#B71C1C' },
-                { label: 'Hypoglycémie',          range: `${GLUCOSE_THRESHOLDS.HYPO_CRITICAL}–${GLUCOSE_THRESHOLDS.HYPO_ALERT - 1}`, color: '#F57C00' },
-                { label: 'Normal',                range: `${GLUCOSE_THRESHOLDS.NORMAL_MIN}–${GLUCOSE_THRESHOLDS.NORMAL_MAX}`, color: '#388E3C' },
-                { label: 'Hyperglycémie',         range: `${GLUCOSE_THRESHOLDS.NORMAL_MAX + 1}–${GLUCOSE_THRESHOLDS.HYPER_CRITICAL}`, color: '#F57C00' },
-                { label: 'Hyperglycémie critique', range: `> ${GLUCOSE_THRESHOLDS.HYPER_CRITICAL}`, color: '#B71C1C' },
+                { label: 'Hypoglycémie critique', range: `< ${toDisplay(GLUCOSE_THRESHOLDS.HYPO_CRITICAL, glucoseUnit)}`, color: '#B71C1C' },
+                { label: 'Hypoglycémie',          range: `${toDisplay(GLUCOSE_THRESHOLDS.HYPO_CRITICAL, glucoseUnit)}–${toDisplay(GLUCOSE_THRESHOLDS.HYPO_ALERT - 1, glucoseUnit)}`, color: '#F57C00' },
+                { label: 'Normal',                range: `${toDisplay(GLUCOSE_THRESHOLDS.NORMAL_MIN, glucoseUnit)}–${toDisplay(GLUCOSE_THRESHOLDS.NORMAL_MAX, glucoseUnit)}`, color: '#388E3C' },
+                { label: 'Hyperglycémie',         range: `${toDisplay(GLUCOSE_THRESHOLDS.NORMAL_MAX + 1, glucoseUnit)}–${toDisplay(GLUCOSE_THRESHOLDS.HYPER_CRITICAL, glucoseUnit)}`, color: '#F57C00' },
+                { label: 'Hyperglycémie critique', range: `> ${toDisplay(GLUCOSE_THRESHOLDS.HYPER_CRITICAL, glucoseUnit)}`, color: '#B71C1C' },
               ].map((row) => (
                 <View key={row.label} style={styles.thresholdRow}>
                   <View style={[styles.dot, { backgroundColor: row.color }]} />
                   <ThemedText style={styles.thresholdLabel}>{row.label}</ThemedText>
                   <ThemedText style={[styles.thresholdValue, { color: row.color }]}>
-                    {row.range} mg/dL
+                    {row.range} {unitLabel(glucoseUnit)}
                   </ThemedText>
                 </View>
               ))}

@@ -854,7 +854,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1565C0', padding: s(24), alignItems: 'center',
     marginBottom: vs(8),
   },
-  heroEmoji: { fontSize: fs(48), marginBottom: vs(8) },
+  heroEmoji: { fontSize: fs(36), marginBottom: vs(6) },
   heroTitle: { fontSize: fs(22), fontWeight: 'bold', color: '#fff', textAlign: 'center', marginBottom: vs(4) },
   heroSub:   { fontSize: fs(13), color: 'rgba(255,255,255,0.8)', marginBottom: vs(12) },
   heroBadge: {
@@ -888,39 +888,39 @@ const styles = StyleSheet.create({
 
   // Chapter body
   chapterBody: {
-    padding: s(16), gap: vs(12),
+    padding: s(16), gap: vs(16),
   },
 
   // Paragraph
   paragraph: {
-    fontSize: fs(13), color: '#333', lineHeight: vs(21),
+    fontSize: fs(15), color: '#333', lineHeight: vs(24),
   },
 
   // List
   listBlock: { gap: vs(4) },
-  listTitle: { fontSize: fs(13), fontWeight: '700', marginBottom: vs(6) },
+  listTitle: { fontSize: fs(15), fontWeight: '700', marginBottom: vs(6) },
   listItem:  { flexDirection: 'row', gap: s(8), alignItems: 'flex-start' },
-  listBullet:    { fontSize: fs(14), fontWeight: 'bold', lineHeight: vs(20), marginTop: vs(1) },
-  listItemText:  { flex: 1, fontSize: fs(13), color: '#333', lineHeight: vs(20) },
+  listBullet:    { fontSize: fs(15), fontWeight: 'bold', lineHeight: vs(23), marginTop: vs(1) },
+  listItemText:  { flex: 1, fontSize: fs(15), color: '#333', lineHeight: vs(23) },
 
   // Tip
   tipBox: {
     backgroundColor: '#E8F5E9', borderRadius: 10,
     padding: s(12), borderLeftWidth: 3, borderLeftColor: '#388E3C',
   },
-  tipText: { fontSize: fs(12), color: '#2E7D32', lineHeight: vs(19) },
+  tipText: { fontSize: fs(14), color: '#2E7D32', lineHeight: vs(22) },
 
   // Warning
   warningBox: {
     backgroundColor: '#FFF8E1', borderRadius: 10,
     padding: s(12), borderLeftWidth: 3, borderLeftColor: '#F57C00',
   },
-  warningText: { fontSize: fs(12), color: '#E65100', lineHeight: vs(19) },
+  warningText: { fontSize: fs(14), color: '#E65100', lineHeight: vs(22) },
 
   // Table
   tableBlock: { borderRadius: 10, overflow: 'hidden', borderWidth: 1, borderColor: '#e0e0e0' },
   tableRow:    { flexDirection: 'row', alignItems: 'center', padding: s(10) },
   tableRowAlt: { backgroundColor: 'rgba(0,0,0,0.03)' },
-  tableLabel:  { flex: 1, fontSize: fs(12), color: '#444' },
-  tableValue:  { fontSize: fs(12), fontWeight: '700', textAlign: 'right' },
+  tableLabel:  { flex: 1, fontSize: fs(14), color: '#444' },
+  tableValue:  { fontSize: fs(14), fontWeight: '700', textAlign: 'right' },
 });

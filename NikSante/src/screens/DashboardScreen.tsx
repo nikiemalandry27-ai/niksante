@@ -25,7 +25,10 @@ import {
   getAIMessage,
   getStatusColor,
   formatDate,
+  formatGlucose,
+  unitLabel,
 } from '@/utils/glucoseHelper';
+import { useSettingsStore } from '@/store/settingsStore';
 import {
   getTimeInRange,
   getPatternInsight,
@@ -81,6 +84,7 @@ export default function DashboardScreen() {
   const isLoadingHistory = useGlucoseStore((state) => state.isLoadingHistory);
 
   const [loggingOut, setLoggingOut] = useState(false);
+  const glucoseUnit = useSettingsStore((s) => s.glucoseUnit);
 
   useEffect(() => { initGlucose(); }, []);
 
@@ -174,7 +178,7 @@ export default function DashboardScreen() {
               {/* Valeur + tendance + badge statut */}
               <View style={styles.glucoseValueRow}>
                 <ThemedText style={[styles.glucoseValue, { color: statusColor }]}>
-                  {latestGlucose.value}
+                  {formatGlucose(latestGlucose.value, glucoseUnit)}
                 </ThemedText>
 
                 {/* Indicateur tendance */}
@@ -190,7 +194,7 @@ export default function DashboardScreen() {
                 )}
 
                 <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                  <ThemedText style={styles.unitText}>mg/dL</ThemedText>
+                  <ThemedText style={styles.unitText}>{unitLabel(glucoseUnit)}</ThemedText>
                   <View style={[styles.statusBadge, {
                     backgroundColor: statusColor + '20',
                     borderColor:     statusColor,
@@ -243,7 +247,7 @@ export default function DashboardScreen() {
 
         {/* ── Statistiques ── */}
         <View style={styles.statsRow}>
-          <StatBox label="MOYENNE"      value={averageGlucose > 0 ? `${averageGlucose}` : '—'} unit="mg/dL" />
+          <StatBox label="MOYENNE"      value={averageGlucose > 0 ? formatGlucose(averageGlucose, glucoseUnit) : '—'} unit={unitLabel(glucoseUnit)} />
           <StatBox label="MESURES"      value={`${glucoseHistory.length}`} unit="total" />
           <StatBox label="AUJOURD'HUI"  value={`${todayCount}`} unit="mesure(s)" />
         </View>
@@ -319,7 +323,7 @@ export default function DashboardScreen() {
                   <View style={styles.historyLeft}>
                     <View style={styles.historyTopRow}>
                       <ThemedText style={[styles.historyValue, { color }]}>
-                        {entry.value} mg/dL
+                        {formatGlucose(entry.value, glucoseUnit)} {unitLabel(glucoseUnit)}
                       </ThemedText>
                       {ctx && (
                         <View style={styles.ctxBadge}>
