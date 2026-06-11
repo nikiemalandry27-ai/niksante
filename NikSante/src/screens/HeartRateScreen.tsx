@@ -15,6 +15,8 @@ import {
   ActivityIndicator,
   ScrollView,
   Animated,
+  Linking,
+  Alert,
 } from 'react-native';
 // Imports natifs conditionnels — Expo Go ne supporte pas ces modules
 let Camera: any        = null;
@@ -270,6 +272,20 @@ export default function HeartRateScreen() {
 
   // ── Permission ────────────────────────────────────────────────────────────
 
+  const handleRequestPermission = useCallback(async () => {
+    const granted = await requestPermission();
+    if (!granted) {
+      Alert.alert(
+        'Permission refusée',
+        "L'accès à la caméra a été refusé. Veuillez l'autoriser dans les paramètres de l'application.",
+        [
+          { text: 'Annuler', style: 'cancel' },
+          { text: 'Ouvrir les paramètres', onPress: () => Linking.openSettings() },
+        ]
+      );
+    }
+  }, [requestPermission]);
+
   if (!hasPermission) {
     return (
       <SafeAreaView style={styles.centered}>
@@ -278,7 +294,7 @@ export default function HeartRateScreen() {
         <ThemedText style={styles.permSub}>
           La mesure de fréquence cardiaque nécessite l'accès à la caméra arrière.
         </ThemedText>
-        <TouchableOpacity style={styles.primaryBtn} onPress={requestPermission}>
+        <TouchableOpacity style={styles.primaryBtn} onPress={handleRequestPermission}>
           <ThemedText style={styles.primaryBtnText}>Autoriser la caméra</ThemedText>
         </TouchableOpacity>
       </SafeAreaView>
