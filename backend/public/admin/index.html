@@ -170,8 +170,6 @@
         </div>
       </div>
 
-      <div id="notif-result" class="hidden mt-4 px-4 py-3 rounded-xl text-sm font-medium"></div>
-
       <div class="flex items-center gap-4 mt-5">
         <button id="notif-btn" onclick="sendNotification()"
           class="bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-colors flex items-center gap-2">
@@ -179,6 +177,8 @@
         </button>
         <p class="text-xs text-gray-400" id="notif-token-count"></p>
       </div>
+
+      <div id="notif-result" class="hidden mt-4 px-4 py-3 rounded-xl text-sm font-medium"></div>
     </div>
 
     <!-- ── Tableau utilisateurs ── -->
@@ -505,6 +505,7 @@
     else el.classList.add('bg-red-50', 'text-red-600', 'border', 'border-red-200');
     el.textContent = msg;
     el.classList.remove('hidden');
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
