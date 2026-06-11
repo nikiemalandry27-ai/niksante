@@ -19,24 +19,36 @@ import {
   Alert,
 } from 'react-native';
 // Imports natifs conditionnels — Expo Go ne supporte pas ces modules
-let Camera: any        = null;
+//
+// On sépare volontairement l'import de base (Camera + permission) de l'import
+// worklets, afin que le hook de permission reste fonctionnel même si
+// react-native-worklets-core échoue à charger.
+let Camera: any             = null;
 let useCameraDevice: any    = () => null;
-let useCameraPermission: any = () => ({ hasPermission: false, requestPermission: async () => ({ granted: false }) });
+let useCameraPermission: any = () => ({ hasPermission: false, requestPermission: async () => false });
 let useFrameProcessor: any  = () => undefined;
-let runOnJS: any       = (fn: any) => fn;
-let nativeAvailable    = false;
+let runOnJS: any            = (fn: any) => fn;
+let nativeAvailable         = false;
 
+// Étape 1 : caméra de base (ne dépend pas des worklets)
+let cameraModuleLoaded = false;
 try {
-  const vc = require('react-native-vision-camera');
-  const wc = require('react-native-worklets-core');
+  const vc        = require('react-native-vision-camera');
   Camera              = vc.Camera;
   useCameraDevice     = vc.useCameraDevice;
   useCameraPermission = vc.useCameraPermission;
-  useFrameProcessor   = vc.useFrameProcessor;
-  runOnJS             = wc.runOnJS;
-  nativeAvailable     = true;
-} catch {
-  nativeAvailable = false;
+  cameraModuleLoaded  = true;
+} catch { /* Expo Go */ }
+
+// Étape 2 : worklets + frame processor (requis pour le PPG)
+if (cameraModuleLoaded) {
+  try {
+    const vc        = require('react-native-vision-camera');
+    const wc        = require('react-native-worklets-core');
+    useFrameProcessor = vc.useFrameProcessor;
+    runOnJS           = wc.runOnJS;
+    nativeAvailable   = true;
+  } catch { /* worklets indisponibles */ }
 }
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -273,11 +285,13 @@ export default function HeartRateScreen() {
   // ── Permission ────────────────────────────────────────────────────────────
 
   const handleRequestPermission = useCallback(async () => {
-    const granted = await requestPermission();
+    const result = await requestPermission();
+    // result peut être boolean (v4) ou PermissionStatus string (selon la version)
+    const granted = result === true || result === 'granted' || result === 'authorized';
     if (!granted) {
       Alert.alert(
-        'Permission refusée',
-        "L'accès à la caméra a été refusé. Veuillez l'autoriser dans les paramètres de l'application.",
+        'Permission caméra refusée',
+        "Autorisez l'accès à la caméra dans les paramètres de l'application pour utiliser la mesure de fréquence cardiaque.",
         [
           { text: 'Annuler', style: 'cancel' },
           { text: 'Ouvrir les paramètres', onPress: () => Linking.openSettings() },
@@ -286,22 +300,8 @@ export default function HeartRateScreen() {
     }
   }, [requestPermission]);
 
-  if (!hasPermission) {
-    return (
-      <SafeAreaView style={styles.centered}>
-        <ThemedText style={styles.bigEmoji}>📷</ThemedText>
-        <ThemedText style={styles.permTitle}>Accès caméra requis</ThemedText>
-        <ThemedText style={styles.permSub}>
-          La mesure de fréquence cardiaque nécessite l'accès à la caméra arrière.
-        </ThemedText>
-        <TouchableOpacity style={styles.primaryBtn} onPress={handleRequestPermission}>
-          <ThemedText style={styles.primaryBtnText}>Autoriser la caméra</ThemedText>
-        </TouchableOpacity>
-      </SafeAreaView>
-    );
-  }
-
-  // Expo Go : modules natifs non disponibles
+  // Expo Go ou worklets indisponibles — afficher AVANT le check permission
+  // pour éviter que le mock permission hook rende le bouton inactif
   if (!nativeAvailable) {
     return (
       <SafeAreaView style={styles.container}>
@@ -321,6 +321,21 @@ export default function HeartRateScreen() {
             Cette fonctionnalité utilise la caméra en temps réel et nécessite un build natif (EAS Build). Elle n'est pas disponible dans Expo Go.
           </ThemedText>
         </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!hasPermission) {
+    return (
+      <SafeAreaView style={styles.centered}>
+        <ThemedText style={styles.bigEmoji}>📷</ThemedText>
+        <ThemedText style={styles.permTitle}>Accès caméra requis</ThemedText>
+        <ThemedText style={styles.permSub}>
+          La mesure de fréquence cardiaque nécessite l'accès à la caméra arrière.
+        </ThemedText>
+        <TouchableOpacity style={styles.primaryBtn} onPress={handleRequestPermission}>
+          <ThemedText style={styles.primaryBtnText}>Autoriser la caméra</ThemedText>
+        </TouchableOpacity>
       </SafeAreaView>
     );
   }
