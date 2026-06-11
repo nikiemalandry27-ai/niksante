@@ -171,7 +171,7 @@
       </div>
 
       <div class="flex items-center gap-4 mt-5">
-        <button id="notif-btn" onclick="sendNotification()"
+        <button id="notif-btn"
           class="bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-colors flex items-center gap-2">
           <span>📣</span> Envoyer la notification
         </button>
@@ -443,24 +443,40 @@
 
   // ── Notifications ──────────────────────────────────────────────────────────
 
+  document.getElementById('notif-btn').addEventListener('click', function() {
+    sendNotification().catch(function(err) {
+      showNotifResult('error', '❌ Erreur inattendue : ' + err.message);
+      document.getElementById('notif-btn').disabled = false;
+      document.getElementById('notif-btn').innerHTML = '<span>📣</span> Envoyer la notification';
+    });
+  });
+
   async function sendNotification() {
+    const btn       = document.getElementById('notif-btn');
+    const resultEl  = document.getElementById('notif-result');
+
+    // Feedback immédiat — confirme que le clic est reçu
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span> Traitement…';
+
     const version   = document.getElementById('notif-version').value.trim();
     const changelog = document.getElementById('notif-changelog').value.trim();
     const title     = document.getElementById('notif-title').value.trim();
-    const resultEl  = document.getElementById('notif-result');
-    const btn       = document.getElementById('notif-btn');
 
     if (!version) {
-      showNotifResult('error', '⚠️ Le numéro de version est obligatoire.');
+      btn.disabled = false;
+      btn.innerHTML = '<span>📣</span> Envoyer la notification';
+      showNotifResult('error', '⚠️ Remplis le champ "Version" (ex : 1.1.1).');
       return;
     }
     if (!changelog) {
-      showNotifResult('error', '⚠️ Le changelog est obligatoire.');
+      btn.disabled = false;
+      btn.innerHTML = '<span>📣</span> Envoyer la notification';
+      showNotifResult('error', '⚠️ Remplis le champ "Changelog / Message".');
       return;
     }
 
-    btn.disabled   = true;
-    btn.textContent = '⏳ Envoi en cours…';
+    btn.innerHTML = '<span>⏳</span> Envoi en cours…';
     resultEl.classList.add('hidden');
 
     try {
@@ -479,12 +495,11 @@
       const data = await res.json();
 
       if (!res.ok) {
-        showNotifResult('error', `❌ Erreur : ${data.error}`);
+        showNotifResult('error', `❌ Erreur serveur : ${data.error || res.status}`);
       } else if (data.sent === 0) {
         showNotifResult('warn', `⚠️ Aucun utilisateur avec notifications activées pour l'instant (${data.total} token${data.total !== 1 ? 's' : ''} enregistré${data.total !== 1 ? 's' : ''}).`);
       } else {
         showNotifResult('success', `✅ Notification envoyée à ${data.sent} utilisateur${data.sent !== 1 ? 's' : ''} sur ${data.total}.`);
-        // Reset form
         document.getElementById('notif-version').value   = '';
         document.getElementById('notif-changelog').value = '';
         document.getElementById('notif-title').value     = '';
@@ -492,8 +507,8 @@
     } catch (err) {
       showNotifResult('error', `❌ Erreur réseau : ${err.message}`);
     } finally {
-      btn.disabled    = false;
-      btn.innerHTML   = '<span>📣</span> Envoyer la notification';
+      btn.disabled  = false;
+      btn.innerHTML = '<span>📣</span> Envoyer la notification';
     }
   }
 
