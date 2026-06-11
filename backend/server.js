@@ -103,7 +103,7 @@ app.use('/api/auth',    cors(corsOptions), authLimiter, authRoutes);
 app.use('/api/glucose', cors(corsOptions), glucoseRoutes);
 app.use('/api/food',     cors(corsOptions), foodLimiter, foodRoutes);
 app.use('/api/glycemic',       cors(corsOptions), foodLimiter, glycemicRoutes);
-app.use('/api/notifications',  cors(corsOptions), notificationsRoutes);
+app.use('/api/notifications',  notificationsRoutes);
 // /api/admin n'a pas besoin de CORS — appelé uniquement depuis la même page serveur
 app.use('/api/admin',    adminRoutes);
 
