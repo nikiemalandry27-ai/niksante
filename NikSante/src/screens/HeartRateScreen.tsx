@@ -31,6 +31,7 @@ let useCameraPermission: any = () => ({ hasPermission: false, requestPermission:
 let useFrameProcessor: any   = () => undefined;
 let nativeAvailable          = false;
 let frameProcessorsAvailable = false;
+let _nativeLoadError         = '';
 
 try {
   const vc = require('react-native-vision-camera');
@@ -45,7 +46,9 @@ try {
     useFrameProcessor        = vc.useFrameProcessor;
     frameProcessorsAvailable = true;
   }
-} catch { /* Expo Go */ }
+} catch (e: any) {
+  _nativeLoadError = String(e?.message ?? e ?? 'unknown error');
+}
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
@@ -296,7 +299,7 @@ export default function HeartRateScreen() {
     }
   }, [requestPermission]);
 
-  // Expo Go — caméra native non disponible
+  // Caméra native non disponible
   if (!nativeAvailable) {
     return (
       <SafeAreaView style={styles.container}>
@@ -310,11 +313,16 @@ export default function HeartRateScreen() {
         <View style={styles.centered}>
           <ThemedText style={{ fontSize: fs(48), marginBottom: vs(16) }}>📱</ThemedText>
           <ThemedText style={[styles.permTitle, { textAlign: 'center' }]}>
-            Disponible dans le build complet
+            Module caméra indisponible
           </ThemedText>
           <ThemedText style={[styles.permSub, { textAlign: 'center' }]}>
-            Cette fonctionnalité utilise la caméra en temps réel et nécessite un build natif (EAS Build). Elle n'est pas disponible dans Expo Go.
+            Le module natif de la caméra n'a pas pu être chargé. Veuillez relancer l'application.
           </ThemedText>
+          {_nativeLoadError.length > 0 && (
+            <ThemedText style={{ fontSize: fs(10), color: '#aaa', textAlign: 'center', marginTop: vs(8), paddingHorizontal: s(16) }}>
+              {_nativeLoadError}
+            </ThemedText>
+          )}
         </View>
       </SafeAreaView>
     );
