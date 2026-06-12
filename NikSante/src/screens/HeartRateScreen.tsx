@@ -17,6 +17,7 @@ import {
   Animated,
   Linking,
   Alert,
+  Vibration,
 } from 'react-native';
 import { runOnJS } from 'react-native-reanimated';
 
@@ -255,27 +256,33 @@ export default function HeartRateScreen() {
 
   const onFrame = useCallback((brightness: number) => {
     if (phaseRef.current === 'waiting') {
-      // Étape 1 : établir la baseline sur les 20 premières trames
-      // (flash allumé, pas de doigt → luminosité max de référence)
+      // Étape 1 : baseline sur les 30 premières trames (flash ON, pas de doigt)
       if (!baselineReady.current) {
         baselineSum.current   += brightness;
         baselineCount.current += 1;
-        if (baselineCount.current >= 20) {
+        if (baselineCount.current >= 30) {
           baselineValue.current = baselineSum.current / baselineCount.current;
           baselineReady.current = true;
         }
         return;
       }
 
-      // Étape 2 : détecter le doigt quand la luminosité chute de > 50 %
-      // Le doigt posé sur la caméra absorbe la lumière du flash → image très sombre
-      const threshold = baselineValue.current * 0.50;
-      const fingerOn  = brightness < threshold;
+      // Étape 2 : détection du doigt
+      // Seuil adaptatif :
+      //  - Si baseline haute (>80, flash actif) : chute de 55 % requise
+      //  - Si baseline basse (≤80, flash inactif ou pièce sombre) : chute absolue de 30 pts
+      const base      = baselineValue.current;
+      const threshold = base > 80 ? base * 0.45 : base - 30;
+      const fingerOn  = brightness < threshold && brightness < base - 20;
 
       setFingerDetected(fingerOn);
       if (fingerOn) {
+        if (fingerFrames.current === 0) {
+          // Premier frame avec doigt détecté → vibration courte
+          Vibration.vibrate(60);
+        }
         fingerFrames.current += 1;
-        if (fingerFrames.current >= 20 && !measureStarted.current) {
+        if (fingerFrames.current >= 15 && !measureStarted.current) {
           measureStarted.current = true;
           startCountdownRef.current();
         }
@@ -340,6 +347,8 @@ export default function HeartRateScreen() {
     setPhase('measuring');
     setCountdown(15);
     startHeartbeat();
+    // Double vibration : mesure démarrée
+    Vibration.vibrate([0, 80, 80, 80]);
 
     let remaining = 15;
     countdownRef.current = setInterval(() => {
@@ -351,6 +360,7 @@ export default function HeartRateScreen() {
         heartAnim.stopAnimation();
         phaseRef.current = 'processing';
         setPhase('processing');
+        Vibration.vibrate(300);
 
         setTimeout(() => {
           const result = analyzePPG(samplesRef.current);
@@ -649,6 +659,7 @@ export default function HeartRateScreen() {
                 device={device}
                 isActive={true}
                 torch={torchProp}
+                video={true}
                 pixelFormat="yuv"
                 frameProcessor={frameProcessor}
               />
@@ -714,6 +725,7 @@ export default function HeartRateScreen() {
             device={device}
             isActive={true}
             torch={hasTorch ? 'on' : 'off'}
+            video={true}
             pixelFormat="yuv"
             frameProcessor={frameProcessor}
           />
