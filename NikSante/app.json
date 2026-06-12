@@ -64,11 +64,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#388E3C",
-          "android": {
-            "image": "./assets/images/splash-niksante.png",
-            "resizeMode": "cover"
-          }
+          "backgroundColor": "#388E3C"
         }
       ]
     ],
