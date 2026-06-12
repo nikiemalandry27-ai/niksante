@@ -41,9 +41,10 @@ try {
   useCameraPermission = vc.useCameraPermission;
   nativeAvailable     = true;
 
-  // VisionCameraProxy.workletContext est non-null uniquement si
-  // react-native-worklets-core s'est correctement initialisé
-  if (vc.VisionCameraProxy?.workletContext != null) {
+  // VisionCamera v4 : useFrameProcessor est disponible dès que le package natif
+  // est chargé. L'ancien check VisionCameraProxy.workletContext était une API v3
+  // qui retourne null en v4, ce qui désactivait à tort frame processors + torch.
+  if (typeof vc.useFrameProcessor === 'function') {
     useFrameProcessor        = vc.useFrameProcessor;
     frameProcessorsAvailable = true;
   }
