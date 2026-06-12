@@ -300,7 +300,7 @@ export default function HeartRateScreen() {
   // Worklets.createRunOnJS est l'API correcte pour VisionCamera v4 +
   // worklets-core. runOnJS de reanimated ne fonctionne pas dans ce runtime.
   const onFrameJS = useMemo(
-    () => Worklets ? Worklets.createRunOnJS((b: number) => onFrame(b)) : null,
+    () => Worklets?.createRunOnJS?.((b: number) => onFrame(b)) ?? null,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
