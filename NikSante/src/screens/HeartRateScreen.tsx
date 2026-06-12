@@ -322,12 +322,14 @@ export default function HeartRateScreen() {
       const rStep = Math.max(1, Math.floor((r1 - r0) / 20));
       const cStep = Math.max(1, Math.floor((c1 - c0) / 20));
 
+      // pixelFormat="rgb" → ARGB_8888 → 4 octets par pixel
+      // Luminosité = moyenne des 3 canaux couleur (indices 0,1,2 par pixel)
       let sum   = 0;
       let count = 0;
       for (let r = r0; r < r1; r += rStep) {
-        const rowOffset = r * w;
         for (let c = c0; c < c1; c += cStep) {
-          sum += data[rowOffset + c];
+          const base = (r * w + c) * 4;
+          sum += (data[base] + data[base + 1] + data[base + 2]) / 3;
           count++;
         }
       }
@@ -402,6 +404,7 @@ export default function HeartRateScreen() {
     baselineValue.current  = 0;
     baselineReady.current  = false;
     setFingerDetected(false);
+    setCameraReady(false); // reset pour que onInitialized re-déclenche le torch
     phaseRef.current = 'waiting';
     setPhase('waiting');
   }, [hasPermission, requestPermission]);
@@ -663,7 +666,7 @@ export default function HeartRateScreen() {
                 isActive={true}
                 torch={torchProp}
                 video={true}
-                pixelFormat="yuv"
+                pixelFormat="rgb"
                 frameProcessor={frameProcessor}
                 onInitialized={() => setCameraReady(true)}
               />
