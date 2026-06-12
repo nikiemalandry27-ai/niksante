@@ -2,7 +2,7 @@
   "expo": {
     "name": "NikSanté – Diabète & Glycémie",
     "slug": "NikSante",
-    "version": "1.1.8",
+    "version": "1.1.9",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "niksante",
@@ -36,7 +36,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.niksante.app",
-      "versionCode": 13,
+      "versionCode": 14,
       "googleServicesFile": "./google-services.json",
       "newArchEnabled": false
     },
@@ -64,10 +64,10 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#388E3C",
           "android": {
             "image": "./assets/images/splash-niksante.png",
-            "imageWidth": 220
+            "resizeMode": "cover"
           }
         }
       ]

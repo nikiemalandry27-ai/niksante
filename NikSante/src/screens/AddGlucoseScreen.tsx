@@ -67,7 +67,7 @@ export default function AddGlucoseScreen() {
   const numMgDl     = hasValue ? fromDisplay(numDisplay, glucoseUnit) : 0;
   const status      = hasValue ? getGlucoseStatus(numMgDl) : 'normal';
   const statusColor = hasValue ? getStatusColor(status) : '#ccc';
-  const aiMessage   = getAIMessage(status);
+  const aiMessage   = getAIMessage(status, mealContext);
 
   // ---------------------------------------------------------------------------
   // Handlers

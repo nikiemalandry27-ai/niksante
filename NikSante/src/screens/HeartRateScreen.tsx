@@ -220,6 +220,10 @@ export default function HeartRateScreen() {
   const [sampleCount,    setSampleCount]    = useState(0);
   const [fingerDetected, setFingerDetected] = useState(false);
 
+  // hasTorch : true si la caméra arrière supporte le torch (flash LED continu)
+  // Sur quasi tous les téléphones Android modernes, hasTorch = true sur la caméra arrière
+  const hasTorch = (device as any)?.hasTorch ?? true;
+
   const samplesRef        = useRef<Sample[]>([]);
   const measuringRef      = useRef(false);
   const countdownRef      = useRef<NodeJS.Timeout>();
@@ -228,6 +232,13 @@ export default function HeartRateScreen() {
   const fingerFrames      = useRef(0);
   const measureStarted    = useRef(false);
   const startCountdownRef = useRef<() => void>(() => {});
+
+  // Baseline adaptative : luminosité mesurée quand flash ON + pas de doigt
+  // Dès que le doigt couvre la caméra, la luminosité chute de > 50 %
+  const baselineSum       = useRef(0);
+  const baselineCount     = useRef(0);
+  const baselineValue     = useRef(0);
+  const baselineReady     = useRef(false);
 
   // ── Heartbeat animation ───────────────────────────────────────────────────
 
@@ -243,11 +254,24 @@ export default function HeartRateScreen() {
   // ── Frame callback (called from worklet via runOnJS) ──────────────────────
 
   const onFrame = useCallback((brightness: number) => {
-    // Phase waiting : détection du doigt par luminosité
-    // Flash allumé sans doigt → luminosité haute (>130)
-    // Flash allumé avec doigt couvrant caméra+flash → luminosité basse (<110)
     if (phaseRef.current === 'waiting') {
-      const fingerOn = brightness < 110;
+      // Étape 1 : établir la baseline sur les 20 premières trames
+      // (flash allumé, pas de doigt → luminosité max de référence)
+      if (!baselineReady.current) {
+        baselineSum.current   += brightness;
+        baselineCount.current += 1;
+        if (baselineCount.current >= 20) {
+          baselineValue.current = baselineSum.current / baselineCount.current;
+          baselineReady.current = true;
+        }
+        return;
+      }
+
+      // Étape 2 : détecter le doigt quand la luminosité chute de > 50 %
+      // Le doigt posé sur la caméra absorbe la lumière du flash → image très sombre
+      const threshold = baselineValue.current * 0.50;
+      const fingerOn  = brightness < threshold;
+
       setFingerDetected(fingerOn);
       if (fingerOn) {
         fingerFrames.current += 1;
@@ -361,6 +385,10 @@ export default function HeartRateScreen() {
     }
     fingerFrames.current   = 0;
     measureStarted.current = false;
+    baselineSum.current    = 0;
+    baselineCount.current  = 0;
+    baselineValue.current  = 0;
+    baselineReady.current  = false;
     setFingerDetected(false);
     phaseRef.current = 'waiting';
     setPhase('waiting');
@@ -371,6 +399,10 @@ export default function HeartRateScreen() {
     measuringRef.current   = false;
     measureStarted.current = false;
     fingerFrames.current   = 0;
+    baselineSum.current    = 0;
+    baselineCount.current  = 0;
+    baselineValue.current  = 0;
+    baselineReady.current  = false;
     heartAnim.stopAnimation();
     heartAnim.setValue(1);
     setBpm(null);
@@ -543,7 +575,7 @@ export default function HeartRateScreen() {
           {/* Étapes */}
           {[
             { step: '1', icon: '👆', text: 'Posez le bout de votre index sur la caméra arrière', sub: 'La caméra se trouve au dos du téléphone' },
-            { step: '2', icon: '💡', text: 'Couvrez entièrement la caméra ET le flash', sub: 'Le flash doit être caché sous votre doigt' },
+            { step: '2', icon: '💡', text: 'Le flash s\'allume pour éclairer votre doigt', sub: 'Ne couvrez pas le flash — il doit rester visible à côté de votre doigt' },
             { step: '3', icon: '🤏', text: 'Appuyez doucement sans serrer', sub: 'Trop de pression bloque la circulation sanguine' },
             { step: '4', icon: '🧘', text: 'Restez immobile pendant 15 secondes', sub: 'Tout mouvement fausse la mesure' },
           ].map((item) => (
@@ -582,57 +614,79 @@ export default function HeartRateScreen() {
     );
   }
 
-  // ── Waiting (flash ON, attente du doigt) ─────────────────────────────────
+  // ── Waiting (flash ON, aperçu circulaire en temps réel) ─────────────────
 
   if (phase === 'waiting') {
+    const ringColor = fingerDetected ? '#4CAF50' : '#fff';
+    const circleSize = s(300);
+    const torchProp: 'on' | 'off' = hasTorch ? 'on' : 'off';
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: '#0d0000' }]}>
-        <View style={StyleSheet.absoluteFillObject}>
-          <Camera
-            style={StyleSheet.absoluteFillObject}
-            device={device}
-            isActive
-            torch="on"
-            pixelFormat="yuv"
-            frameProcessor={frameProcessor}
-          />
-          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.85)' }]} />
-        </View>
-
+      <SafeAreaView style={[styles.container, { backgroundColor: '#111' }]}>
         <View style={styles.measuringContent}>
-          <ThemedText style={{ fontSize: fs(72), marginBottom: vs(16) }}>👆</ThemedText>
 
-          <ThemedText style={{ fontSize: fs(19), fontWeight: 'bold', color: '#fff', textAlign: 'center', marginBottom: vs(20) }}>
+          <ThemedText style={{ fontSize: fs(18), fontWeight: 'bold', color: '#fff', textAlign: 'center', marginBottom: vs(20) }}>
             Posez votre doigt sur la caméra
           </ThemedText>
 
-          {/* Indicateur de détection */}
+          {/* Anneau + aperçu caméra circulaire */}
           <View style={{
-            width: s(18), height: s(18), borderRadius: s(9),
-            backgroundColor: fingerDetected ? '#4CAF50' : 'rgba(255,255,255,0.25)',
-            marginBottom: vs(12),
-          }} />
+            width: circleSize + 8,
+            height: circleSize + 8,
+            borderRadius: (circleSize + 8) / 2,
+            borderWidth: 4,
+            borderColor: ringColor,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            <View style={{
+              width: circleSize,
+              height: circleSize,
+              borderRadius: circleSize / 2,
+              overflow: 'hidden',
+            }}>
+              <Camera
+                style={{ flex: 1 }}
+                device={device}
+                isActive={true}
+                torch={torchProp}
+                pixelFormat="yuv"
+                frameProcessor={frameProcessor}
+              />
+            </View>
+          </View>
 
+          {/* Indicateur flash — couleur réelle selon hasTorch */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: vs(14), gap: s(6) }}>
+            <View style={{
+              width: s(8), height: s(8), borderRadius: 4,
+              backgroundColor: hasTorch ? '#FFD600' : '#888',
+            }} />
+            <ThemedText style={{ fontSize: fs(12), color: hasTorch ? 'rgba(255,255,255,0.7)' : '#888' }}>
+              {hasTorch ? 'Flash activé' : 'Flash non disponible sur cet appareil'}
+            </ThemedText>
+          </View>
+
+          {/* Statut doigt */}
           <ThemedText style={{
             fontSize: fs(14),
             color: fingerDetected ? '#4CAF50' : 'rgba(255,255,255,0.55)',
             textAlign: 'center',
-            marginBottom: vs(8),
+            marginTop: vs(8),
           }}>
             {fingerDetected
               ? '✓ Doigt détecté — démarrage automatique…'
-              : '💡 Flash activé — en attente du doigt'}
+              : 'Posez votre doigt sur la caméra — le flash éclaire votre doigt'}
           </ThemedText>
 
           {fingerDetected && (
-            <ThemedText style={{ fontSize: fs(12), color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>
+            <ThemedText style={{ fontSize: fs(12), color: 'rgba(255,255,255,0.4)', textAlign: 'center', marginTop: vs(4) }}>
               Restez immobile…
             </ThemedText>
           )}
 
           <TouchableOpacity
             style={[styles.primaryBtn, {
-              marginTop: vs(44),
+              marginTop: vs(28),
               backgroundColor: 'transparent',
               borderWidth: 1,
               borderColor: 'rgba(255,255,255,0.25)',
@@ -653,13 +707,13 @@ export default function HeartRateScreen() {
   if (phase === 'measuring') {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: '#0d0000' }]}>
-        {/* Camera active — frame processor running */}
+        {/* Camera active — frame processor running, torch toujours ON */}
         <View style={StyleSheet.absoluteFillObject}>
           <Camera
             style={StyleSheet.absoluteFillObject}
             device={device}
-            isActive
-            torch="on"
+            isActive={true}
+            torch={hasTorch ? 'on' : 'off'}
             pixelFormat="yuv"
             frameProcessor={frameProcessor}
           />

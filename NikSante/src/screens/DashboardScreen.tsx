@@ -301,8 +301,8 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        {/* ── Graphique ── */}
-        <GlucoseChart data={glucoseHistory} maxBars={7} unit={glucoseUnit} />
+        {/* ── Courbe d'évolution ── */}
+        <GlucoseChart data={glucoseHistory} maxBars={12} unit={glucoseUnit} />
 
         {/* ── Historique récent ── */}
         {glucoseHistory.length > 0 && (
