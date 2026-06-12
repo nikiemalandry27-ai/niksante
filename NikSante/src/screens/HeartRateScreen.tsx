@@ -58,7 +58,7 @@ import { s, fs, vs } from '@/utils/responsive';
 // Types
 // ---------------------------------------------------------------------------
 
-type Phase = 'disclaimer' | 'instruction' | 'measuring' | 'processing' | 'result' | 'error';
+type Phase = 'disclaimer' | 'instruction' | 'waiting' | 'measuring' | 'processing' | 'result' | 'error';
 
 interface Sample {
   value:     number;  // average pixel brightness (Y channel)
@@ -171,18 +171,23 @@ export default function HeartRateScreen() {
   const device = useCameraDevice('back');
   const { hasPermission, requestPermission } = useCameraPermission();
 
-  const [phase,       setPhase]       = useState<Phase>('disclaimer');
-  const [countdown,   setCountdown]   = useState(15);
-  const [bpm,         setBpm]         = useState<number | null>(null);
-  const [confidence,  setConfidence]  = useState(0);
-  const [fps,         setFps]         = useState(0);
-  const [errorMsg,    setErrorMsg]    = useState('');
-  const [sampleCount, setSampleCount] = useState(0);
+  const [phase,          setPhase]          = useState<Phase>('disclaimer');
+  const [countdown,      setCountdown]      = useState(15);
+  const [bpm,            setBpm]            = useState<number | null>(null);
+  const [confidence,     setConfidence]     = useState(0);
+  const [fps,            setFps]            = useState(0);
+  const [errorMsg,       setErrorMsg]       = useState('');
+  const [sampleCount,    setSampleCount]    = useState(0);
+  const [fingerDetected, setFingerDetected] = useState(false);
 
-  const samplesRef   = useRef<Sample[]>([]);
-  const measuringRef = useRef(false);
-  const countdownRef = useRef<NodeJS.Timeout>();
-  const heartAnim    = useRef(new Animated.Value(1)).current;
+  const samplesRef        = useRef<Sample[]>([]);
+  const measuringRef      = useRef(false);
+  const countdownRef      = useRef<NodeJS.Timeout>();
+  const heartAnim         = useRef(new Animated.Value(1)).current;
+  const phaseRef          = useRef<Phase>('disclaimer');
+  const fingerFrames      = useRef(0);
+  const measureStarted    = useRef(false);
+  const startCountdownRef = useRef<() => void>(() => {});
 
   // ── Heartbeat animation ───────────────────────────────────────────────────
 
@@ -198,6 +203,24 @@ export default function HeartRateScreen() {
   // ── Frame callback (called from worklet via runOnJS) ──────────────────────
 
   const onFrame = useCallback((brightness: number) => {
+    // Phase waiting : détection du doigt par luminosité
+    // Flash allumé sans doigt → luminosité haute (>130)
+    // Flash allumé avec doigt couvrant caméra+flash → luminosité basse (<110)
+    if (phaseRef.current === 'waiting') {
+      const fingerOn = brightness < 110;
+      setFingerDetected(fingerOn);
+      if (fingerOn) {
+        fingerFrames.current += 1;
+        if (fingerFrames.current >= 20 && !measureStarted.current) {
+          measureStarted.current = true;
+          startCountdownRef.current();
+        }
+      } else {
+        fingerFrames.current = 0;
+      }
+      return;
+    }
+
     if (!measuringRef.current) return;
     samplesRef.current.push({ value: brightness, timestamp: Date.now() });
     if (samplesRef.current.length % 10 === 0) {
@@ -230,17 +253,13 @@ export default function HeartRateScreen() {
     }
   }, [onFrame]);
 
-  // ── Start measurement ─────────────────────────────────────────────────────
+  // ── Start countdown (called automatically when finger detected) ──────────
 
-  const startMeasurement = useCallback(async () => {
-    if (!hasPermission) {
-      await requestPermission();
-      return;
-    }
-
+  const startCountdown = useCallback(() => {
     samplesRef.current   = [];
     measuringRef.current = true;
     setSampleCount(0);
+    phaseRef.current = 'measuring';
     setPhase('measuring');
     setCountdown(15);
     startHeartbeat();
@@ -253,6 +272,7 @@ export default function HeartRateScreen() {
         clearInterval(countdownRef.current);
         measuringRef.current = false;
         heartAnim.stopAnimation();
+        phaseRef.current = 'processing';
         setPhase('processing');
 
         setTimeout(() => {
@@ -261,23 +281,49 @@ export default function HeartRateScreen() {
             setBpm(result.bpm);
             setConfidence(result.confidence);
             setFps(result.fps);
+            phaseRef.current = 'result';
             setPhase('result');
           } else {
             setErrorMsg(result.message);
+            phaseRef.current = 'error';
             setPhase('error');
           }
         }, 400);
       }
     }, 1000);
-  }, [hasPermission, requestPermission, startHeartbeat, heartAnim]);
+  }, [startHeartbeat, heartAnim]);
+
+  // Sync ref so onFrame (no-dep callback) can call the latest startCountdown
+  const _syncCountdownRef = useCallback(() => {
+    startCountdownRef.current = startCountdown;
+  }, [startCountdown]);
+  _syncCountdownRef();
+
+  // ── Enter waiting phase (flash ON, waiting for finger) ───────────────────
+
+  const enterWaiting = useCallback(async () => {
+    if (!hasPermission) {
+      await requestPermission();
+      return;
+    }
+    fingerFrames.current   = 0;
+    measureStarted.current = false;
+    setFingerDetected(false);
+    phaseRef.current = 'waiting';
+    setPhase('waiting');
+  }, [hasPermission, requestPermission]);
 
   const handleRetry = useCallback(() => {
     clearInterval(countdownRef.current);
-    measuringRef.current = false;
+    measuringRef.current   = false;
+    measureStarted.current = false;
+    fingerFrames.current   = 0;
     heartAnim.stopAnimation();
     heartAnim.setValue(1);
     setBpm(null);
     setErrorMsg('');
+    setFingerDetected(false);
+    phaseRef.current = 'instruction';
     setPhase('instruction');
   }, [heartAnim]);
 
@@ -473,12 +519,78 @@ export default function HeartRateScreen() {
             </ThemedText>
           </View>
 
-          <TouchableOpacity style={styles.primaryBtn} onPress={startMeasurement}>
+          <TouchableOpacity style={styles.primaryBtn} onPress={enterWaiting}>
             <ThemedText style={styles.primaryBtnText}>▶  Démarrer la mesure (15 s)</ThemedText>
           </TouchableOpacity>
 
           <View style={{ height: vs(8) }} />
         </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // ── Waiting (flash ON, attente du doigt) ─────────────────────────────────
+
+  if (phase === 'waiting') {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: '#0d0000' }]}>
+        <View style={StyleSheet.absoluteFillObject}>
+          <Camera
+            style={StyleSheet.absoluteFillObject}
+            device={device}
+            isActive
+            torch="on"
+            pixelFormat="yuv"
+            frameProcessor={frameProcessor}
+          />
+          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.85)' }]} />
+        </View>
+
+        <View style={styles.measuringContent}>
+          <ThemedText style={{ fontSize: fs(72), marginBottom: vs(16) }}>👆</ThemedText>
+
+          <ThemedText style={{ fontSize: fs(19), fontWeight: 'bold', color: '#fff', textAlign: 'center', marginBottom: vs(20) }}>
+            Posez votre doigt sur la caméra
+          </ThemedText>
+
+          {/* Indicateur de détection */}
+          <View style={{
+            width: s(18), height: s(18), borderRadius: s(9),
+            backgroundColor: fingerDetected ? '#4CAF50' : 'rgba(255,255,255,0.25)',
+            marginBottom: vs(12),
+          }} />
+
+          <ThemedText style={{
+            fontSize: fs(14),
+            color: fingerDetected ? '#4CAF50' : 'rgba(255,255,255,0.55)',
+            textAlign: 'center',
+            marginBottom: vs(8),
+          }}>
+            {fingerDetected
+              ? '✓ Doigt détecté — démarrage automatique…'
+              : '💡 Flash activé — en attente du doigt'}
+          </ThemedText>
+
+          {fingerDetected && (
+            <ThemedText style={{ fontSize: fs(12), color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>
+              Restez immobile…
+            </ThemedText>
+          )}
+
+          <TouchableOpacity
+            style={[styles.primaryBtn, {
+              marginTop: vs(44),
+              backgroundColor: 'transparent',
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.25)',
+            }]}
+            onPress={handleRetry}
+          >
+            <ThemedText style={[styles.primaryBtnText, { color: 'rgba(255,255,255,0.6)' }]}>
+              ← Annuler
+            </ThemedText>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     );
   }
