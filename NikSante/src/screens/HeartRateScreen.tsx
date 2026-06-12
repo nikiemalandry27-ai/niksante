@@ -222,6 +222,7 @@ export default function HeartRateScreen() {
   const [errorMsg,         setErrorMsg]         = useState('');
   const [sampleCount,      setSampleCount]      = useState(0);
   const [fingerDetected,   setFingerDetected]   = useState(false);
+  const [fingerProgress,   setFingerProgress]   = useState(0);
   const [debugBrightness,  setDebugBrightness]  = useState(0);
   const [cameraReady,      setCameraReady]      = useState(false);
 
@@ -282,12 +283,14 @@ export default function HeartRateScreen() {
       if (fingerOn) {
         if (fingerFrames.current === 0) Vibration.vibrate(60);
         fingerFrames.current += 1;
+        setFingerProgress(Math.min(100, Math.round((fingerFrames.current / 15) * 100)));
         if (fingerFrames.current >= 15 && !measureStarted.current) {
           measureStarted.current = true;
           startCountdownRef.current();
         }
       } else {
         fingerFrames.current = 0;
+        setFingerProgress(0);
       }
       return;
     }
@@ -632,7 +635,7 @@ export default function HeartRateScreen() {
   // ── Waiting (flash ON, aperçu circulaire en temps réel) ─────────────────
 
   if (phase === 'waiting') {
-    const ringColor = fingerDetected ? '#4CAF50' : '#fff';
+    const ringColor = fingerDetected ? '#E53935' : 'rgba(255,255,255,0.5)';
     const circleSize = s(300);
     // cameraReady s'active après onInitialized → évite torch ignoré si session pas encore ouverte
     const torchProp: 'on' | 'off' = cameraReady && hasTorch ? 'on' : 'off';
@@ -697,9 +700,31 @@ export default function HeartRateScreen() {
           </ThemedText>
 
           {fingerDetected && (
-            <ThemedText style={{ fontSize: fs(12), color: 'rgba(255,255,255,0.4)', textAlign: 'center', marginTop: vs(4) }}>
-              Restez immobile…
-            </ThemedText>
+            <>
+              <ThemedText style={{ fontSize: fs(12), color: 'rgba(255,255,255,0.4)', textAlign: 'center', marginTop: vs(4) }}>
+                Restez immobile…
+              </ThemedText>
+
+              {/* Barre de progression : démarrage automatique */}
+              <View style={{ width: s(260), marginTop: vs(12) }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: vs(4) }}>
+                  <ThemedText style={{ fontSize: fs(11), color: 'rgba(255,255,255,0.5)' }}>
+                    Démarrage automatique
+                  </ThemedText>
+                  <ThemedText style={{ fontSize: fs(11), color: '#E53935', fontWeight: '700' }}>
+                    {fingerProgress}%
+                  </ThemedText>
+                </View>
+                <View style={{ width: '100%', height: vs(6), backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 3, overflow: 'hidden' }}>
+                  <View style={{
+                    height: vs(6),
+                    width: `${fingerProgress}%` as any,
+                    backgroundColor: '#E53935',
+                    borderRadius: 3,
+                  }} />
+                </View>
+              </View>
+            </>
           )}
 
           {/* Debug : ✓fp=bridge OK, ✗fp=onFrameJS null ; lum=-2 exception, -1 no-pixels, ≥0 luminosité */}
@@ -758,8 +783,53 @@ export default function HeartRateScreen() {
             <View style={[styles.progressFill, { width: `${((15 - countdown) / 15) * 100}%` as any }]} />
           </View>
 
-          <ThemedText style={styles.measuringHint}>{sampleCount} trames analysées</ThemedText>
-          <ThemedText style={styles.measuringHint}>Gardez le doigt immobile sur la caméra</ThemedText>
+          {/* Données en temps réel */}
+          <View style={{ width: '100%', marginTop: vs(4), marginBottom: vs(4) }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: vs(4) }}>
+              <ThemedText style={{ fontSize: fs(11), color: 'rgba(255,255,255,0.45)' }}>
+                Échantillons collectés
+              </ThemedText>
+              <ThemedText style={{ fontSize: fs(11), color: '#E53935', fontWeight: '700' }}>
+                {sampleCount} / ~450
+              </ThemedText>
+            </View>
+            <View style={{ width: '100%', height: vs(6), backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden' }}>
+              <View style={{
+                height: vs(6),
+                width: `${Math.min(100, Math.round((sampleCount / 450) * 100))}%` as any,
+                backgroundColor: '#E53935',
+                borderRadius: 3,
+              }} />
+            </View>
+          </View>
+
+          {/* Signal PPG en temps réel */}
+          <View style={{ width: '100%', marginTop: vs(6) }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: vs(4) }}>
+              <ThemedText style={{ fontSize: fs(11), color: 'rgba(255,255,255,0.45)' }}>
+                Signal PPG
+              </ThemedText>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(4) }}>
+                <View style={{
+                  width: s(7), height: s(7), borderRadius: s(4),
+                  backgroundColor: debugBrightness > 10 ? '#E53935' : 'rgba(255,255,255,0.2)',
+                }} />
+                <ThemedText style={{ fontSize: fs(11), color: 'rgba(255,255,255,0.45)' }}>
+                  {debugBrightness > 10 ? 'Actif' : '—'}
+                </ThemedText>
+              </View>
+            </View>
+            <View style={{ width: '100%', height: vs(6), backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden' }}>
+              <View style={{
+                height: vs(6),
+                width: `${Math.min(100, Math.max(0, Math.round((debugBrightness / 220) * 100)))}%` as any,
+                backgroundColor: 'rgba(229,57,53,0.7)',
+                borderRadius: 3,
+              }} />
+            </View>
+          </View>
+
+          <ThemedText style={[styles.measuringHint, { marginTop: vs(12) }]}>Gardez le doigt immobile sur la caméra</ThemedText>
         </View>
       </SafeAreaView>
     );
