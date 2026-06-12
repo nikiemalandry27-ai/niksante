@@ -7,7 +7,7 @@
  * ⚠️ ESTIMATION INDICATIVE — PAS UN DISPOSITIF MÉDICAL.
  */
 
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useMemo } from 'react';
 import {
   View,
   TouchableOpacity,
@@ -19,17 +19,15 @@ import {
   Alert,
   Vibration,
 } from 'react-native';
-import { runOnJS } from 'react-native-reanimated';
 
-// Imports natifs conditionnels — Expo Go ne supporte pas ces modules
-//
-// nativeAvailable  = true si react-native-vision-camera est chargé (EAS Build)
-// frameProcessorsAvailable = true si worklets-core s'est initialisé correctement
-//   → vérifié via VisionCameraProxy.workletContext (non-null quand worklets-core OK)
+// runOnJS de react-native-reanimated ne fonctionne PAS dans le runtime
+// react-native-worklets-core utilisé par VisionCamera v4.
+// On utilise Worklets.createRunOnJS (worklets-core) à la place.
 let Camera: any              = null;
 let useCameraDevice: any     = () => null;
 let useCameraPermission: any = () => ({ hasPermission: false, requestPermission: async () => false });
 let useFrameProcessor: any   = () => undefined;
+let Worklets: any            = null;
 let nativeAvailable          = false;
 let frameProcessorsAvailable = false;
 let _nativeLoadError         = '';
@@ -41,13 +39,16 @@ try {
   useCameraPermission = vc.useCameraPermission;
   nativeAvailable     = true;
 
-  // VisionCamera v4 : useFrameProcessor est disponible dès que le package natif
-  // est chargé. L'ancien check VisionCameraProxy.workletContext était une API v3
-  // qui retourne null en v4, ce qui désactivait à tort frame processors + torch.
   if (typeof vc.useFrameProcessor === 'function') {
     useFrameProcessor        = vc.useFrameProcessor;
     frameProcessorsAvailable = true;
   }
+
+  // Worklets.createRunOnJS est l'API correcte pour appeler du JS
+  // depuis un frame processor tournant dans le runtime worklets-core
+  try {
+    Worklets = require('react-native-worklets-core').Worklets;
+  } catch (_) {}
 } catch (e: any) {
   _nativeLoadError = String(e?.message ?? e ?? 'unknown error');
 }
@@ -213,14 +214,15 @@ export default function HeartRateScreen() {
   const device = useCameraDevice('back');
   const { hasPermission, requestPermission } = useCameraPermission();
 
-  const [phase,          setPhase]          = useState<Phase>('disclaimer');
-  const [countdown,      setCountdown]      = useState(15);
-  const [bpm,            setBpm]            = useState<number | null>(null);
-  const [confidence,     setConfidence]     = useState(0);
-  const [fps,            setFps]            = useState(0);
-  const [errorMsg,       setErrorMsg]       = useState('');
-  const [sampleCount,    setSampleCount]    = useState(0);
-  const [fingerDetected, setFingerDetected] = useState(false);
+  const [phase,            setPhase]            = useState<Phase>('disclaimer');
+  const [countdown,        setCountdown]        = useState(15);
+  const [bpm,              setBpm]              = useState<number | null>(null);
+  const [confidence,       setConfidence]       = useState(0);
+  const [fps,              setFps]              = useState(0);
+  const [errorMsg,         setErrorMsg]         = useState('');
+  const [sampleCount,      setSampleCount]      = useState(0);
+  const [fingerDetected,   setFingerDetected]   = useState(false);
+  const [debugBrightness,  setDebugBrightness]  = useState(0);
 
   // hasTorch : true si la caméra arrière supporte le torch (flash LED continu)
   // Sur quasi tous les téléphones Android modernes, hasTorch = true sur la caméra arrière
@@ -256,8 +258,9 @@ export default function HeartRateScreen() {
   // ── Frame callback (called from worklet via runOnJS) ──────────────────────
 
   const onFrame = useCallback((brightness: number) => {
+    setDebugBrightness(Math.round(brightness));
+
     if (phaseRef.current === 'waiting') {
-      // Étape 1 : baseline sur les 30 premières trames (flash ON, pas de doigt)
       if (!baselineReady.current) {
         baselineSum.current   += brightness;
         baselineCount.current += 1;
@@ -268,20 +271,13 @@ export default function HeartRateScreen() {
         return;
       }
 
-      // Étape 2 : détection du doigt
-      // Seuil adaptatif :
-      //  - Si baseline haute (>80, flash actif) : chute de 55 % requise
-      //  - Si baseline basse (≤80, flash inactif ou pièce sombre) : chute absolue de 30 pts
       const base      = baselineValue.current;
       const threshold = base > 80 ? base * 0.45 : base - 30;
       const fingerOn  = brightness < threshold && brightness < base - 20;
 
       setFingerDetected(fingerOn);
       if (fingerOn) {
-        if (fingerFrames.current === 0) {
-          // Premier frame avec doigt détecté → vibration courte
-          Vibration.vibrate(60);
-        }
+        if (fingerFrames.current === 0) Vibration.vibrate(60);
         fingerFrames.current += 1;
         if (fingerFrames.current >= 15 && !measureStarted.current) {
           measureStarted.current = true;
@@ -300,6 +296,15 @@ export default function HeartRateScreen() {
     }
   }, []);
 
+  // Crée une fois un wrapper worklet-callable vers onFrame (JS thread).
+  // Worklets.createRunOnJS est l'API correcte pour VisionCamera v4 +
+  // worklets-core. runOnJS de reanimated ne fonctionne pas dans ce runtime.
+  const onFrameJS = useMemo(
+    () => Worklets ? Worklets.createRunOnJS((b: number) => onFrame(b)) : null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+
   // ── Frame processor — runs at camera FPS (~30fps) ─────────────────────────
 
   const frameProcessor = useFrameProcessor((frame) => {
@@ -308,9 +313,6 @@ export default function HeartRateScreen() {
       const buffer = frame.toArrayBuffer();
       const data   = new Uint8Array(buffer);
 
-      // Échantillonner uniquement la zone centrale (30–70 % en x et y)
-      // Le flash est au centre — c'est là que le signal PPG est le plus fort
-      // YUV_420_888 : plan Y = premiers width*height octets, stride = width
       const w  = frame.width;
       const h  = frame.height;
       const r0 = Math.floor(h * 0.30);
@@ -318,7 +320,6 @@ export default function HeartRateScreen() {
       const c0 = Math.floor(w * 0.30);
       const c1 = Math.floor(w * 0.70);
 
-      // ~20×20 = 400 points max dans la zone centrale
       const rStep = Math.max(1, Math.floor((r1 - r0) / 20));
       const cStep = Math.max(1, Math.floor((c1 - c0) / 20));
 
@@ -332,11 +333,11 @@ export default function HeartRateScreen() {
         }
       }
 
-      runOnJS(onFrame)(count > 0 ? sum / count : 0);
+      if (onFrameJS && count > 0) onFrameJS(sum / count);
     } catch {
       // skip frame on read error
     }
-  }, [onFrame]);
+  }, [onFrameJS]);
 
   // ── Start countdown (called automatically when finger detected) ──────────
 
@@ -695,6 +696,11 @@ export default function HeartRateScreen() {
               Restez immobile…
             </ThemedText>
           )}
+
+          {/* Debug : confirme que le frame processor tourne */}
+          <ThemedText style={{ fontSize: fs(10), color: 'rgba(255,255,255,0.25)', textAlign: 'center', marginTop: vs(6) }}>
+            lum: {debugBrightness}
+          </ThemedText>
 
           <TouchableOpacity
             style={[styles.primaryBtn, {
