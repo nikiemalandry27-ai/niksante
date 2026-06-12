@@ -70,11 +70,13 @@ interface Sample {
 // ---------------------------------------------------------------------------
 
 function movingAverage(arr: number[], window: number): number[] {
+  const half = Math.floor(window / 2);
   return arr.map((_, i) => {
-    const start = Math.max(0, i - Math.floor(window / 2));
-    const end   = Math.min(arr.length - 1, i + Math.floor(window / 2));
-    const slice = arr.slice(start, end + 1);
-    return slice.reduce((a, b) => a + b, 0) / slice.length;
+    const start = Math.max(0, i - half);
+    const end   = Math.min(arr.length - 1, i + half);
+    let sum = 0;
+    for (let j = start; j <= end; j++) sum += arr[j];
+    return sum / (end - start + 1);
   });
 }
 
@@ -84,39 +86,60 @@ function analyzePPG(samples: Sample[]): {
   fps:        number;
   message:    string;
 } {
-  if (samples.length < 30) {
+  // Need at least 2 seconds of data
+  if (samples.length < 60) {
     return { bpm: null, confidence: 0, fps: 0, message: 'Pas assez de données — gardez le doigt immobile sur la caméra' };
   }
 
   const values     = samples.map((s) => s.value);
   const timestamps = samples.map((s) => s.timestamp);
 
-  // Actual FPS
   const durationSec = (timestamps[timestamps.length - 1] - timestamps[0]) / 1000;
-  const fps = Math.round(samples.length / durationSec);
+  const fps         = Math.round(samples.length / durationSec);
 
-  // Signal quality check
-  const mean = values.reduce((a, b) => a + b, 0) / values.length;
-  const std  = Math.sqrt(values.map((v) => (v - mean) ** 2).reduce((a, b) => a + b, 0) / values.length);
-
-  if (std / (mean || 1) < 0.002) {
-    return { bpm: null, confidence: 0, fps, message: 'Doigt non détecté — couvrez bien la caméra et le flash' };
+  if (fps < 10) {
+    return { bpm: null, confidence: 0, fps, message: 'Fréquence caméra trop basse — réessayez' };
   }
 
-  // Normalize and smooth
+  // ── Signal quality check ───────────────────────────────────────────────────
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  const std  = Math.sqrt(values.map((v) => (v - mean) ** 2).reduce((a, b) => a + b, 0) / values.length);
+  const cv   = std / (mean || 1); // coefficient of variation
+
+  if (cv < 0.002) {
+    return { bpm: null, confidence: 0, fps, message: 'Doigt non détecté — couvrez bien la caméra ET le flash' };
+  }
+  if (cv > 0.20) {
+    return { bpm: null, confidence: 0, fps, message: 'Signal instable — restez immobile, réduisez la pression' };
+  }
+
+  // ── 1. Normalize ──────────────────────────────────────────────────────────
   const normalized = values.map((v) => (v - mean) / (std || 1));
-  const smoothed   = movingAverage(normalized, 5);
 
-  // Peak detection
-  const threshold = 0.15;
-  const minDist   = Math.max(3, Math.floor(fps * 0.35)); // min 350ms between peaks
+  // ── 2. Smooth — fenêtre ≈ 80 ms (supprime le bruit haute fréquence) ───────
+  const smoothWin = Math.max(3, Math.round(fps * 0.08));
+  const smoothed  = movingAverage(normalized, smoothWin);
+
+  // ── 3. Détrend — supprime la dérive lente (pression variable, ≈ 1.2 s) ───
+  const trendWin  = Math.max(smoothWin + 2, Math.round(fps * 1.2));
+  const trend     = movingAverage(smoothed, trendWin);
+  const detrended = smoothed.map((v, i) => v - trend[i]);
+
+  // ── 4. Détection de pics avec seuil adaptatif ─────────────────────────────
+  const sigMax   = Math.max(...detrended);
+  const sigMin   = Math.min(...detrended);
+  const amp      = sigMax - sigMin;
+  // Seuil = 40 % de l'amplitude — s'adapte à l'intensité du signal
+  const peakThr  = sigMin + amp * 0.40;
+  // Distance minimale entre pics ≈ 330 ms (≤ 182 BPM)
+  const minDist  = Math.max(3, Math.floor(fps * 0.33));
+
   const peaks: number[] = [];
-
-  for (let i = 1; i < smoothed.length - 1; i++) {
+  for (let i = 1; i < detrended.length - 1; i++) {
     if (
-      smoothed[i] > threshold &&
-      smoothed[i] >= smoothed[i - 1] &&
-      smoothed[i] >= smoothed[i + 1]
+      detrended[i] > peakThr &&
+      detrended[i] >= detrended[i - 1] &&
+      detrended[i] >= detrended[i + 1]
     ) {
       if (peaks.length === 0 || i - peaks[peaks.length - 1] >= minDist) {
         peaks.push(i);
@@ -124,40 +147,57 @@ function analyzePPG(samples: Sample[]): {
     }
   }
 
-  if (peaks.length < 4) {
+  if (peaks.length < 5) {
     return {
       bpm:        null,
       confidence: 0,
       fps,
-      message:    'Signal insuffisant — restez immobile, appuyez doucement sur la caméra',
+      message:    'Signal PPG insuffisant — couvrez bien la caméra, appuyez doucement, restez immobile',
     };
   }
 
-  // RR intervals using actual timestamps
+  // ── 5. Intervalles RR réels (via timestamps) ──────────────────────────────
   const intervals: number[] = [];
   for (let i = 1; i < peaks.length; i++) {
     const dt = (timestamps[peaks[i]] - timestamps[peaks[i - 1]]) / 1000;
-    if (dt > 0.25 && dt < 2.5) intervals.push(dt);
+    if (dt > 0.28 && dt < 1.8) intervals.push(dt); // 33 – 214 BPM
   }
 
-  if (intervals.length < 3) {
+  if (intervals.length < 4) {
     return { bpm: null, confidence: 0, fps, message: 'Intervalles irréguliers — réessayez en restant immobile' };
   }
 
-  // Median RR interval
-  const sorted   = [...intervals].sort((a, b) => a - b);
-  const medianRR = sorted[Math.floor(sorted.length / 2)];
-  const bpm      = Math.round(60 / medianRR);
+  // ── 6. Rejet des valeurs aberrantes (méthode IQR) ─────────────────────────
+  const sortedIQR = [...intervals].sort((a, b) => a - b);
+  const q1        = sortedIQR[Math.floor(sortedIQR.length * 0.25)];
+  const q3        = sortedIQR[Math.floor(sortedIQR.length * 0.75)];
+  const iqr       = q3 - q1;
+  const clean     = intervals.filter((v) => v >= q1 - 1.5 * iqr && v <= q3 + 1.5 * iqr);
+
+  if (clean.length < 3) {
+    return { bpm: null, confidence: 0, fps, message: 'Trop d\'irrégularités — réessayez' };
+  }
+
+  // ── 7. BPM via médiane ────────────────────────────────────────────────────
+  const sortedClean = [...clean].sort((a, b) => a - b);
+  const medianRR    = sortedClean[Math.floor(sortedClean.length / 2)];
+  const bpm         = Math.round(60 / medianRR);
 
   if (bpm < 40 || bpm > 200) {
     return { bpm: null, confidence: 0, fps, message: 'Résultat hors plage physiologique — réessayez' };
   }
 
-  // RMSSD-based confidence
-  const diffs = intervals.map((v, i, arr) => i > 0 ? Math.abs(v - arr[i - 1]) : 0).slice(1);
-  const rmssd = Math.sqrt(diffs.map((d) => d ** 2).reduce((a, b) => a + b, 0) / (diffs.length || 1));
-  const variabilityPenalty = Math.min(40, Math.round(rmssd * 200));
-  const confidence = Math.min(97, 55 + peaks.length * 4 - variabilityPenalty);
+  // ── 8. Score de confiance ─────────────────────────────────────────────────
+  const diffs       = clean.map((v, i, arr) => i > 0 ? Math.abs(v - arr[i - 1]) : 0).slice(1);
+  const rmssd       = Math.sqrt(diffs.map((d) => d ** 2).reduce((a, b) => a + b, 0) / (diffs.length || 1));
+  const regularity  = Math.max(0, 1 - rmssd / (medianRR || 1));
+  const peakScore   = Math.min(1, clean.length / 10);
+  const sampleScore = Math.min(1, samples.length / 400);
+  const snrScore    = Math.min(1, (cv - 0.002) / 0.03);
+
+  const confidence = Math.round(Math.min(96,
+    40 * regularity + 20 * peakScore + 20 * sampleScore + 16 * snrScore
+  ));
 
   return { bpm, confidence, fps, message: 'Mesure effectuée' };
 }
@@ -236,15 +276,28 @@ export default function HeartRateScreen() {
       const buffer = frame.toArrayBuffer();
       const data   = new Uint8Array(buffer);
 
-      // Sample Y channel (luminance) uniformly — YUV_420: Y plane = first w*h bytes
-      const totalPixels = frame.width * frame.height;
-      const step        = Math.max(1, Math.floor(totalPixels / 400));
+      // Échantillonner uniquement la zone centrale (30–70 % en x et y)
+      // Le flash est au centre — c'est là que le signal PPG est le plus fort
+      // YUV_420_888 : plan Y = premiers width*height octets, stride = width
+      const w  = frame.width;
+      const h  = frame.height;
+      const r0 = Math.floor(h * 0.30);
+      const r1 = Math.floor(h * 0.70);
+      const c0 = Math.floor(w * 0.30);
+      const c1 = Math.floor(w * 0.70);
+
+      // ~20×20 = 400 points max dans la zone centrale
+      const rStep = Math.max(1, Math.floor((r1 - r0) / 20));
+      const cStep = Math.max(1, Math.floor((c1 - c0) / 20));
 
       let sum   = 0;
       let count = 0;
-      for (let i = 0; i < totalPixels; i += step) {
-        sum += data[i];
-        count++;
+      for (let r = r0; r < r1; r += rStep) {
+        const rowOffset = r * w;
+        for (let c = c0; c < c1; c += cStep) {
+          sum += data[rowOffset + c];
+          count++;
+        }
       }
 
       runOnJS(onFrame)(count > 0 ? sum / count : 0);
