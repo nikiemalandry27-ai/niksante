@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "NikSanté – Diabète & Glycémie",
-    "slug": "NikSante",
+    "slug": "niksante",
     "version": "1.2.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -75,9 +75,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "7cc85ca2-aca8-433c-bf36-47d4c258706c"
+        "projectId": "ba5142f5-0308-47bb-b9a8-f4d6777002ce"
       }
     },
-    "owner": "nikiemalandry"
+    "owner": "relwende"
   }
 }
