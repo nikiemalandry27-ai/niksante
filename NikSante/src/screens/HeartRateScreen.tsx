@@ -7,7 +7,7 @@
  * ⚠️ ESTIMATION INDICATIVE — PAS UN DISPOSITIF MÉDICAL.
  */
 
-import { useRef, useState, useCallback, useMemo } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import {
   View,
   TouchableOpacity,
@@ -22,12 +22,12 @@ import {
 
 // runOnJS de react-native-reanimated ne fonctionne PAS dans le runtime
 // react-native-worklets-core utilisé par VisionCamera v4.
-// On utilise Worklets.createRunOnJS (worklets-core) à la place.
+// On utilise useRunOnJS (worklets-core v1.6.3) à la place.
 let Camera: any              = null;
 let useCameraDevice: any     = () => null;
 let useCameraPermission: any = () => ({ hasPermission: false, requestPermission: async () => false });
 let useFrameProcessor: any   = () => undefined;
-let Worklets: any            = null;
+let useRunOnJS: any          = (_fn: any, _deps: any[]) => null;
 let nativeAvailable          = false;
 let frameProcessorsAvailable = false;
 let _nativeLoadError         = '';
@@ -44,10 +44,10 @@ try {
     frameProcessorsAvailable = true;
   }
 
-  // Worklets.createRunOnJS est l'API correcte pour appeler du JS
-  // depuis un frame processor tournant dans le runtime worklets-core
+  // useRunOnJS est le hook officiel worklets-core pour appeler du JS
+  // depuis un frame processor. Confirmé disponible en v1.6.3.
   try {
-    Worklets = require('react-native-worklets-core').Worklets;
+    useRunOnJS = require('react-native-worklets-core').useRunOnJS;
   } catch (_) {}
 } catch (e: any) {
   _nativeLoadError = String(e?.message ?? e ?? 'unknown error');
@@ -296,14 +296,9 @@ export default function HeartRateScreen() {
     }
   }, []);
 
-  // Crée une fois un wrapper worklet-callable vers onFrame (JS thread).
-  // Worklets.createRunOnJS est l'API correcte pour VisionCamera v4 +
-  // worklets-core. runOnJS de reanimated ne fonctionne pas dans ce runtime.
-  const onFrameJS = useMemo(
-    () => Worklets?.createRunOnJS?.((b: number) => onFrame(b)) ?? null,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
-  );
+  // useRunOnJS crée un wrapper worklet-callable vers onFrame (JS thread).
+  // C'est le hook officiel de worklets-core v1.6.3 pour VisionCamera v4.
+  const onFrameJS = useRunOnJS(onFrame, [onFrame]);
 
   // ── Frame processor — runs at camera FPS (~30fps) ─────────────────────────
 
