@@ -223,6 +223,7 @@ export default function HeartRateScreen() {
   const [sampleCount,      setSampleCount]      = useState(0);
   const [fingerDetected,   setFingerDetected]   = useState(false);
   const [debugBrightness,  setDebugBrightness]  = useState(0);
+  const [cameraReady,      setCameraReady]      = useState(false);
 
   // hasTorch : true si la caméra arrière supporte le torch (flash LED continu)
   // Sur quasi tous les téléphones Android modernes, hasTorch = true sur la caméra arrière
@@ -259,6 +260,8 @@ export default function HeartRateScreen() {
 
   const onFrame = useCallback((brightness: number) => {
     setDebugBrightness(Math.round(brightness));
+    // -1 = frame processor tourne mais count=0 ; -2 = toArrayBuffer a planté
+    if (brightness < 0) return;
 
     if (phaseRef.current === 'waiting') {
       if (!baselineReady.current) {
@@ -304,6 +307,7 @@ export default function HeartRateScreen() {
 
   const frameProcessor = useFrameProcessor((frame) => {
     'worklet';
+    if (!onFrameJS) return;
     try {
       const buffer = frame.toArrayBuffer();
       const data   = new Uint8Array(buffer);
@@ -328,9 +332,10 @@ export default function HeartRateScreen() {
         }
       }
 
-      if (onFrameJS && count > 0) onFrameJS(sum / count);
+      // -1 = count nul (frame trop petite), -2 = exception toArrayBuffer
+      onFrameJS(count > 0 ? sum / count : -1);
     } catch {
-      // skip frame on read error
+      onFrameJS(-2);
     }
   }, [onFrameJS]);
 
@@ -626,7 +631,8 @@ export default function HeartRateScreen() {
   if (phase === 'waiting') {
     const ringColor = fingerDetected ? '#4CAF50' : '#fff';
     const circleSize = s(300);
-    const torchProp: 'on' | 'off' = hasTorch ? 'on' : 'off';
+    // cameraReady s'active après onInitialized → évite torch ignoré si session pas encore ouverte
+    const torchProp: 'on' | 'off' = cameraReady && hasTorch ? 'on' : 'off';
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: '#111' }]}>
         <View style={styles.measuringContent}>
@@ -659,6 +665,7 @@ export default function HeartRateScreen() {
                 video={true}
                 pixelFormat="yuv"
                 frameProcessor={frameProcessor}
+                onInitialized={() => setCameraReady(true)}
               />
             </View>
           </View>
@@ -692,9 +699,9 @@ export default function HeartRateScreen() {
             </ThemedText>
           )}
 
-          {/* Debug : confirme que le frame processor tourne */}
+          {/* Debug : ✓fp=bridge OK, ✗fp=onFrameJS null ; lum=-2 exception, -1 no-pixels, ≥0 luminosité */}
           <ThemedText style={{ fontSize: fs(10), color: 'rgba(255,255,255,0.25)', textAlign: 'center', marginTop: vs(6) }}>
-            lum: {debugBrightness}
+            {onFrameJS ? '✓fp' : '✗fp'} | lum:{debugBrightness}
           </ThemedText>
 
           <TouchableOpacity
@@ -726,10 +733,11 @@ export default function HeartRateScreen() {
             style={StyleSheet.absoluteFillObject}
             device={device}
             isActive={true}
-            torch={hasTorch ? 'on' : 'off'}
+            torch={cameraReady && hasTorch ? 'on' : 'off'}
             video={true}
             pixelFormat="yuv"
             frameProcessor={frameProcessor}
+            onInitialized={() => setCameraReady(true)}
           />
           {/* Dark overlay so UI is readable */}
           <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.88)' }]} />
