@@ -87,7 +87,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="heart-rate"
         options={{
-          title: 'Cœur',
+          title: 'Fréq. cardiaque',
           tabBarIcon: ({ color, focused }) => (
             <Text style={{ fontSize: focused ? 24 : 22 }}>❤️</Text>
           ),

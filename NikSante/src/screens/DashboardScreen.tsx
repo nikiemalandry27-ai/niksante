@@ -353,7 +353,7 @@ export default function DashboardScreen() {
       {/* ── Barre d'action ── */}
       <View style={styles.actionBar}>
         <TouchableOpacity style={styles.emergencyBtn} onPress={handleEmergency}>
-          <ThemedText style={styles.emergencyBtnText}>🆘 URGENCE</ThemedText>
+          <ThemedText style={styles.emergencyBtnText}>🆘 Hypo/Hyperglycémie</ThemedText>
         </TouchableOpacity>
         <TouchableOpacity style={styles.addBtn} onPress={handleAddGlucose}>
           <ThemedText style={styles.addBtnText}>+ Ajouter</ThemedText>
@@ -508,7 +508,7 @@ const styles = StyleSheet.create({
     flex: 1, backgroundColor: '#B71C1C', borderRadius: 12,
     paddingVertical: vs(15), alignItems: 'center',
   },
-  emergencyBtnText: { color: '#fff', fontWeight: 'bold', fontSize: fs(14) },
+  emergencyBtnText: { color: '#fff', fontWeight: 'bold', fontSize: fs(12) },
   addBtn: {
     flex: 1, backgroundColor: '#388E3C', borderRadius: 12,
     paddingVertical: vs(15), alignItems: 'center',
