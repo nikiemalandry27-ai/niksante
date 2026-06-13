@@ -84,6 +84,48 @@ function movingAvg(arr: number[], win: number): number[] {
   });
 }
 
+// DFT ciblée 0.8–3 Hz (48–180 BPM) — second estimateur fréquentiel.
+// Utilise les timestamps réels pour être robuste au jitter de FPS.
+// Complexité : O(F × N) avec F ≈ 110 fréquences et N ≈ 450 échantillons ≈ 50 k ops.
+function computeDFT(signal: number[], timestamps: number[]): { bpm: number; snr: number } {
+  const fMin = 0.8, fMax = 3.0;
+  const N    = signal.length;
+  const mean = signal.reduce((a, b) => a + b, 0) / N;
+  const x    = signal.map(v => v - mean);
+
+  const dur  = (timestamps[N - 1] - timestamps[0]) / 1000;
+  // Pas de fréquence : interpolation ×2 (résolution réelle limitée à 1/dur)
+  const step = Math.max(0.02, 0.5 / dur);
+
+  const freqs: number[] = [];
+  const mags:  number[] = [];
+
+  for (let f = fMin; f <= fMax + 1e-9; f += step) {
+    let re = 0, im = 0;
+    for (let n = 0; n < N; n++) {
+      const t   = (timestamps[n] - timestamps[0]) / 1000; // temps réel en secondes
+      const phi = -2 * Math.PI * f * t;
+      re += x[n] * Math.cos(phi);
+      im += x[n] * Math.sin(phi);
+    }
+    freqs.push(f);
+    mags.push(Math.sqrt(re * re + im * im));
+  }
+
+  // Pic dominant
+  let peakMag = 0, peakIdx = 0;
+  for (let i = 0; i < mags.length; i++) {
+    if (mags[i] > peakMag) { peakMag = mags[i]; peakIdx = i; }
+  }
+
+  // SNR fréquentiel : pic / moyenne des voisins éloignés (exclut ±2 bins)
+  const others   = mags.filter((_, i) => Math.abs(i - peakIdx) > 2);
+  const avgOther = others.length > 0 ? others.reduce((a, b) => a + b, 0) / others.length : 1;
+  const snr      = avgOther > 0 ? peakMag / avgOther : 1;
+
+  return { bpm: Math.round(freqs[peakIdx] * 60), snr };
+}
+
 interface PPGResult {
   bpm:           number | null;
   confidence:    number;
@@ -111,37 +153,37 @@ function analyzePPG(samples: Sample[]): PPGResult {
   const std  = Math.sqrt(vals.reduce((s, v) => s + (v - mean) ** 2, 0) / vals.length);
   const cv   = std / (mean || 1);
 
-  // Signal trop plat → pas de doigt ou pression excessive
-  if (cv < 0.0008) return fail('Signal trop plat — couvrez la caméra ET le flash, appuyez légèrement');
-  // Signal chaotique → mouvement
-  if (cv > 0.25) return fail('Signal instable — restez parfaitement immobile, réduisez la pression');
+  if (cv < 0.0008) return fail('Signal trop plat — appuyez légèrement, laissez le flash dégagé');
+  if (cv > 0.25)   return fail('Signal instable — restez parfaitement immobile, réduisez la pression');
 
   // ── 1. Suppression outliers (> 3σ) ───────────────────────────────────────
   const clean = vals.map(v => (Math.abs(v - mean) > std * 3 ? mean : v));
 
-  // ── 2. Détrend — soustrait la dérive lente (fenêtre 2.5 s) ───────────────
+  // ── 2. Détrend (fenêtre 2.5 s → HP effectif ≈ 0.4 Hz, bien sous 0.8 Hz) ──
   const trendWin  = Math.max(5, Math.round(fps * 2.5));
   const trend     = movingAvg(clean, trendWin);
   const detrended = clean.map((v, i) => v - trend[i]);
 
-  // ── 3. Bandpass par double lissage (40 ms + 200 ms → 0.5–4 Hz) ──────────
-  const smW      = Math.max(2, Math.round(fps * 0.04));
-  const bpW      = Math.max(3, Math.round(fps * 0.20));
-  const filtered = movingAvg(movingAvg(detrended, smW), bpW);
+  // ── 3. Bandpass 0.8–3 Hz ──────────────────────────────────────────────────
+  // LP 3 Hz  : fenêtre W ≈ 0.44 × fps / 3  (≈ 4 samples à 30 fps)
+  // HP 0.8 Hz: déjà assuré par le détrend 2.5 s (élimine < 0.4 Hz)
+  const smW      = Math.max(2, Math.round(fps * 0.04));            // anti-bruit 40 ms
+  const lpW      = Math.max(2, Math.round(fps * 0.44 / 3));        // LP 3 Hz
+  const filtered = movingAvg(movingAvg(detrended, smW), lpW);
 
-  // ── 4. SNR : amplitude signal / bruit résiduel HF ─────────────────────────
+  // ── 4. SNR temporel ───────────────────────────────────────────────────────
   const sigMax   = Math.max(...filtered);
   const sigMin   = Math.min(...filtered);
   const amp      = sigMax - sigMin;
-  if (amp < 1e-10) return fail('Amplitude PPG nulle — couvrez mieux la caméra et le flash');
+  if (amp < 1e-10) return fail('Amplitude PPG nulle — repositionnez le doigt');
 
   const noiseArr = filtered.map((v, i) => detrended[i] - v);
   const noiseRMS = Math.sqrt(noiseArr.reduce((s, v) => s + v * v, 0) / noiseArr.length);
   const snr      = noiseRMS > 0 ? amp / noiseRMS : 0;
 
-  // ── 5. Détection de pics (seuil 40%, distance min 300 ms) ────────────────
+  // ── 5. Détection de pics (seuil 40%, distance min 333 ms = 180 BPM max) ──
   const peakThr = sigMin + amp * 0.40;
-  const minDist = Math.max(3, Math.floor(fps * 0.30));
+  const minDist = Math.max(3, Math.floor(fps * 0.333));
   const peaks: number[] = [];
   for (let i = 1; i < filtered.length - 1; i++) {
     if (
@@ -156,20 +198,20 @@ function analyzePPG(samples: Sample[]): PPGResult {
     return {
       bpm: null, confidence: 0, signalQuality: Math.round(Math.min(40, snr * 5)),
       isValid: false, fps,
-      message: `Signal PPG insuffisant (${peaks.length} pics) — couvrez mieux la caméra et le flash`,
+      message: `Signal PPG insuffisant (${peaks.length} pics) — repositionnez le doigt`,
     };
   }
 
-  // ── 6. Intervalles RR via timestamps réels (robuste au jitter FPS) ────────
+  // ── 6. Intervalles RR — plage 0.8–3 Hz (48–180 BPM) ─────────────────────
   const rr: number[] = [];
   for (let i = 1; i < peaks.length; i++) {
     const dt = (ts[peaks[i]] - ts[peaks[i - 1]]) / 1000;
-    if (dt >= 0.30 && dt <= 1.5) rr.push(dt); // 40–200 BPM
+    if (dt >= 0.333 && dt <= 1.25) rr.push(dt);
   }
 
-  if (rr.length < 3) return fail('Intervalles RR invalides — réessayez en restant immobile');
+  if (rr.length < 3) return fail('Intervalles RR hors plage 48–180 BPM — réessayez immobile');
 
-  // ── 7. Rejet IQR des outliers ─────────────────────────────────────────────
+  // ── 7. Rejet IQR ─────────────────────────────────────────────────────────
   const sortedRR = [...rr].sort((a, b) => a - b);
   const q1       = sortedRR[Math.floor(sortedRR.length * 0.25)];
   const q3       = sortedRR[Math.floor(sortedRR.length * 0.75)];
@@ -178,18 +220,60 @@ function analyzePPG(samples: Sample[]): PPGResult {
 
   if (cleanRR.length < 3) return fail('Trop d\'artefacts — réessayez parfaitement immobile');
 
-  // ── 8. BPM via médiane RR ─────────────────────────────────────────────────
-  const sortedC = [...cleanRR].sort((a, b) => a - b);
-  const medRR   = sortedC[Math.floor(sortedC.length / 2)];
-  const bpm     = Math.round(60 / medRR);
+  // ── 8. BPM par détection de pics (médiane RR) ────────────────────────────
+  const sortedC  = [...cleanRR].sort((a, b) => a - b);
+  const medRR    = sortedC[Math.floor(sortedC.length / 2)];
+  const bpmPeaks = Math.round(60 / medRR);
 
-  if (bpm < 40 || bpm > 200) return fail(`Résultat hors plage physiologique (${bpm} BPM) — réessayez`);
+  if (bpmPeaks < 48 || bpmPeaks > 180) {
+    return fail(`BPM hors plage 48–180 BPM (${bpmPeaks}) — réessayez`);
+  }
 
-  // ── 9. Cohérence multi-fenêtres (détecte les sauts = artefacts) ──────────
+  // ── 9. DFT ciblée 0.8–3 Hz — second estimateur fréquentiel ──────────────
+  const dft    = computeDFT(filtered, ts);
+  const bpmDFT = dft.bpm;
+  const diff   = Math.abs(bpmPeaks - bpmDFT);
+
+  // Détection d'harmonique : DFT peut trouver le 2e harmonique (bpmDFT ≈ 2×bpmPeaks)
+  const isHarmonic = Math.abs(bpmDFT - 2 * bpmPeaks) <= 8
+                  || Math.abs(bpmPeaks - 2 * bpmDFT) <= 8;
+
+  let bpm: number;
+  let coherenceScore: number;
+  let coherenceMsg: string;
+
+  if (isHarmonic) {
+    // Harmonique fréquentielle → pics temporels plus fiables
+    bpm            = bpmPeaks;
+    coherenceScore = 0.80;
+    coherenceMsg   = `Accord méthodes (harmonique DFT corrigée)`;
+  } else if (diff <= 5) {
+    // Accord parfait ≤ 5 BPM : fusion pondérée (DFT 55%, pics 45%)
+    bpm            = Math.round(bpmPeaks * 0.45 + bpmDFT * 0.55);
+    coherenceScore = 1.0;
+    coherenceMsg   = `Mesure fiable — accord Δ${diff} BPM`;
+  } else if (diff <= 12) {
+    // Accord partiel : DFT prioritaire (plus robuste au bruit d'amplitude)
+    bpm            = bpmDFT;
+    coherenceScore = 0.70;
+    coherenceMsg   = `Mesure acceptable — Δ${diff} BPM entre méthodes`;
+  } else {
+    // Désaccord : signal ambigu, DFT conservée, confiance très basse
+    bpm            = bpmDFT;
+    coherenceScore = 0.38;
+    coherenceMsg   = `Signal ambigu — Δ${diff} BPM, réessayez immobile`;
+  }
+
+  // Rejet si divergence extrême ou BPM fusionné hors plage
+  if (diff > 30 || bpm < 48 || bpm > 180) {
+    return fail(`Mesure incohérente (pics ${bpmPeaks} / DFT ${bpmDFT} BPM) — réessayez immobile`);
+  }
+
+  // ── 10. Cohérence temporelle multi-fenêtres ───────────────────────────────
   const wSz   = Math.max(2, Math.floor(cleanRR.length / 3));
   const wBPMs: number[] = [];
   for (let s = 0; s + wSz <= cleanRR.length; s += Math.max(1, Math.floor(wSz / 2))) {
-    const w = cleanRR.slice(s, s + wSz);
+    const w    = cleanRR.slice(s, s + wSz);
     const wMed = [...w].sort((a, b) => a - b)[Math.floor(w.length / 2)];
     wBPMs.push(Math.round(60 / wMed));
   }
@@ -197,34 +281,35 @@ function analyzePPG(samples: Sample[]): PPGResult {
     ? wBPMs.reduce((s, b) => s + (b - bpm) ** 2, 0) / wBPMs.length
     : 0;
 
-  // Rejet : BPM élevé + forte variance → artefact de mouvement
+  // Rejet : BPM élevé + forte variance temporelle → artefact de mouvement
   if (bpm > 110 && bpmVar > 300) {
     return fail('BPM élevé instable — mouvement détecté, gardez le doigt parfaitement immobile');
   }
 
-  // ── 10. Scores qualité et confiance ──────────────────────────────────────
+  // ── 11. Scores qualité et confiance ──────────────────────────────────────
   const diffs      = cleanRR.slice(1).map((v, i) => Math.abs(v - cleanRR[i]));
   const rmssd      = Math.sqrt(diffs.reduce((s, d) => s + d * d, 0) / (diffs.length || 1));
   const regularity = Math.max(0, 1 - rmssd / medRR);
   const snrScore   = Math.min(1, snr / 8);
+  const dftSNR     = Math.min(1, dft.snr / 5);   // SNR fréquentiel de la DFT
   const peakScore  = Math.min(1, cleanRR.length / 10);
   const sampScore  = Math.min(1, samples.length / (fps * 12));
   const consScore  = Math.max(0, 1 - bpmVar / 400);
 
   const signalQuality = Math.round(Math.min(100,
-    30 * snrScore + 25 * regularity + 20 * peakScore + 15 * sampScore + 10 * consScore
+    25 * snrScore + 20 * dftSNR + 20 * regularity + 20 * peakScore + 15 * sampScore
   ));
-  const confidence = Math.round(Math.min(96,
-    35 * regularity + 25 * snrScore + 20 * consScore + 12 * peakScore + 8 * sampScore
-  ));
+
+  const rawConf = Math.round(
+    28 * regularity + 22 * snrScore + 18 * dftSNR + 16 * consScore + 10 * peakScore + 6 * sampScore
+  );
+  const confidence = Math.round(Math.min(96, rawConf * coherenceScore));
 
   return {
     bpm, confidence, signalQuality,
     isValid: confidence >= 45 && signalQuality >= 25,
     fps,
-    message: confidence >= 70 ? 'Mesure fiable'
-           : confidence >= 50 ? 'Mesure acceptable'
-           : 'Mesure peu fiable — réessayez',
+    message: coherenceMsg,
   };
 }
 
