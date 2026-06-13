@@ -12,26 +12,26 @@ const path = require('path');
 const KOTLIN_SOURCE = `package com.niksante.app
 
 import android.util.Log
-import com.mrousavy.camera.core.VisionCameraProxy
 import com.mrousavy.camera.frameprocessors.Frame
 import com.mrousavy.camera.frameprocessors.FrameProcessorPlugin
 import com.mrousavy.camera.frameprocessors.FrameProcessorPluginRegistry
 
-class BrightnessPlugin(
-  proxy: VisionCameraProxy,
-  options: Map<String, Any>?
-) : FrameProcessorPlugin(proxy, options) {
+class BrightnessPlugin : FrameProcessorPlugin() {
 
-  override fun callback(frame: Frame, arguments: Map<String, Any>?): Any? {
+  override fun callback(frame: Frame, params: Map<String, Any>?): Any {
     return try {
       val imageProxy = frame.imageProxy
       val planes = imageProxy.planes
       if (planes.isEmpty()) return -1.0
 
-      val plane = planes[0]
-      val buf = plane.buffer.duplicate()
-      val rowStride: Int = plane.rowStride
-      val pixelStride: Int = plane.pixelStride
+      // Plan Y de YUV_420_888 — toujours en memoire CPU via CameraX
+      val yPlane = planes[0]
+      val buf = yPlane.buffer.duplicate()
+
+      // Annotations :Int explicites pour eviter l erreur Kotlin FIR
+      // "operator modifier required on compareTo" sur les types Java-interop
+      val rowStride: Int = yPlane.rowStride
+      val pixelStride: Int = yPlane.pixelStride
       val width: Int = imageProxy.width
       val height: Int = imageProxy.height
 
@@ -39,11 +39,13 @@ class BrightnessPlugin(
       buf.get(bytes)
       val bufLen: Int = bytes.size
 
+      // Zone centrale 30-70 % pour eviter les bords
       val r0: Int = height * 30 / 100
       val r1: Int = height * 70 / 100
       val c0: Int = width * 30 / 100
       val c1: Int = width * 70 / 100
 
+      // if/else explicite au lieu de maxOf() pour eviter le compareTo FIR
       var rStep: Int = (r1 - r0) / 20
       if (rStep < 1) rStep = 1
       var cStep: Int = (c1 - c0) / 20
@@ -78,8 +80,8 @@ class BrightnessPlugin(
     fun register() {
       if (registered) return
       registered = true
-      FrameProcessorPluginRegistry.addFrameProcessorPlugin("getBrightness") { proxy, options ->
-        BrightnessPlugin(proxy, options)
+      FrameProcessorPluginRegistry.addFrameProcessorPlugin("getBrightness") { _, _ ->
+        BrightnessPlugin()
       }
     }
   }
@@ -93,10 +95,10 @@ module.exports = function withBrightnessPlugin(config) {
 
     fs.mkdirSync(pkgDir, { recursive: true });
 
-    // 1. Écrire BrightnessPlugin.kt
+    // 1. Ecrire BrightnessPlugin.kt
     fs.writeFileSync(path.join(pkgDir, 'BrightnessPlugin.kt'), KOTLIN_SOURCE);
 
-    // 2. Patcher MainApplication.kt pour enregistrer le plugin au démarrage
+    // 2. Patcher MainApplication.kt pour enregistrer le plugin au demarrage
     const mainAppPath = path.join(pkgDir, 'MainApplication.kt');
     if (fs.existsSync(mainAppPath)) {
       let content = fs.readFileSync(mainAppPath, 'utf8');
@@ -106,10 +108,10 @@ module.exports = function withBrightnessPlugin(config) {
           'super.onCreate()\n      BrightnessPlugin.register()'
         );
         fs.writeFileSync(mainAppPath, content);
-        console.log('[withBrightnessPlugin] BrightnessPlugin.register() ajouté dans MainApplication.kt');
+        console.log('[withBrightnessPlugin] BrightnessPlugin.register() ajoute dans MainApplication.kt');
       }
     } else {
-      console.warn('[withBrightnessPlugin] MainApplication.kt introuvable — le plugin ne sera pas enregistré automatiquement.');
+      console.warn('[withBrightnessPlugin] MainApplication.kt introuvable — le plugin ne sera pas enregistre automatiquement.');
     }
 
     return config;
