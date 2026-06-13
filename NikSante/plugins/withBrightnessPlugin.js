@@ -124,15 +124,34 @@ dependencies {
     if (fs.existsSync(mainAppPath)) {
       let content = fs.readFileSync(mainAppPath, 'utf8');
       if (!content.includes('BrightnessPlugin.register')) {
-        content = content.replace(
+        const patched = content.replace(
           /super\.onCreate\(\)/,
           'super.onCreate()\n      BrightnessPlugin.register()'
         );
-        fs.writeFileSync(mainAppPath, content);
+        if (!patched.includes('BrightnessPlugin.register')) {
+          // super.onCreate() non trouve : on injecte dans la methode onCreate manuellement
+          const injected = patched.replace(
+            /override\s+fun\s+onCreate\(\)\s*\{/,
+            'override fun onCreate() {\n      BrightnessPlugin.register()'
+          );
+          if (!injected.includes('BrightnessPlugin.register')) {
+            throw new Error(
+              '[withBrightnessPlugin] Impossible de patcher MainApplication.kt ' +
+              '— ni super.onCreate() ni override fun onCreate() trouves. ' +
+              'Le plugin getBrightness ne sera pas enregistre.'
+            );
+          }
+          fs.writeFileSync(mainAppPath, injected);
+        } else {
+          fs.writeFileSync(mainAppPath, patched);
+        }
         console.log('[withBrightnessPlugin] BrightnessPlugin.register() ajoute dans MainApplication.kt');
       }
     } else {
-      console.warn('[withBrightnessPlugin] MainApplication.kt introuvable.');
+      throw new Error(
+        '[withBrightnessPlugin] MainApplication.kt introuvable dans ' + pkgDir +
+        ' — verifiez que withBrightnessPlugin est apres les plugins Expo core dans app.json.'
+      );
     }
 
     return config;
