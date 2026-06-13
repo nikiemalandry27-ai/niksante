@@ -5,13 +5,20 @@
  * appareils Android. Ce plugin natif lit directement imageProxy.planes[0]
  * (plan Y de YUV_420_888), chemin toujours CPU-accessible via CameraX.
  */
-const { withDangerousMod } = require('@expo/config-plugins');
+const { withDangerousMod, withAppBuildGradle } = require('@expo/config-plugins');
 const fs   = require('fs');
 const path = require('path');
+
+// ImageProxy vient de androidx.camera:camera-core qui est une dependance
+// transitive de VisionCamera (implementation, non exposee au module app).
+// On l ajoute en compileOnly pour que le compilateur Kotlin puisse resoudre
+// la classe — elle est deja presente au runtime via VisionCamera.
+const CAMERA_CORE_VERSION = '1.5.0-alpha03';
 
 const KOTLIN_SOURCE = `package com.niksante.app
 
 import android.util.Log
+import androidx.camera.core.ImageProxy
 import com.mrousavy.camera.frameprocessors.Frame
 import com.mrousavy.camera.frameprocessors.FrameProcessorPlugin
 import com.mrousavy.camera.frameprocessors.FrameProcessorPluginRegistry
@@ -20,18 +27,18 @@ class BrightnessPlugin : FrameProcessorPlugin() {
 
   override fun callback(frame: Frame, params: Map<String, Any>?): Any {
     return try {
-      val imageProxy = frame.imageProxy
-      val planes = imageProxy.planes
+      val imageProxy: ImageProxy = frame.imageProxy
+      val planes: Array<ImageProxy.PlaneProxy> = imageProxy.planes
       if (planes.isEmpty()) return -1.0
 
       // Plan Y de YUV_420_888 — toujours en memoire CPU via CameraX
-      val yPlane = planes[0]
-      val buf = yPlane.buffer.duplicate()
+      val plane: ImageProxy.PlaneProxy = planes[0]
+      val buf = plane.buffer.duplicate()
 
       // Annotations :Int explicites pour eviter l erreur Kotlin FIR
       // "operator modifier required on compareTo" sur les types Java-interop
-      val rowStride: Int = yPlane.rowStride
-      val pixelStride: Int = yPlane.pixelStride
+      val rowStride: Int = plane.rowStride
+      val pixelStride: Int = plane.pixelStride
       val width: Int = imageProxy.width
       val height: Int = imageProxy.height
 
@@ -89,16 +96,29 @@ class BrightnessPlugin : FrameProcessorPlugin() {
 `;
 
 module.exports = function withBrightnessPlugin(config) {
-  return withDangerousMod(config, ['android', (config) => {
+  // Etape 1 : ajouter camera-core en compileOnly pour que ImageProxy soit
+  // visible au compilateur Kotlin (deja presente au runtime via VisionCamera)
+  config = withAppBuildGradle(config, (config) => {
+    if (!config.modResults.contents.includes('brightness_plugin_camera_core')) {
+      config.modResults.contents += `
+// brightness_plugin_camera_core — ImageProxy visible pour BrightnessPlugin.kt
+dependencies {
+    compileOnly("androidx.camera:camera-core:${CAMERA_CORE_VERSION}")
+}
+`;
+    }
+    return config;
+  });
+
+  // Etape 2 : ecrire BrightnessPlugin.kt + patcher MainApplication.kt
+  config = withDangerousMod(config, ['android', (config) => {
     const projectRoot  = config.modRequest.platformProjectRoot;
     const pkgDir       = path.join(projectRoot, 'app', 'src', 'main', 'java', 'com', 'niksante', 'app');
 
     fs.mkdirSync(pkgDir, { recursive: true });
 
-    // 1. Ecrire BrightnessPlugin.kt
     fs.writeFileSync(path.join(pkgDir, 'BrightnessPlugin.kt'), KOTLIN_SOURCE);
 
-    // 2. Patcher MainApplication.kt pour enregistrer le plugin au demarrage
     const mainAppPath = path.join(pkgDir, 'MainApplication.kt');
     if (fs.existsSync(mainAppPath)) {
       let content = fs.readFileSync(mainAppPath, 'utf8');
@@ -111,9 +131,11 @@ module.exports = function withBrightnessPlugin(config) {
         console.log('[withBrightnessPlugin] BrightnessPlugin.register() ajoute dans MainApplication.kt');
       }
     } else {
-      console.warn('[withBrightnessPlugin] MainApplication.kt introuvable — le plugin ne sera pas enregistre automatiquement.');
+      console.warn('[withBrightnessPlugin] MainApplication.kt introuvable.');
     }
 
     return config;
   }]);
+
+  return config;
 };
