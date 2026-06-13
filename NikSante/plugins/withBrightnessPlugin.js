@@ -12,57 +12,60 @@ const path = require('path');
 const KOTLIN_SOURCE = `package com.niksante.app
 
 import android.util.Log
+import com.mrousavy.camera.core.VisionCameraProxy
 import com.mrousavy.camera.frameprocessors.Frame
 import com.mrousavy.camera.frameprocessors.FrameProcessorPlugin
 import com.mrousavy.camera.frameprocessors.FrameProcessorPluginRegistry
 
-/**
- * Frame Processor Plugin VisionCamera — calcule la luminosité moyenne
- * du canal Y (YUV_420_888) sans passer par toArrayBuffer() / GPU.
- * Lit directement imageProxy.planes[0].buffer (CPU-accessible, standard CameraX).
- */
-class BrightnessPlugin : FrameProcessorPlugin() {
+class BrightnessPlugin(
+  proxy: VisionCameraProxy,
+  options: Map<String, Any>?
+) : FrameProcessorPlugin(proxy, options) {
 
-  override fun callback(frame: Frame, params: Map<String, Any>?): Any {
+  override fun callback(frame: Frame, arguments: Map<String, Any>?): Any? {
     return try {
       val imageProxy = frame.imageProxy
       val planes = imageProxy.planes
       if (planes.isEmpty()) return -1.0
 
-      // Plan Y = luminosité ; rowStride peut dépasser width sur certains devices
-      val yPlane      = planes[0]
-      val buf         = yPlane.buffer.duplicate()   // ne modifie pas la position originale
-      val rowStride   = yPlane.rowStride
-      val pixelStride = yPlane.pixelStride
-      val w           = imageProxy.width
-      val h           = imageProxy.height
+      val plane = planes[0]
+      val buf = plane.buffer.duplicate()
+      val rowStride: Int = plane.rowStride
+      val pixelStride: Int = plane.pixelStride
+      val width: Int = imageProxy.width
+      val height: Int = imageProxy.height
 
       val bytes = ByteArray(buf.remaining())
       buf.get(bytes)
+      val bufLen: Int = bytes.size
 
-      // Zone centrale 30–70 % pour éviter les bords
-      val r0 = h * 30 / 100;  val r1 = h * 70 / 100
-      val c0 = w * 30 / 100;  val c1 = w * 70 / 100
-      val rStep = maxOf(1, (r1 - r0) / 20)
-      val cStep = maxOf(1, (c1 - c0) / 20)
+      val r0: Int = height * 30 / 100
+      val r1: Int = height * 70 / 100
+      val c0: Int = width * 30 / 100
+      val c1: Int = width * 70 / 100
 
-      var sum   = 0L
-      var count = 0
-      var r = r0
+      var rStep: Int = (r1 - r0) / 20
+      if (rStep < 1) rStep = 1
+      var cStep: Int = (c1 - c0) / 20
+      if (cStep < 1) cStep = 1
+
+      var sum: Long = 0L
+      var count: Int = 0
+      var r: Int = r0
       while (r < r1) {
-        var c = c0
+        var c: Int = c0
         while (c < c1) {
-          val idx = r * rowStride + c * pixelStride
-          if (idx < bytes.size) {
-            sum   += bytes[idx].toInt() and 0xFF
-            count += 1
+          val idx: Int = r * rowStride + c * pixelStride
+          if (idx >= 0 && idx < bufLen) {
+            sum += (bytes[idx].toInt() and 0xFF).toLong()
+            count++
           }
           c += cStep
         }
         r += rStep
       }
 
-      if (count > 0) sum.toDouble() / count else -1.0
+      if (count > 0) sum.toDouble() / count.toDouble() else -1.0
     } catch (e: Exception) {
       Log.e("BrightnessPlugin", "Error reading frame: \${e.message}")
       -2.0
@@ -75,8 +78,8 @@ class BrightnessPlugin : FrameProcessorPlugin() {
     fun register() {
       if (registered) return
       registered = true
-      FrameProcessorPluginRegistry.addFrameProcessorPlugin("getBrightness") { _, _ ->
-        BrightnessPlugin()
+      FrameProcessorPluginRegistry.addFrameProcessorPlugin("getBrightness") { proxy, options ->
+        BrightnessPlugin(proxy, options)
       }
     }
   }
