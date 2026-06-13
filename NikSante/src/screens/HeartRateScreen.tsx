@@ -69,6 +69,38 @@ interface Sample {
   timestamp: number;
 }
 
+interface HRVData {
+  rmssdMs:   number;
+  sdnnMs:    number;
+  recovery:  number;   // 0–100
+  stress:    number;   // 0–100
+  advice:    string;
+}
+
+// ---------------------------------------------------------------------------
+// HRV helpers
+// ---------------------------------------------------------------------------
+
+function getHRVAdvice(recovery: number): string {
+  if (recovery >= 80) return 'Excellente récupération — votre système nerveux est en parfait équilibre. Idéal pour un effort physique intense aujourd\'hui.';
+  if (recovery >= 65) return 'Bonne récupération. Une activité modérée à soutenue est envisageable — votre organisme est bien reposé.';
+  if (recovery >= 50) return 'Récupération modérée. Privilégiez une activité légère et veillez à bien dormir ce soir.';
+  if (recovery >= 35) return 'Votre HRV suggère un niveau de stress élevé ou une fatigue accumulée. Privilégiez le repos et des activités apaisantes aujourd\'hui.';
+  return 'Votre HRV indique un état de fatigue marqué. Reposez-vous et évitez tout effort intense — consultez votre médecin si cela persiste.';
+}
+
+function hrvRecoveryColor(score: number): string {
+  if (score >= 70) return '#388E3C';
+  if (score >= 50) return '#F57C00';
+  return '#E53935';
+}
+
+function hrvStressColor(score: number): string {
+  if (score >= 65) return '#E53935';
+  if (score >= 40) return '#F57C00';
+  return '#388E3C';
+}
+
 // ---------------------------------------------------------------------------
 // PPG algorithm
 // ---------------------------------------------------------------------------
@@ -133,6 +165,7 @@ interface PPGResult {
   isValid:       boolean;
   fps:           number;
   message:       string;
+  hrv?:          HRVData;
 }
 
 function analyzePPG(samples: Sample[]): PPGResult {
@@ -305,11 +338,29 @@ function analyzePPG(samples: Sample[]): PPGResult {
   );
   const confidence = Math.round(Math.min(96, rawConf * coherenceScore));
 
+  // ── 12. HRV (RMSSD + SDNN) ───────────────────────────────────────────────
+  // rmssd déjà calculé en secondes → conversion ms
+  const rmssdMs   = Math.round(rmssd * 1000);
+  const rrMeanSec = cleanRR.reduce((a, b) => a + b, 0) / cleanRR.length;
+  const sdnnMs    = Math.round(
+    Math.sqrt(cleanRR.reduce((s, v) => s + (v - rrMeanSec) ** 2, 0) / cleanRR.length) * 1000
+  );
+  // Score de récupération : fonction racine carrée normalisée sur 100 ms de référence
+  // RMSSD 20 ms → ~45 | 40 ms → ~63 | 60 ms → ~77 | 80 ms → ~89
+  const recovery = Math.min(98, Math.max(5, Math.round(Math.sqrt(rmssdMs / 100) * 100)));
+  const hrv: HRVData = {
+    rmssdMs, sdnnMs,
+    recovery,
+    stress: 100 - recovery,
+    advice: getHRVAdvice(recovery),
+  };
+
   return {
     bpm, confidence, signalQuality,
     isValid: confidence >= 45 && signalQuality >= 25,
     fps,
     message: coherenceMsg,
+    hrv,
   };
 }
 
@@ -335,6 +386,7 @@ export default function HeartRateScreen() {
   const [debugBrightness,  setDebugBrightness]  = useState(0);
   const [cameraReady,      setCameraReady]      = useState(false);
   const [signalQuality,    setSignalQuality]    = useState(0);
+  const [hrv,              setHrv]              = useState<HRVData | null>(null);
 
   // hasTorch : true si la caméra arrière supporte le torch (flash LED continu)
   // Sur quasi tous les téléphones Android modernes, hasTorch = true sur la caméra arrière
@@ -356,6 +408,7 @@ export default function HeartRateScreen() {
   const baselineValue     = useRef(0);
   const baselineReady     = useRef(false);
   const noFingerFrames    = useRef(0);
+  const badSignalSeconds  = useRef(0);
 
   // ── Heartbeat animation ───────────────────────────────────────────────────
 
@@ -486,10 +539,37 @@ export default function HeartRateScreen() {
     // Double vibration : mesure démarrée
     Vibration.vibrate([0, 80, 80, 80]);
 
+    badSignalSeconds.current = 0;
     let remaining = 15;
     countdownRef.current = setInterval(() => {
       remaining -= 1;
       setCountdown(remaining);
+
+      // ── Détection signal instable (chaque seconde) ──────────────────────────
+      // Prend la dernière seconde d'échantillons (~30 trames à 30 fps)
+      const recent = samplesRef.current.slice(-30);
+      if (recent.length >= 10) {
+        const vals = recent.map(s => s.value);
+        const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+        const std  = Math.sqrt(vals.reduce((a, v) => a + (v - mean) ** 2, 0) / vals.length);
+        if (std < 1.0) {
+          // Signal plat : pas de pulsation détectable (doigt mal positionné ou retiré)
+          badSignalSeconds.current += 1;
+          if (badSignalSeconds.current >= 5) {
+            clearInterval(countdownRef.current);
+            measuringRef.current = false;
+            heartAnim.stopAnimation();
+            setErrorMsg('Signal instable depuis 5 secondes — replacez votre doigt bien à plat sur l\'objectif et recommencez.');
+            phaseRef.current = 'error';
+            setPhase('error');
+            Vibration.vibrate(200);
+            return;
+          }
+        } else {
+          badSignalSeconds.current = 0;
+        }
+      }
+
       if (remaining <= 0) {
         clearInterval(countdownRef.current);
         measuringRef.current = false;
@@ -501,12 +581,22 @@ export default function HeartRateScreen() {
         setTimeout(() => {
           const result = analyzePPG(samplesRef.current);
           if (result.bpm !== null) {
-            setBpm(result.bpm);
-            setConfidence(result.confidence);
-            setSignalQuality(result.signalQuality);
-            setFps(result.fps);
-            phaseRef.current = 'result';
-            setPhase('result');
+            // Rejet si confiance ou qualité signal insuffisante
+            if (result.confidence < 85 || result.signalQuality < 85) {
+              setErrorMsg(
+                `Signal insuffisant — confiance ${result.confidence}%, qualité ${result.signalQuality}%.\nAppuyez légèrement votre doigt à plat sur l'objectif et recommencez.`
+              );
+              phaseRef.current = 'error';
+              setPhase('error');
+            } else {
+              setBpm(result.bpm);
+              setConfidence(result.confidence);
+              setSignalQuality(result.signalQuality);
+              setFps(result.fps);
+              setHrv(result.hrv ?? null);
+              phaseRef.current = 'result';
+              setPhase('result');
+            }
           } else {
             setErrorMsg(result.message);
             phaseRef.current = 'error';
@@ -549,7 +639,8 @@ export default function HeartRateScreen() {
     measuringRef.current   = false;
     measureStarted.current = false;
     fingerFrames.current   = 0;
-    noFingerFrames.current = 0;
+    noFingerFrames.current  = 0;
+    badSignalSeconds.current = 0;
     baselineSum.current    = 0;
     baselineCount.current  = 0;
     baselineValue.current  = 0;
@@ -560,6 +651,7 @@ export default function HeartRateScreen() {
     heartAnim.setValue(1);
     setBpm(null);
     setSignalQuality(0);
+    setHrv(null);
     setErrorMsg('');
     setFingerDetected(false);
     phaseRef.current = 'instruction';
@@ -1004,6 +1096,70 @@ export default function HeartRateScreen() {
           </ThemedText>
         </View>
 
+        {/* ── Carte HRV ────────────────────────────────────────────────── */}
+        {hrv && (
+          <View style={styles.hrvCard}>
+            <View style={styles.hrvHeader}>
+              <ThemedText style={styles.hrvTitle}>Variabilité cardiaque — HRV</ThemedText>
+              <ThemedText style={styles.hrvSubtitle}>Analyse du système nerveux autonome</ThemedText>
+            </View>
+
+            {/* Scores barres */}
+            <View style={styles.hrvScoresRow}>
+              {/* Récupération */}
+              <View style={styles.hrvScoreBlock}>
+                <ThemedText style={styles.hrvScoreLabel}>Récupération</ThemedText>
+                <View style={styles.hrvBarTrack}>
+                  <View style={[styles.hrvBarFill, { width: `${hrv.recovery}%` as any, backgroundColor: hrvRecoveryColor(hrv.recovery) }]} />
+                </View>
+                <ThemedText style={[styles.hrvScoreValue, { color: hrvRecoveryColor(hrv.recovery) }]}>
+                  {hrv.recovery}%
+                </ThemedText>
+              </View>
+              {/* Stress */}
+              <View style={styles.hrvScoreBlock}>
+                <ThemedText style={styles.hrvScoreLabel}>Stress estimé</ThemedText>
+                <View style={styles.hrvBarTrack}>
+                  <View style={[styles.hrvBarFill, { width: `${hrv.stress}%` as any, backgroundColor: hrvStressColor(hrv.stress) }]} />
+                </View>
+                <ThemedText style={[styles.hrvScoreValue, { color: hrvStressColor(hrv.stress) }]}>
+                  {hrv.stress}%
+                </ThemedText>
+              </View>
+            </View>
+
+            {/* Métriques cliniques */}
+            <View style={styles.hrvMetricsRow}>
+              <View style={styles.hrvMetricBox}>
+                <ThemedText style={styles.hrvMetricVal}>{hrv.rmssdMs} ms</ThemedText>
+                <ThemedText style={styles.hrvMetricName}>RMSSD</ThemedText>
+                <ThemedText style={styles.hrvMetricHint}>successions RR</ThemedText>
+              </View>
+              <View style={styles.hrvMetricDivider} />
+              <View style={styles.hrvMetricBox}>
+                <ThemedText style={styles.hrvMetricVal}>{hrv.sdnnMs} ms</ThemedText>
+                <ThemedText style={styles.hrvMetricName}>SDNN</ThemedText>
+                <ThemedText style={styles.hrvMetricHint}>écart-type RR</ThemedText>
+              </View>
+              <View style={styles.hrvMetricDivider} />
+              <View style={styles.hrvMetricBox}>
+                <ThemedText style={styles.hrvMetricVal}>{hrv.recovery >= 70 ? '🟢' : hrv.recovery >= 50 ? '🟡' : '🔴'}</ThemedText>
+                <ThemedText style={styles.hrvMetricName}>Niveau</ThemedText>
+                <ThemedText style={styles.hrvMetricHint}>{hrv.recovery >= 70 ? 'Bon' : hrv.recovery >= 50 ? 'Moyen' : 'Faible'}</ThemedText>
+              </View>
+            </View>
+
+            {/* Conseil personnalisé */}
+            <View style={styles.hrvAdviceBox}>
+              <ThemedText style={styles.hrvAdviceText}>💡 {hrv.advice}</ThemedText>
+            </View>
+
+            <ThemedText style={styles.hrvDisclaimer}>
+              * HRV mesurée sur 15 s (enregistrement ultra-court). Indicatif — non clinique.
+            </ThemedText>
+          </View>
+        )}
+
         <View style={styles.infoCard}>
           <ThemedText style={styles.infoTitle}>Plages de référence indicatives</ThemedText>
           {[
@@ -1152,6 +1308,43 @@ const styles = StyleSheet.create({
   },
   bpmBadgeText:   { fontSize: fs(14), fontWeight: '700' },
   confidenceText: { fontSize: fs(11), color: '#aaa', textAlign: 'center' },
+
+  // HRV card
+  hrvCard: {
+    width: '100%', backgroundColor: '#fff', borderRadius: 20, padding: s(20),
+    elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.10, shadowRadius: 6,
+  },
+  hrvHeader: { marginBottom: vs(14) },
+  hrvTitle:  { fontSize: fs(15), fontWeight: '800', color: '#1a1a1a', marginBottom: vs(2) },
+  hrvSubtitle: { fontSize: fs(12), color: '#888' },
+
+  hrvScoresRow: { gap: vs(10), marginBottom: vs(16) },
+  hrvScoreBlock: { width: '100%' },
+  hrvScoreLabel: { fontSize: fs(12), color: '#555', fontWeight: '600', marginBottom: vs(4) },
+  hrvBarTrack: {
+    width: '100%', height: vs(10), backgroundColor: '#f0f0f0',
+    borderRadius: 5, overflow: 'hidden', marginBottom: vs(3),
+  },
+  hrvBarFill: { height: vs(10), borderRadius: 5 },
+  hrvScoreValue: { fontSize: fs(13), fontWeight: '700', textAlign: 'right' },
+
+  hrvMetricsRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around',
+    backgroundColor: '#fafafa', borderRadius: 12, padding: s(14), marginBottom: vs(14),
+  },
+  hrvMetricBox: { alignItems: 'center', flex: 1 },
+  hrvMetricVal:  { fontSize: fs(16), fontWeight: '800', color: '#1a1a1a' },
+  hrvMetricName: { fontSize: fs(11), fontWeight: '700', color: '#555', marginTop: vs(2) },
+  hrvMetricHint: { fontSize: fs(10), color: '#aaa', marginTop: vs(1) },
+  hrvMetricDivider: { width: 1, height: vs(40), backgroundColor: '#e0e0e0' },
+
+  hrvAdviceBox: {
+    backgroundColor: '#F3F8FF', borderRadius: 12, padding: s(14),
+    borderLeftWidth: 3, borderLeftColor: '#1565C0', marginBottom: vs(10),
+  },
+  hrvAdviceText: { fontSize: fs(13), color: '#1a1a1a', lineHeight: vs(20) },
+  hrvDisclaimer: { fontSize: fs(10), color: '#bbb', textAlign: 'center' },
 
   refRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: vs(6), gap: s(10) },
   refDot:   { width: s(10), height: s(10), borderRadius: 5 },
