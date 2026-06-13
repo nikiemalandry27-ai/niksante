@@ -27,13 +27,14 @@ class BrightnessPlugin : FrameProcessorPlugin() {
 
   override fun callback(frame: Frame, params: Map<String, Any>?): Any {
     return try {
-      val imageProxy: ImageProxy = frame.imageProxy
+      val imageProxy: ImageProxy = frame.imageProxy ?: return -3.0
       val planes: Array<ImageProxy.PlaneProxy> = imageProxy.planes
       if (planes.isEmpty()) return -1.0
 
       // Plan Y de YUV_420_888 — toujours en memoire CPU via CameraX
       val plane: ImageProxy.PlaneProxy = planes[0]
-      val buf = plane.buffer.duplicate()
+      val rawBuf = plane.buffer ?: return -3.0
+      val buf = rawBuf.duplicate()
 
       // Annotations :Int explicites pour eviter l erreur Kotlin FIR
       // "operator modifier required on compareTo" sur les types Java-interop
