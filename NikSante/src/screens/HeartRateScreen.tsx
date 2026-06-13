@@ -73,137 +73,159 @@ interface Sample {
 // PPG algorithm
 // ---------------------------------------------------------------------------
 
-function movingAverage(arr: number[], window: number): number[] {
-  const half = Math.floor(window / 2);
+function movingAvg(arr: number[], win: number): number[] {
+  const half = Math.floor(win / 2);
   return arr.map((_, i) => {
-    const start = Math.max(0, i - half);
-    const end   = Math.min(arr.length - 1, i + half);
-    let sum = 0;
-    for (let j = start; j <= end; j++) sum += arr[j];
-    return sum / (end - start + 1);
+    const lo = Math.max(0, i - half);
+    const hi = Math.min(arr.length - 1, i + half);
+    let s = 0;
+    for (let j = lo; j <= hi; j++) s += arr[j];
+    return s / (hi - lo + 1);
   });
 }
 
-function analyzePPG(samples: Sample[]): {
-  bpm:        number | null;
-  confidence: number;
-  fps:        number;
-  message:    string;
-} {
-  // Need at least 2 seconds of data
-  if (samples.length < 60) {
-    return { bpm: null, confidence: 0, fps: 0, message: 'Pas assez de données — gardez le doigt immobile sur la caméra' };
-  }
+interface PPGResult {
+  bpm:           number | null;
+  confidence:    number;
+  signalQuality: number;
+  isValid:       boolean;
+  fps:           number;
+  message:       string;
+}
 
-  const values     = samples.map((s) => s.value);
-  const timestamps = samples.map((s) => s.timestamp);
+function analyzePPG(samples: Sample[]): PPGResult {
+  const fail = (msg: string, sq = 0): PPGResult => ({
+    bpm: null, confidence: 0, signalQuality: sq, isValid: false, fps: 0, message: msg,
+  });
 
-  const durationSec = (timestamps[timestamps.length - 1] - timestamps[0]) / 1000;
-  const fps         = Math.round(samples.length / durationSec);
+  if (samples.length < 120) return fail('Pas assez de données — gardez le doigt immobile sur la caméra');
 
-  if (fps < 10) {
-    return { bpm: null, confidence: 0, fps, message: 'Fréquence caméra trop basse — réessayez' };
-  }
+  const vals = samples.map(s => s.value);
+  const ts   = samples.map(s => s.timestamp);
+  const dur  = (ts[ts.length - 1] - ts[0]) / 1000;
+  const fps  = Math.round(samples.length / dur);
 
-  // ── Signal quality check ───────────────────────────────────────────────────
-  const mean = values.reduce((a, b) => a + b, 0) / values.length;
-  const std  = Math.sqrt(values.map((v) => (v - mean) ** 2).reduce((a, b) => a + b, 0) / values.length);
-  const cv   = std / (mean || 1); // coefficient of variation
+  if (fps < 10) return { ...fail('Fréquence caméra trop faible — réessayez'), fps };
 
-  if (cv < 0.001) {
-    return { bpm: null, confidence: 0, fps, message: 'Doigt non détecté — couvrez bien la caméra ET le flash' };
-  }
-  if (cv > 0.20) {
-    return { bpm: null, confidence: 0, fps, message: 'Signal instable — restez immobile, réduisez la pression' };
-  }
+  const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+  const std  = Math.sqrt(vals.reduce((s, v) => s + (v - mean) ** 2, 0) / vals.length);
+  const cv   = std / (mean || 1);
 
-  // ── 1. Normalize ──────────────────────────────────────────────────────────
-  const normalized = values.map((v) => (v - mean) / (std || 1));
+  // Signal trop plat → pas de doigt ou pression excessive
+  if (cv < 0.0008) return fail('Signal trop plat — couvrez la caméra ET le flash, appuyez légèrement');
+  // Signal chaotique → mouvement
+  if (cv > 0.25) return fail('Signal instable — restez parfaitement immobile, réduisez la pression');
 
-  // ── 2. Smooth — fenêtre ≈ 80 ms (supprime le bruit haute fréquence) ───────
-  const smoothWin = Math.max(3, Math.round(fps * 0.08));
-  const smoothed  = movingAverage(normalized, smoothWin);
+  // ── 1. Suppression outliers (> 3σ) ───────────────────────────────────────
+  const clean = vals.map(v => (Math.abs(v - mean) > std * 3 ? mean : v));
 
-  // ── 3. Détrend — supprime la dérive lente (pression variable, ≈ 1.2 s) ───
-  const trendWin  = Math.max(smoothWin + 2, Math.round(fps * 1.2));
-  const trend     = movingAverage(smoothed, trendWin);
-  const detrended = smoothed.map((v, i) => v - trend[i]);
+  // ── 2. Détrend — soustrait la dérive lente (fenêtre 2.5 s) ───────────────
+  const trendWin  = Math.max(5, Math.round(fps * 2.5));
+  const trend     = movingAvg(clean, trendWin);
+  const detrended = clean.map((v, i) => v - trend[i]);
 
-  // ── 4. Détection de pics avec seuil adaptatif ─────────────────────────────
-  const sigMax   = Math.max(...detrended);
-  const sigMin   = Math.min(...detrended);
+  // ── 3. Bandpass par double lissage (40 ms + 200 ms → 0.5–4 Hz) ──────────
+  const smW      = Math.max(2, Math.round(fps * 0.04));
+  const bpW      = Math.max(3, Math.round(fps * 0.20));
+  const filtered = movingAvg(movingAvg(detrended, smW), bpW);
+
+  // ── 4. SNR : amplitude signal / bruit résiduel HF ─────────────────────────
+  const sigMax   = Math.max(...filtered);
+  const sigMin   = Math.min(...filtered);
   const amp      = sigMax - sigMin;
-  // Seuil = 40 % de l'amplitude — s'adapte à l'intensité du signal
-  const peakThr  = sigMin + amp * 0.40;
-  // Distance minimale entre pics ≈ 330 ms (≤ 182 BPM)
-  const minDist  = Math.max(3, Math.floor(fps * 0.33));
+  if (amp < 1e-10) return fail('Amplitude PPG nulle — couvrez mieux la caméra et le flash');
 
+  const noiseArr = filtered.map((v, i) => detrended[i] - v);
+  const noiseRMS = Math.sqrt(noiseArr.reduce((s, v) => s + v * v, 0) / noiseArr.length);
+  const snr      = noiseRMS > 0 ? amp / noiseRMS : 0;
+
+  // ── 5. Détection de pics (seuil 40%, distance min 300 ms) ────────────────
+  const peakThr = sigMin + amp * 0.40;
+  const minDist = Math.max(3, Math.floor(fps * 0.30));
   const peaks: number[] = [];
-  for (let i = 1; i < detrended.length - 1; i++) {
+  for (let i = 1; i < filtered.length - 1; i++) {
     if (
-      detrended[i] > peakThr &&
-      detrended[i] >= detrended[i - 1] &&
-      detrended[i] >= detrended[i + 1]
-    ) {
-      if (peaks.length === 0 || i - peaks[peaks.length - 1] >= minDist) {
-        peaks.push(i);
-      }
-    }
+      filtered[i] > peakThr &&
+      filtered[i] >= filtered[i - 1] &&
+      filtered[i] >= filtered[i + 1] &&
+      (peaks.length === 0 || i - peaks[peaks.length - 1] >= minDist)
+    ) peaks.push(i);
   }
 
-  if (peaks.length < 5) {
+  if (peaks.length < 4) {
     return {
-      bpm:        null,
-      confidence: 0,
-      fps,
-      message:    'Signal PPG insuffisant — couvrez bien la caméra, appuyez doucement, restez immobile',
+      bpm: null, confidence: 0, signalQuality: Math.round(Math.min(40, snr * 5)),
+      isValid: false, fps,
+      message: `Signal PPG insuffisant (${peaks.length} pics) — couvrez mieux la caméra et le flash`,
     };
   }
 
-  // ── 5. Intervalles RR réels (via timestamps) ──────────────────────────────
-  const intervals: number[] = [];
+  // ── 6. Intervalles RR via timestamps réels (robuste au jitter FPS) ────────
+  const rr: number[] = [];
   for (let i = 1; i < peaks.length; i++) {
-    const dt = (timestamps[peaks[i]] - timestamps[peaks[i - 1]]) / 1000;
-    if (dt > 0.28 && dt < 1.8) intervals.push(dt); // 33 – 214 BPM
+    const dt = (ts[peaks[i]] - ts[peaks[i - 1]]) / 1000;
+    if (dt >= 0.30 && dt <= 1.5) rr.push(dt); // 40–200 BPM
   }
 
-  if (intervals.length < 4) {
-    return { bpm: null, confidence: 0, fps, message: 'Intervalles irréguliers — réessayez en restant immobile' };
+  if (rr.length < 3) return fail('Intervalles RR invalides — réessayez en restant immobile');
+
+  // ── 7. Rejet IQR des outliers ─────────────────────────────────────────────
+  const sortedRR = [...rr].sort((a, b) => a - b);
+  const q1       = sortedRR[Math.floor(sortedRR.length * 0.25)];
+  const q3       = sortedRR[Math.floor(sortedRR.length * 0.75)];
+  const iqrV     = q3 - q1;
+  const cleanRR  = rr.filter(v => v >= q1 - 1.5 * iqrV && v <= q3 + 1.5 * iqrV);
+
+  if (cleanRR.length < 3) return fail('Trop d\'artefacts — réessayez parfaitement immobile');
+
+  // ── 8. BPM via médiane RR ─────────────────────────────────────────────────
+  const sortedC = [...cleanRR].sort((a, b) => a - b);
+  const medRR   = sortedC[Math.floor(sortedC.length / 2)];
+  const bpm     = Math.round(60 / medRR);
+
+  if (bpm < 40 || bpm > 200) return fail(`Résultat hors plage physiologique (${bpm} BPM) — réessayez`);
+
+  // ── 9. Cohérence multi-fenêtres (détecte les sauts = artefacts) ──────────
+  const wSz   = Math.max(2, Math.floor(cleanRR.length / 3));
+  const wBPMs: number[] = [];
+  for (let s = 0; s + wSz <= cleanRR.length; s += Math.max(1, Math.floor(wSz / 2))) {
+    const w = cleanRR.slice(s, s + wSz);
+    const wMed = [...w].sort((a, b) => a - b)[Math.floor(w.length / 2)];
+    wBPMs.push(Math.round(60 / wMed));
+  }
+  const bpmVar = wBPMs.length > 1
+    ? wBPMs.reduce((s, b) => s + (b - bpm) ** 2, 0) / wBPMs.length
+    : 0;
+
+  // Rejet : BPM élevé + forte variance → artefact de mouvement
+  if (bpm > 110 && bpmVar > 300) {
+    return fail('BPM élevé instable — mouvement détecté, gardez le doigt parfaitement immobile');
   }
 
-  // ── 6. Rejet des valeurs aberrantes (méthode IQR) ─────────────────────────
-  const sortedIQR = [...intervals].sort((a, b) => a - b);
-  const q1        = sortedIQR[Math.floor(sortedIQR.length * 0.25)];
-  const q3        = sortedIQR[Math.floor(sortedIQR.length * 0.75)];
-  const iqr       = q3 - q1;
-  const clean     = intervals.filter((v) => v >= q1 - 1.5 * iqr && v <= q3 + 1.5 * iqr);
+  // ── 10. Scores qualité et confiance ──────────────────────────────────────
+  const diffs      = cleanRR.slice(1).map((v, i) => Math.abs(v - cleanRR[i]));
+  const rmssd      = Math.sqrt(diffs.reduce((s, d) => s + d * d, 0) / (diffs.length || 1));
+  const regularity = Math.max(0, 1 - rmssd / medRR);
+  const snrScore   = Math.min(1, snr / 8);
+  const peakScore  = Math.min(1, cleanRR.length / 10);
+  const sampScore  = Math.min(1, samples.length / (fps * 12));
+  const consScore  = Math.max(0, 1 - bpmVar / 400);
 
-  if (clean.length < 3) {
-    return { bpm: null, confidence: 0, fps, message: 'Trop d\'irrégularités — réessayez' };
-  }
-
-  // ── 7. BPM via médiane ────────────────────────────────────────────────────
-  const sortedClean = [...clean].sort((a, b) => a - b);
-  const medianRR    = sortedClean[Math.floor(sortedClean.length / 2)];
-  const bpm         = Math.round(60 / medianRR);
-
-  if (bpm < 40 || bpm > 200) {
-    return { bpm: null, confidence: 0, fps, message: 'Résultat hors plage physiologique — réessayez' };
-  }
-
-  // ── 8. Score de confiance ─────────────────────────────────────────────────
-  const diffs       = clean.map((v, i, arr) => i > 0 ? Math.abs(v - arr[i - 1]) : 0).slice(1);
-  const rmssd       = Math.sqrt(diffs.map((d) => d ** 2).reduce((a, b) => a + b, 0) / (diffs.length || 1));
-  const regularity  = Math.max(0, 1 - rmssd / (medianRR || 1));
-  const peakScore   = Math.min(1, clean.length / 10);
-  const sampleScore = Math.min(1, samples.length / 400);
-  const snrScore    = Math.min(1, (cv - 0.002) / 0.03);
-
+  const signalQuality = Math.round(Math.min(100,
+    30 * snrScore + 25 * regularity + 20 * peakScore + 15 * sampScore + 10 * consScore
+  ));
   const confidence = Math.round(Math.min(96,
-    40 * regularity + 20 * peakScore + 20 * sampleScore + 16 * snrScore
+    35 * regularity + 25 * snrScore + 20 * consScore + 12 * peakScore + 8 * sampScore
   ));
 
-  return { bpm, confidence, fps, message: 'Mesure effectuée' };
+  return {
+    bpm, confidence, signalQuality,
+    isValid: confidence >= 45 && signalQuality >= 25,
+    fps,
+    message: confidence >= 70 ? 'Mesure fiable'
+           : confidence >= 50 ? 'Mesure acceptable'
+           : 'Mesure peu fiable — réessayez',
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -227,6 +249,7 @@ export default function HeartRateScreen() {
   const [isCalibrating,    setIsCalibrating]    = useState(true);
   const [debugBrightness,  setDebugBrightness]  = useState(0);
   const [cameraReady,      setCameraReady]      = useState(false);
+  const [signalQuality,    setSignalQuality]    = useState(0);
 
   // hasTorch : true si la caméra arrière supporte le torch (flash LED continu)
   // Sur quasi tous les téléphones Android modernes, hasTorch = true sur la caméra arrière
@@ -247,6 +270,7 @@ export default function HeartRateScreen() {
   const baselineCount     = useRef(0);
   const baselineValue     = useRef(0);
   const baselineReady     = useRef(false);
+  const noFingerFrames    = useRef(0);
 
   // ── Heartbeat animation ───────────────────────────────────────────────────
 
@@ -263,7 +287,6 @@ export default function HeartRateScreen() {
 
   const onFrame = useCallback((brightness: number) => {
     setDebugBrightness(Math.round(brightness));
-    // -1 = frame processor tourne mais count=0 ; -2 = toArrayBuffer a planté
     if (brightness < 0) return;
 
     if (phaseRef.current === 'waiting') {
@@ -278,23 +301,30 @@ export default function HeartRateScreen() {
         return;
       }
 
-      const base = baselineValue.current;
-      // Détection bidirectionnelle : le doigt change la luminosité dans n'importe
-      // quel sens (hausse ou baisse >30% selon l'appareil et l'environnement)
-      const fingerOn = base > 0 && Math.abs(brightness - base) / base > 0.30;
+      const base  = baselineValue.current;
+      const delta = Math.abs(brightness - base);
+      // Seuil 40% relatif ET 15 points absolus — évite les faux positifs
+      // sur variations d'éclairage ambiant (< 20% typiquement)
+      const fingerOn = base > 0 && delta > 15 && delta / base > 0.40;
 
-      setFingerDetected(fingerOn);
       if (fingerOn) {
+        noFingerFrames.current = 0;
         if (fingerFrames.current === 0) Vibration.vibrate(60);
         fingerFrames.current += 1;
+        setFingerDetected(true);
         setFingerProgress(Math.min(100, Math.round((fingerFrames.current / 15) * 100)));
         if (fingerFrames.current >= 15 && !measureStarted.current) {
           measureStarted.current = true;
           startCountdownRef.current();
         }
       } else {
-        fingerFrames.current = 0;
-        setFingerProgress(0);
+        noFingerFrames.current += 1;
+        // Hystérésis : 5 trames consécutives sans doigt avant réinitialisation
+        if (noFingerFrames.current >= 5) {
+          fingerFrames.current = 0;
+          setFingerDetected(false);
+          setFingerProgress(0);
+        }
       }
       return;
     }
@@ -388,6 +418,7 @@ export default function HeartRateScreen() {
           if (result.bpm !== null) {
             setBpm(result.bpm);
             setConfidence(result.confidence);
+            setSignalQuality(result.signalQuality);
             setFps(result.fps);
             phaseRef.current = 'result';
             setPhase('result');
@@ -433,6 +464,7 @@ export default function HeartRateScreen() {
     measuringRef.current   = false;
     measureStarted.current = false;
     fingerFrames.current   = 0;
+    noFingerFrames.current = 0;
     baselineSum.current    = 0;
     baselineCount.current  = 0;
     baselineValue.current  = 0;
@@ -442,6 +474,7 @@ export default function HeartRateScreen() {
     heartAnim.stopAnimation();
     heartAnim.setValue(1);
     setBpm(null);
+    setSignalQuality(0);
     setErrorMsg('');
     setFingerDetected(false);
     phaseRef.current = 'instruction';
@@ -610,8 +643,8 @@ export default function HeartRateScreen() {
 
           {/* Étapes */}
           {[
-            { step: '1', icon: '👆', text: 'Posez le bout de votre index sur la caméra arrière', sub: 'La caméra se trouve au dos du téléphone' },
-            { step: '2', icon: '💡', text: 'Le flash s\'allume pour éclairer votre doigt', sub: 'Ne couvrez pas le flash — il doit rester visible à côté de votre doigt' },
+            { step: '1', icon: '👆', text: 'Couvrez la caméra ET le flash avec le bout de votre index', sub: 'Les deux objectifs doivent être sous votre doigt — flash inclus' },
+            { step: '2', icon: '💡', text: 'Le flash traverse votre doigt et éclaire les capillaires', sub: 'C\'est ce flux lumineux pulsé que la caméra mesure — ne dégagez pas le flash' },
             { step: '3', icon: '🤏', text: 'Appuyez doucement sans serrer', sub: 'Trop de pression bloque la circulation sanguine' },
             { step: '4', icon: '🧘', text: 'Restez immobile pendant 15 secondes', sub: 'Tout mouvement fausse la mesure' },
           ].map((item) => (
@@ -836,10 +869,10 @@ export default function HeartRateScreen() {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(4) }}>
                 <View style={{
                   width: s(7), height: s(7), borderRadius: s(4),
-                  backgroundColor: debugBrightness > 10 ? '#E53935' : 'rgba(255,255,255,0.2)',
+                  backgroundColor: debugBrightness >= 0 ? '#E53935' : 'rgba(255,255,255,0.2)',
                 }} />
                 <ThemedText style={{ fontSize: fs(11), color: 'rgba(255,255,255,0.45)' }}>
-                  {debugBrightness > 10 ? 'Actif' : '—'}
+                  {debugBrightness >= 0 ? 'Actif' : '—'}
                 </ThemedText>
               </View>
             </View>
@@ -933,7 +966,10 @@ export default function HeartRateScreen() {
             <ThemedText style={[styles.bpmBadgeText, { color: bpmColor }]}>{bpmLabel}</ThemedText>
           </View>
           <ThemedText style={styles.confidenceText}>
-            Confiance : {confidence}%  ·  {sampleCount} trames  ·  ~{fps} fps
+            Confiance : {confidence}%  ·  Qualité signal : {signalQuality}%
+          </ThemedText>
+          <ThemedText style={styles.confidenceText}>
+            {sampleCount} trames  ·  ~{fps} fps
           </ThemedText>
         </View>
 
