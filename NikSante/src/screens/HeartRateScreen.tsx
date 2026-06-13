@@ -948,7 +948,7 @@ export default function HeartRateScreen() {
           <View style={styles.infoCard}>
             <ThemedText style={styles.infoTitle}>Conseils pour mieux mesurer</ThemedText>
             <ThemedText style={styles.infoText}>
-              • Couvrez entièrement la caméra et le flash{'\n'}
+              • Couvrez uniquement l'objectif — le flash doit rester dégagé à côté{'\n'}
               • Appuyez légèrement (trop fort peut bloquer la circulation){'\n'}
               • Restez dans une pièce éclairée normalement{'\n'}
               • Évitez tout mouvement du téléphone et du doigt

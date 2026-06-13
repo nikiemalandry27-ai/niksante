@@ -104,7 +104,7 @@ export function getAIMessage(status: GlucoseStatus, mealContext: MealContext = n
       title: '⚠️ Hypoglycémie critique',
       message: `Votre glycémie est dangereusement basse. ${contextNote}`,
       suggestion: 'Prenez immédiatement 15 g de sucres rapides (jus de fruit, sucre en morceau, gel de glucose).',
-      action: 'Appelez le 15 (SAMU) si vous ressentez vertiges, tremblements ou confusion.',
+      action: 'Appelez les secours si vous ressentez vertiges, tremblements ou confusion.',
     };
   }
 
