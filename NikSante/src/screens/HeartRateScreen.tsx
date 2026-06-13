@@ -7,7 +7,7 @@
  * ⚠️ ESTIMATION INDICATIVE — PAS UN DISPOSITIF MÉDICAL.
  */
 
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useMemo } from 'react';
 import {
   View,
   TouchableOpacity,
@@ -28,6 +28,7 @@ let useCameraDevice: any     = () => null;
 let useCameraPermission: any = () => ({ hasPermission: false, requestPermission: async () => false });
 let useFrameProcessor: any   = () => undefined;
 let useRunOnJS: any          = (_fn: any, _deps: any[]) => null;
+let VisionCameraProxy: any   = null;
 let nativeAvailable          = false;
 let frameProcessorsAvailable = false;
 let _nativeLoadError         = '';
@@ -37,6 +38,7 @@ try {
   Camera              = vc.Camera;
   useCameraDevice     = vc.useCameraDevice;
   useCameraPermission = vc.useCameraPermission;
+  VisionCameraProxy   = vc.VisionCameraProxy ?? null;
   nativeAvailable     = true;
 
   if (typeof vc.useFrameProcessor === 'function') {
@@ -44,8 +46,7 @@ try {
     frameProcessorsAvailable = true;
   }
 
-  // useRunOnJS est le hook officiel worklets-core pour appeler du JS
-  // depuis un frame processor. Confirmé disponible en v1.6.3.
+  // useRunOnJS : hook officiel worklets-core pour appeler du JS depuis un frame processor
   try {
     useRunOnJS = require('react-native-worklets-core').useRunOnJS;
   } catch (_) {}
@@ -305,8 +306,17 @@ export default function HeartRateScreen() {
     }
   }, []);
 
+  // Plugin natif Kotlin : lit imageProxy.planes[0] (Y-plan YUV) directement
+  // en mémoire CPU, bypasse toArrayBuffer() qui échoue sur les frames GPU.
+  const brightnessPlugin = useMemo(() => {
+    try {
+      return VisionCameraProxy?.initFrameProcessorPlugin('getBrightness', {}) ?? null;
+    } catch {
+      return null;
+    }
+  }, []);
+
   // useRunOnJS crée un wrapper worklet-callable vers onFrame (JS thread).
-  // C'est le hook officiel de worklets-core v1.6.3 pour VisionCamera v4.
   const onFrameJS = useRunOnJS(onFrame, [onFrame]);
 
   // ── Frame processor — runs at camera FPS (~30fps) ─────────────────────────
@@ -315,41 +325,38 @@ export default function HeartRateScreen() {
     'worklet';
     if (!onFrameJS) return;
     try {
-      const buffer = frame.toArrayBuffer();
-      const data   = new Uint8Array(buffer);
-
-      const w  = frame.width;
-      const h  = frame.height;
-      const r0 = Math.floor(h * 0.30);
-      const r1 = Math.floor(h * 0.70);
-      const c0 = Math.floor(w * 0.30);
-      const c1 = Math.floor(w * 0.70);
-
-      const rStep = Math.max(1, Math.floor((r1 - r0) / 20));
-      const cStep = Math.max(1, Math.floor((c1 - c0) / 20));
-
-      // pixelFormat="rgb" → ARGB_8888 → 4 octets par pixel
-      // Canal dominant = max(ch0, ch1, ch2) : capture le rouge PPG sans
-      // connaître l'ordre exact des canaux (ARGB/BGRA selon le device)
-      let sum   = 0;
-      let count = 0;
-      for (let r = r0; r < r1; r += rStep) {
-        for (let c = c0; c < c1; c += cStep) {
-          const idx = (r * w + c) * 4;
-          const ch0 = data[idx];
-          const ch1 = data[idx + 1];
-          const ch2 = data[idx + 2];
-          sum += ch0 > ch1 ? (ch0 > ch2 ? ch0 : ch2) : (ch1 > ch2 ? ch1 : ch2);
-          count++;
+      if (brightnessPlugin) {
+        // Voie native : BrightnessPlugin.kt lit imageProxy.planes[0] en CPU
+        // sans GPU copy — bypasse le bug toArrayBuffer sur frames AHardwareBuffer
+        const result = brightnessPlugin.call(frame);
+        onFrameJS(typeof result === 'number' ? result : -4);
+      } else {
+        // Fallback JS — peut échouer sur frames GPU (lum:-2), mais on garde
+        // le chemin pour les builds sans le plugin natif chargé
+        const buffer = frame.toArrayBuffer();
+        const data   = new Uint8Array(buffer);
+        const w  = frame.width;
+        const h  = frame.height;
+        const bpr = (frame as any).bytesPerRow ?? w;
+        const r0 = Math.floor(h * 0.30);
+        const r1 = Math.floor(h * 0.70);
+        const c0 = Math.floor(w * 0.30);
+        const c1 = Math.floor(w * 0.70);
+        const rStep = Math.max(1, Math.floor((r1 - r0) / 20));
+        const cStep = Math.max(1, Math.floor((c1 - c0) / 20));
+        let sum = 0, count = 0;
+        for (let r = r0; r < r1; r += rStep) {
+          for (let c = c0; c < c1; c += cStep) {
+            const idx = r * bpr + c;
+            if (idx < data.length) { sum += data[idx]; count++; }
+          }
         }
+        onFrameJS(count > 0 ? sum / count : -1);
       }
-
-      // -1 = count nul (frame trop petite), -2 = exception toArrayBuffer
-      onFrameJS(count > 0 ? sum / count : -1);
     } catch {
       onFrameJS(-2);
     }
-  }, [onFrameJS]);
+  }, [onFrameJS, brightnessPlugin]);
 
   // ── Start countdown (called automatically when finger detected) ──────────
 
@@ -680,7 +687,7 @@ export default function HeartRateScreen() {
                 isActive={true}
                 torch={torchProp}
                 video={true}
-                pixelFormat="rgb"
+                pixelFormat="yuv"
                 frameProcessor={frameProcessor}
                 onInitialized={() => setCameraReady(true)}
               />
@@ -744,9 +751,9 @@ export default function HeartRateScreen() {
             </>
           )}
 
-          {/* Debug : ✓fp=bridge OK, ✗fp=onFrameJS null ; lum=-2 exception, -1 no-pixels, ≥0 luminosité */}
+          {/* Debug : ✓plug=plugin natif, ✗plug=fallback JS ; lum=-4 résultat non-number, -2 exception, -1 no-pixels, ≥0 luminosité */}
           <ThemedText style={{ fontSize: fs(10), color: 'rgba(255,255,255,0.25)', textAlign: 'center', marginTop: vs(6) }}>
-            {onFrameJS ? '✓fp' : '✗fp'} | lum:{debugBrightness}
+            {brightnessPlugin ? '✓plug' : '✗plug'} | lum:{debugBrightness}
           </ThemedText>
 
           <TouchableOpacity

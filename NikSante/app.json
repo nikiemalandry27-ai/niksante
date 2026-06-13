@@ -2,7 +2,7 @@
   "expo": {
     "name": "NikSanté – Diabète & Glycémie",
     "slug": "niksante",
-    "version": "1.2.6",
+    "version": "1.2.7",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "niksante",
@@ -36,7 +36,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.niksante.app",
-      "versionCode": 21,
+      "versionCode": 22,
       "googleServicesFile": "./google-services.json",
       "newArchEnabled": false
     },
@@ -53,6 +53,7 @@
     "plugins": [
       "expo-router",
       "./plugins/withCameraProguard",
+      "./plugins/withBrightnessPlugin",
       [
         "react-native-vision-camera",
         {
