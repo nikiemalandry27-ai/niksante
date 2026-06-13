@@ -643,8 +643,8 @@ export default function HeartRateScreen() {
 
           {/* Étapes */}
           {[
-            { step: '1', icon: '👆', text: 'Couvrez la caméra ET le flash avec le bout de votre index', sub: 'Les deux objectifs doivent être sous votre doigt — flash inclus' },
-            { step: '2', icon: '💡', text: 'Le flash traverse votre doigt et éclaire les capillaires', sub: 'C\'est ce flux lumineux pulsé que la caméra mesure — ne dégagez pas le flash' },
+            { step: '1', icon: '👆', text: 'Posez le bout de votre index sur l\'objectif de la caméra arrière', sub: 'Couvrez uniquement l\'objectif — le flash doit rester dégagé à côté' },
+            { step: '2', icon: '💡', text: 'Le flash s\'allume et éclaire votre doigt depuis le côté', sub: 'La lumière traverse les capillaires — la caméra capte les pulsations sanguines' },
             { step: '3', icon: '🤏', text: 'Appuyez doucement sans serrer', sub: 'Trop de pression bloque la circulation sanguine' },
             { step: '4', icon: '🧘', text: 'Restez immobile pendant 15 secondes', sub: 'Tout mouvement fausse la mesure' },
           ].map((item) => (
@@ -751,7 +751,7 @@ export default function HeartRateScreen() {
                 color: fingerDetected ? '#E53935' : 'rgba(255,255,255,0.55)',
                 textAlign: 'center', marginTop: vs(8),
               }}>
-                {fingerDetected ? '✓ Doigt détecté — démarrage automatique…' : 'Posez votre doigt sur la caméra — le flash éclaire votre doigt'}
+                {fingerDetected ? '✓ Doigt détecté — démarrage automatique…' : 'Posez votre doigt sur l\'objectif caméra — laissez le flash dégagé'}
               </ThemedText>
             )}
 
