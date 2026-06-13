@@ -109,7 +109,7 @@ function analyzePPG(samples: Sample[]): {
   const std  = Math.sqrt(values.map((v) => (v - mean) ** 2).reduce((a, b) => a + b, 0) / values.length);
   const cv   = std / (mean || 1); // coefficient of variation
 
-  if (cv < 0.002) {
+  if (cv < 0.001) {
     return { bpm: null, confidence: 0, fps, message: 'Doigt non détecté — couvrez bien la caméra ET le flash' };
   }
   if (cv > 0.20) {
@@ -223,6 +223,7 @@ export default function HeartRateScreen() {
   const [sampleCount,      setSampleCount]      = useState(0);
   const [fingerDetected,   setFingerDetected]   = useState(false);
   const [fingerProgress,   setFingerProgress]   = useState(0);
+  const [isCalibrating,    setIsCalibrating]    = useState(true);
   const [debugBrightness,  setDebugBrightness]  = useState(0);
   const [cameraReady,      setCameraReady]      = useState(false);
 
@@ -271,13 +272,15 @@ export default function HeartRateScreen() {
         if (baselineCount.current >= 30) {
           baselineValue.current = baselineSum.current / baselineCount.current;
           baselineReady.current = true;
+          setIsCalibrating(false);
         }
         return;
       }
 
-      const base      = baselineValue.current;
-      const threshold = base > 80 ? base * 0.45 : base - 30;
-      const fingerOn  = brightness < threshold && brightness < base - 20;
+      const base = baselineValue.current;
+      // Détection bidirectionnelle : le doigt change la luminosité dans n'importe
+      // quel sens (hausse ou baisse >30% selon l'appareil et l'environnement)
+      const fingerOn = base > 0 && Math.abs(brightness - base) / base > 0.30;
 
       setFingerDetected(fingerOn);
       if (fingerOn) {
@@ -326,13 +329,17 @@ export default function HeartRateScreen() {
       const cStep = Math.max(1, Math.floor((c1 - c0) / 20));
 
       // pixelFormat="rgb" → ARGB_8888 → 4 octets par pixel
-      // Luminosité = moyenne des 3 canaux couleur (indices 0,1,2 par pixel)
+      // Canal dominant = max(ch0, ch1, ch2) : capture le rouge PPG sans
+      // connaître l'ordre exact des canaux (ARGB/BGRA selon le device)
       let sum   = 0;
       let count = 0;
       for (let r = r0; r < r1; r += rStep) {
         for (let c = c0; c < c1; c += cStep) {
-          const base = (r * w + c) * 4;
-          sum += (data[base] + data[base + 1] + data[base + 2]) / 3;
+          const idx = (r * w + c) * 4;
+          const ch0 = data[idx];
+          const ch1 = data[idx + 1];
+          const ch2 = data[idx + 2];
+          sum += ch0 > ch1 ? (ch0 > ch2 ? ch0 : ch2) : (ch1 > ch2 ? ch1 : ch2);
           count++;
         }
       }
@@ -406,7 +413,9 @@ export default function HeartRateScreen() {
     baselineCount.current  = 0;
     baselineValue.current  = 0;
     baselineReady.current  = false;
+    setIsCalibrating(true);
     setFingerDetected(false);
+    setFingerProgress(0);
     setCameraReady(false); // reset pour que onInitialized re-déclenche le torch
     phaseRef.current = 'waiting';
     setPhase('waiting');
@@ -421,6 +430,8 @@ export default function HeartRateScreen() {
     baselineCount.current  = 0;
     baselineValue.current  = 0;
     baselineReady.current  = false;
+    setIsCalibrating(true);
+    setFingerProgress(0);
     heartAnim.stopAnimation();
     heartAnim.setValue(1);
     setBpm(null);
@@ -687,17 +698,23 @@ export default function HeartRateScreen() {
             </ThemedText>
           </View>
 
-          {/* Statut doigt */}
-          <ThemedText style={{
-            fontSize: fs(14),
-            color: fingerDetected ? '#4CAF50' : 'rgba(255,255,255,0.55)',
-            textAlign: 'center',
-            marginTop: vs(8),
-          }}>
-            {fingerDetected
-              ? '✓ Doigt détecté — démarrage automatique…'
-              : 'Posez votre doigt sur la caméra — le flash éclaire votre doigt'}
-          </ThemedText>
+          {/* Statut calibration / doigt */}
+          {isCalibrating ? (
+            <ThemedText style={{ fontSize: fs(13), color: 'rgba(255,255,255,0.45)', textAlign: 'center', marginTop: vs(8) }}>
+              ⏳ Calibration… ne posez pas encore votre doigt
+            </ThemedText>
+          ) : (
+            <ThemedText style={{
+              fontSize: fs(14),
+              color: fingerDetected ? '#E53935' : 'rgba(255,255,255,0.55)',
+              textAlign: 'center',
+              marginTop: vs(8),
+            }}>
+              {fingerDetected
+                ? '✓ Doigt détecté — démarrage automatique…'
+                : 'Posez votre doigt sur la caméra — le flash éclaire votre doigt'}
+            </ThemedText>
+          )}
 
           {fingerDetected && (
             <>
