@@ -683,211 +683,151 @@ export default function HeartRateScreen() {
     );
   }
 
-  // ── Waiting (flash ON, aperçu circulaire en temps réel) ─────────────────
+  // ── Waiting + Measuring — UNE seule Camera pour les deux phases ─────────────
+  // Fusionner les deux phases garantit que la Camera reste montée en permanence.
+  // Si on utilise deux instances séparées, VisionCamera éteint le torch au
+  // démontage de la Camera "waiting" et la Camera "measuring" doit réinitialiser
+  // sa session avant de pouvoir le rallumer → flash coupe systématiquement.
 
-  if (phase === 'waiting') {
-    const ringColor = fingerDetected ? '#E53935' : 'rgba(255,255,255,0.5)';
-    const circleSize = s(300);
-    // cameraReady s'active après onInitialized → évite torch ignoré si session pas encore ouverte
-    const torchProp: 'on' | 'off' = cameraReady && hasTorch ? 'on' : 'off';
+  if (phase === 'waiting' || phase === 'measuring') {
+    const isMeasuring = phase === 'measuring';
+    const ringColor   = fingerDetected ? '#E53935' : 'rgba(255,255,255,0.5)';
+    const circleSize  = s(280);
+
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: '#111' }]}>
-        <View style={styles.measuringContent}>
 
-          <ThemedText style={{ fontSize: fs(18), fontWeight: 'bold', color: '#fff', textAlign: 'center', marginBottom: vs(20) }}>
-            Posez votre doigt sur la caméra
-          </ThemedText>
+        {/* ── Camera unique — reste montée pendant waiting ET measuring ────── */}
+        {/* Position fixe dans l'arbre JSX → React ne la démonte jamais        */}
+        <Camera
+          style={StyleSheet.absoluteFillObject}
+          device={device}
+          isActive={true}
+          torch={cameraReady && hasTorch ? 'on' : 'off'}
+          video={true}
+          pixelFormat="yuv"
+          frameProcessor={frameProcessor}
+          onInitialized={() => setCameraReady(true)}
+        />
 
-          {/* Anneau + aperçu caméra circulaire */}
-          <View style={{
-            width: circleSize + 8,
-            height: circleSize + 8,
-            borderRadius: (circleSize + 8) / 2,
-            borderWidth: 4,
-            borderColor: ringColor,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-            <View style={{
-              width: circleSize,
-              height: circleSize,
-              borderRadius: circleSize / 2,
-              overflow: 'hidden',
-            }}>
-              <Camera
-                style={{ flex: 1 }}
-                device={device}
-                isActive={true}
-                torch={torchProp}
-                video={true}
-                pixelFormat="yuv"
-                frameProcessor={frameProcessor}
-                onInitialized={() => setCameraReady(true)}
-              />
-            </View>
-          </View>
-
-          {/* Indicateur flash — couleur réelle selon hasTorch */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: vs(14), gap: s(6) }}>
-            <View style={{
-              width: s(8), height: s(8), borderRadius: 4,
-              backgroundColor: hasTorch ? '#FFD600' : '#888',
-            }} />
-            <ThemedText style={{ fontSize: fs(12), color: hasTorch ? 'rgba(255,255,255,0.7)' : '#888' }}>
-              {hasTorch ? 'Flash activé' : 'Flash non disponible sur cet appareil'}
-            </ThemedText>
-          </View>
-
-          {/* Statut calibration / doigt */}
-          {isCalibrating ? (
-            <ThemedText style={{ fontSize: fs(13), color: 'rgba(255,255,255,0.45)', textAlign: 'center', marginTop: vs(8) }}>
-              ⏳ Calibration… ne posez pas encore votre doigt
-            </ThemedText>
-          ) : (
-            <ThemedText style={{
-              fontSize: fs(14),
-              color: fingerDetected ? '#E53935' : 'rgba(255,255,255,0.55)',
-              textAlign: 'center',
-              marginTop: vs(8),
-            }}>
-              {fingerDetected
-                ? '✓ Doigt détecté — démarrage automatique…'
-                : 'Posez votre doigt sur la caméra — le flash éclaire votre doigt'}
-            </ThemedText>
-          )}
-
-          {fingerDetected && (
-            <>
-              <ThemedText style={{ fontSize: fs(12), color: 'rgba(255,255,255,0.4)', textAlign: 'center', marginTop: vs(4) }}>
-                Restez immobile…
-              </ThemedText>
-
-              {/* Barre de progression : démarrage automatique */}
-              <View style={{ width: s(260), marginTop: vs(12) }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: vs(4) }}>
-                  <ThemedText style={{ fontSize: fs(11), color: 'rgba(255,255,255,0.5)' }}>
-                    Démarrage automatique
-                  </ThemedText>
-                  <ThemedText style={{ fontSize: fs(11), color: '#E53935', fontWeight: '700' }}>
-                    {fingerProgress}%
-                  </ThemedText>
-                </View>
-                <View style={{ width: '100%', height: vs(6), backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 3, overflow: 'hidden' }}>
-                  <View style={{
-                    height: vs(6),
-                    width: `${fingerProgress}%` as any,
-                    backgroundColor: '#E53935',
-                    borderRadius: 3,
-                  }} />
-                </View>
-              </View>
-            </>
-          )}
-
-          {/* Debug : ✓plug=plugin natif, ✗plug=fallback JS ; lum=-4 résultat non-number, -2 exception, -1 no-pixels, ≥0 luminosité */}
-          <ThemedText style={{ fontSize: fs(10), color: 'rgba(255,255,255,0.25)', textAlign: 'center', marginTop: vs(6) }}>
-            {brightnessPlugin ? '✓plug' : '✗plug'} | lum:{debugBrightness}
-          </ThemedText>
-
-          <TouchableOpacity
-            style={[styles.primaryBtn, {
-              marginTop: vs(28),
-              backgroundColor: 'transparent',
-              borderWidth: 1,
-              borderColor: 'rgba(255,255,255,0.25)',
-            }]}
-            onPress={handleRetry}
-          >
-            <ThemedText style={[styles.primaryBtnText, { color: 'rgba(255,255,255,0.6)' }]}>
-              ← Annuler
-            </ThemedText>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  // ── Measuring ─────────────────────────────────────────────────────────────
-
-  if (phase === 'measuring') {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: '#0d0000' }]}>
-        {/* Camera active — frame processor running, torch toujours ON */}
-        <View style={StyleSheet.absoluteFillObject}>
-          <Camera
-            style={StyleSheet.absoluteFillObject}
-            device={device}
-            isActive={true}
-            torch={cameraReady && hasTorch ? 'on' : 'off'}
-            video={true}
-            pixelFormat="yuv"
-            frameProcessor={frameProcessor}
-            onInitialized={() => setCameraReady(true)}
-          />
-          {/* Dark overlay so UI is readable */}
+        {/* ── Overlay sombre pendant la mesure (caméra reste allumée derrière) */}
+        {isMeasuring && (
           <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.88)' }]} />
-        </View>
+        )}
 
-        <View style={styles.measuringContent}>
-          <Animated.Text style={[styles.heartIcon, { transform: [{ scale: heartAnim }] }]}>
-            ❤️
-          </Animated.Text>
+        {/* ── UI Attente ───────────────────────────────────────────────────── */}
+        {!isMeasuring && (
+          <View style={styles.measuringContent}>
 
-          <ThemedText style={styles.countdownText}>{countdown}</ThemedText>
-          <ThemedText style={styles.countdownLabel}>secondes restantes</ThemedText>
+            <ThemedText style={{ fontSize: fs(18), fontWeight: 'bold', color: '#fff', textAlign: 'center', marginBottom: vs(20) }}>
+              Posez votre doigt sur la caméra
+            </ThemedText>
 
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${((15 - countdown) / 15) * 100}%` as any }]} />
-          </View>
+            {/* Anneau indicateur — la caméra en fond reste visible autour */}
+            <View style={{
+              width: circleSize + 8,
+              height: circleSize + 8,
+              borderRadius: (circleSize + 8) / 2,
+              borderWidth: 4,
+              borderColor: ringColor,
+            }} />
 
-          {/* Données en temps réel */}
-          <View style={{ width: '100%', marginTop: vs(4), marginBottom: vs(4) }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: vs(4) }}>
-              <ThemedText style={{ fontSize: fs(11), color: 'rgba(255,255,255,0.45)' }}>
-                Échantillons collectés
-              </ThemedText>
-              <ThemedText style={{ fontSize: fs(11), color: '#E53935', fontWeight: '700' }}>
-                {sampleCount} / ~450
+            {/* Flash status */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: vs(14), gap: s(6) }}>
+              <View style={{ width: s(8), height: s(8), borderRadius: 4, backgroundColor: hasTorch ? '#FFD600' : '#888' }} />
+              <ThemedText style={{ fontSize: fs(12), color: hasTorch ? 'rgba(255,255,255,0.7)' : '#888' }}>
+                {hasTorch ? 'Flash activé' : 'Flash non disponible sur cet appareil'}
               </ThemedText>
             </View>
-            <View style={{ width: '100%', height: vs(6), backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden' }}>
-              <View style={{
-                height: vs(6),
-                width: `${Math.min(100, Math.round((sampleCount / 450) * 100))}%` as any,
-                backgroundColor: '#E53935',
-                borderRadius: 3,
-              }} />
-            </View>
-          </View>
 
-          {/* Signal PPG en temps réel */}
-          <View style={{ width: '100%', marginTop: vs(6) }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: vs(4) }}>
-              <ThemedText style={{ fontSize: fs(11), color: 'rgba(255,255,255,0.45)' }}>
-                Signal PPG
+            {/* Calibration / doigt */}
+            {isCalibrating ? (
+              <ThemedText style={{ fontSize: fs(13), color: 'rgba(255,255,255,0.45)', textAlign: 'center', marginTop: vs(8) }}>
+                ⏳ Calibration… ne posez pas encore votre doigt
               </ThemedText>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(4) }}>
-                <View style={{
-                  width: s(7), height: s(7), borderRadius: s(4),
-                  backgroundColor: debugBrightness >= 0 ? '#E53935' : 'rgba(255,255,255,0.2)',
-                }} />
-                <ThemedText style={{ fontSize: fs(11), color: 'rgba(255,255,255,0.45)' }}>
-                  {debugBrightness >= 0 ? 'Actif' : '—'}
+            ) : (
+              <ThemedText style={{
+                fontSize: fs(14),
+                color: fingerDetected ? '#E53935' : 'rgba(255,255,255,0.55)',
+                textAlign: 'center', marginTop: vs(8),
+              }}>
+                {fingerDetected ? '✓ Doigt détecté — démarrage automatique…' : 'Posez votre doigt sur la caméra — le flash éclaire votre doigt'}
+              </ThemedText>
+            )}
+
+            {fingerDetected && (
+              <>
+                <ThemedText style={{ fontSize: fs(12), color: 'rgba(255,255,255,0.4)', textAlign: 'center', marginTop: vs(4) }}>
+                  Restez immobile…
                 </ThemedText>
+                <View style={{ width: s(260), marginTop: vs(12) }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: vs(4) }}>
+                    <ThemedText style={{ fontSize: fs(11), color: 'rgba(255,255,255,0.5)' }}>Démarrage automatique</ThemedText>
+                    <ThemedText style={{ fontSize: fs(11), color: '#E53935', fontWeight: '700' }}>{fingerProgress}%</ThemedText>
+                  </View>
+                  <View style={{ width: '100%', height: vs(6), backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 3, overflow: 'hidden' }}>
+                    <View style={{ height: vs(6), width: `${fingerProgress}%` as any, backgroundColor: '#E53935', borderRadius: 3 }} />
+                  </View>
+                </View>
+              </>
+            )}
+
+            <ThemedText style={{ fontSize: fs(10), color: 'rgba(255,255,255,0.25)', textAlign: 'center', marginTop: vs(6) }}>
+              {brightnessPlugin ? '✓plug' : '✗plug'} | lum:{debugBrightness}
+            </ThemedText>
+
+            <TouchableOpacity
+              style={[styles.primaryBtn, { marginTop: vs(28), backgroundColor: 'transparent', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)' }]}
+              onPress={handleRetry}
+            >
+              <ThemedText style={[styles.primaryBtnText, { color: 'rgba(255,255,255,0.6)' }]}>← Annuler</ThemedText>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* ── UI Mesure ────────────────────────────────────────────────────── */}
+        {isMeasuring && (
+          <View style={styles.measuringContent}>
+            <Animated.Text style={[styles.heartIcon, { transform: [{ scale: heartAnim }] }]}>❤️</Animated.Text>
+
+            <ThemedText style={styles.countdownText}>{countdown}</ThemedText>
+            <ThemedText style={styles.countdownLabel}>secondes restantes</ThemedText>
+
+            <View style={styles.progressBar}>
+              <View style={[styles.progressFill, { width: `${((15 - countdown) / 15) * 100}%` as any }]} />
+            </View>
+
+            {/* Échantillons collectés */}
+            <View style={{ width: '100%', marginTop: vs(4), marginBottom: vs(4) }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: vs(4) }}>
+                <ThemedText style={{ fontSize: fs(11), color: 'rgba(255,255,255,0.45)' }}>Échantillons collectés</ThemedText>
+                <ThemedText style={{ fontSize: fs(11), color: '#E53935', fontWeight: '700' }}>{sampleCount} / ~450</ThemedText>
+              </View>
+              <View style={{ width: '100%', height: vs(6), backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden' }}>
+                <View style={{ height: vs(6), width: `${Math.min(100, Math.round((sampleCount / 450) * 100))}%` as any, backgroundColor: '#E53935', borderRadius: 3 }} />
               </View>
             </View>
-            <View style={{ width: '100%', height: vs(6), backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden' }}>
-              <View style={{
-                height: vs(6),
-                width: `${Math.min(100, Math.max(0, Math.round((debugBrightness / 220) * 100)))}%` as any,
-                backgroundColor: 'rgba(229,57,53,0.7)',
-                borderRadius: 3,
-              }} />
-            </View>
-          </View>
 
-          <ThemedText style={[styles.measuringHint, { marginTop: vs(12) }]}>Gardez le doigt immobile sur la caméra</ThemedText>
-        </View>
+            {/* Signal PPG */}
+            <View style={{ width: '100%', marginTop: vs(6) }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: vs(4) }}>
+                <ThemedText style={{ fontSize: fs(11), color: 'rgba(255,255,255,0.45)' }}>Signal PPG</ThemedText>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(4) }}>
+                  <View style={{ width: s(7), height: s(7), borderRadius: s(4), backgroundColor: debugBrightness >= 0 ? '#E53935' : 'rgba(255,255,255,0.2)' }} />
+                  <ThemedText style={{ fontSize: fs(11), color: 'rgba(255,255,255,0.45)' }}>
+                    {debugBrightness >= 0 ? 'Actif' : '—'}
+                  </ThemedText>
+                </View>
+              </View>
+              <View style={{ width: '100%', height: vs(6), backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden' }}>
+                <View style={{ height: vs(6), width: `${Math.min(100, Math.max(0, Math.round((debugBrightness / 220) * 100)))}%` as any, backgroundColor: 'rgba(229,57,53,0.7)', borderRadius: 3 }} />
+              </View>
+            </View>
+
+            <ThemedText style={[styles.measuringHint, { marginTop: vs(12) }]}>Gardez le doigt immobile sur la caméra</ThemedText>
+          </View>
+        )}
+
       </SafeAreaView>
     );
   }
