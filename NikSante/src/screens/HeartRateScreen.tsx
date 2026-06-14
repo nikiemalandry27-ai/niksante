@@ -294,12 +294,18 @@ function analyzePPG(samples: Sample[], baselineAvgR = 0): PPGResult {
     ) peaks.push(i);
   }
 
-  if (peaks.length < 4) {
+  // Validation physiologique : nombre de pics cohérent avec la durée réelle
+  // 0.6 pic/s → 36 BPM minimum | 2.0 pics/s → 120 BPM maximum
+  const expectedMin = dur * 0.6;
+  const expectedMax = dur * 2.0;
+  if (peaks.length < expectedMin || peaks.length > expectedMax) {
     return {
       bpm: null, confidence: 0, signalQuality: Math.round(Math.min(40, snr * 5)),
       fingerConfidence, isFingerDetected: ratio >= 1.2,
       isValid: false, isUncertain: false, fps,
-      message: `Signal PPG insuffisant (${peaks.length} pics) — repositionnez le doigt`,
+      message: peaks.length < expectedMin
+        ? `Trop peu de pics détectés (${peaks.length} sur ${Math.round(dur)}s) — repositionnez le doigt`
+        : `Trop de pics détectés (${peaks.length}) — signal bruité, restez parfaitement immobile`,
     };
   }
 
