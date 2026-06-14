@@ -65,7 +65,9 @@ import { s, fs, vs } from '@/utils/responsive';
 type Phase = 'disclaimer' | 'instruction' | 'waiting' | 'measuring' | 'processing' | 'result' | 'error';
 
 interface Sample {
-  value:     number;  // average pixel brightness (Y channel)
+  r:         number;  // canal rouge  (détection doigt + signal PPG)
+  g:         number;  // canal vert   (signal PPG principal — meilleure sensibilité hémoglobine)
+  b:         number;  // canal bleu   (utilisé pour ratio couleur)
   timestamp: number;
 }
 
@@ -159,23 +161,63 @@ function computeDFT(signal: number[], timestamps: number[]): { bpm: number; snr:
 }
 
 interface PPGResult {
-  bpm:           number | null;
-  confidence:    number;
-  signalQuality: number;
-  isValid:       boolean;
-  fps:           number;
-  message:       string;
-  hrv?:          HRVData;
+  bpm:              number | null;
+  confidence:       number;
+  signalQuality:    number;
+  fingerConfidence: number;   // 0–100 : certitude que c'était un doigt humain
+  isFingerDetected: boolean;
+  isValid:          boolean;
+  fps:              number;
+  message:          string;
+  hrv?:             HRVData;
+  debug?: {
+    avgRed:      number;
+    ratio:       number;
+    rrIntervals: number[];
+    variance:    number;
+  };
 }
 
 function analyzePPG(samples: Sample[]): PPGResult {
   const fail = (msg: string, sq = 0): PPGResult => ({
-    bpm: null, confidence: 0, signalQuality: sq, isValid: false, fps: 0, message: msg,
+    bpm: null, confidence: 0, signalQuality: sq,
+    fingerConfidence: 0, isFingerDetected: false,
+    isValid: false, fps: 0, message: msg,
   });
 
   if (samples.length < 120) return fail('Pas assez de données — gardez le doigt immobile sur la caméra');
 
-  const vals = samples.map(s => s.value);
+  // ── 0. Vérification post-hoc dominance rouge (doigt humain) ──────────────
+  // Un doigt humain sous flash produit R >> G ≈ B.
+  // ratio = R / (G + B) : doigt réel > 1.1, ombre/objet < 0.6
+  const avgR   = samples.reduce((s, p) => s + p.r, 0) / samples.length;
+  const avgG   = samples.reduce((s, p) => s + p.g, 0) / samples.length;
+  const avgB   = samples.reduce((s, p) => s + p.b, 0) / samples.length;
+  const ratio  = avgR / (avgG + avgB + 1);
+
+  // Score de confiance doigt : 0-100 basé sur la dominance rouge
+  // ratio 0.6 → fc=0 | ratio 1.1 → fc=50 | ratio 1.5 → fc=85 | ratio 2.0 → fc=100
+  const fingerConfidence = Math.min(100, Math.max(0,
+    Math.round((ratio - 0.6) / (2.0 - 0.6) * 100)
+  ));
+
+  if (ratio < 1.1) {
+    return {
+      ...fail(`Aucun doigt détecté — couvrez uniquement l'objectif (ratio couleur ${ratio.toFixed(2)} < 1.1)`, 0),
+      fingerConfidence, isFingerDetected: false,
+      debug: { avgRed: avgR, ratio, rrIntervals: [], variance: 0 },
+    };
+  }
+  if (avgR < 30 || avgR > 245) {
+    return {
+      ...fail(avgR < 30 ? 'Signal trop sombre — appuyez légèrement sur l\'objectif' : 'Signal surexposé — réduisez la pression', 0),
+      fingerConfidence, isFingerDetected: ratio >= 1.1,
+      debug: { avgRed: avgR, ratio, rrIntervals: [], variance: 0 },
+    };
+  }
+
+  // Signal PPG : canal vert (meilleure absorption par l'hémoglobine en réflexion)
+  const vals = samples.map(s => s.g);
   const ts   = samples.map(s => s.timestamp);
   const dur  = (ts[ts.length - 1] - ts[0]) / 1000;
   const fps  = Math.round(samples.length / dur);
@@ -355,12 +397,19 @@ function analyzePPG(samples: Sample[]): PPGResult {
     advice: getHRVAdvice(recovery),
   };
 
+  // Variance des intervalles RR (pour debug)
+  const rrMeanDbg = cleanRR.reduce((a, b) => a + b, 0) / cleanRR.length;
+  const rrVariance = cleanRR.reduce((s, v) => s + (v - rrMeanDbg) ** 2, 0) / cleanRR.length;
+
   return {
     bpm, confidence, signalQuality,
+    fingerConfidence,
+    isFingerDetected: true,
     isValid: confidence >= 45 && signalQuality >= 25,
     fps,
     message: coherenceMsg,
     hrv,
+    debug: { avgRed: avgR, ratio, rrIntervals: cleanRR.map(v => Math.round(v * 1000)), variance: Math.round(rrVariance * 1e6) / 1e6 },
   };
 }
 
@@ -387,6 +436,8 @@ export default function HeartRateScreen() {
   const [cameraReady,      setCameraReady]      = useState(false);
   const [signalQuality,    setSignalQuality]    = useState(0);
   const [hrv,              setHrv]              = useState<HRVData | null>(null);
+  const [debugRatio,       setDebugRatio]       = useState(0);
+  const [fingerConfidence, setFingerConfidence] = useState(0);
 
   // hasTorch : true si la caméra arrière supporte le torch (flash LED continu)
   // Sur quasi tous les téléphones Android modernes, hasTorch = true sur la caméra arrière
@@ -401,12 +452,16 @@ export default function HeartRateScreen() {
   const measureStarted    = useRef(false);
   const startCountdownRef = useRef<() => void>(() => {});
 
-  // Baseline adaptative : luminosité mesurée quand flash ON + pas de doigt
-  // Dès que le doigt couvre la caméra, la luminosité chute de > 50 %
-  const baselineSum       = useRef(0);
+  // Baseline RGB : mesurée flash ON + sans doigt (≈30 trames)
+  // Permet de calculer le delta ratio lors de la détection doigt
   const baselineCount     = useRef(0);
-  const baselineValue     = useRef(0);
   const baselineReady     = useRef(false);
+  const baselineR         = useRef(0);
+  const baselineG         = useRef(0);
+  const baselineB         = useRef(0);
+  const baselineRSum      = useRef(0);
+  const baselineGSum      = useRef(0);
+  const baselineBSum      = useRef(0);
   const noFingerFrames    = useRef(0);
 
   // ── Heartbeat animation ───────────────────────────────────────────────────
@@ -422,27 +477,49 @@ export default function HeartRateScreen() {
 
   // ── Frame callback (called from worklet via runOnJS) ──────────────────────
 
-  const onFrame = useCallback((brightness: number) => {
-    setDebugBrightness(Math.round(brightness));
-    if (brightness < 0) return;
+  // onFrame reçoit maintenant r, g, b séparément (plugin BT.601 YUV→RGB)
+  const onFrame = useCallback((r: number, g: number, b: number) => {
+    if (r < 0) return; // code d'erreur plugin
+
+    // Ratio dominance rouge : critère physiologique clé d'un doigt humain
+    // Un doigt sous flash : R >> G ≈ B  →  ratio > 1.3
+    // Ombre / objet sombre : ratio ≈ 0.5 ou inférieur
+    const ratio = r / (g + b + 1);
+    setDebugBrightness(Math.round(r));
+    setDebugRatio(parseFloat(ratio.toFixed(2)));
 
     if (phaseRef.current === 'waiting') {
+      // ── Phase de calibration (~1 s, 30 trames) ───────────────────────────
       if (!baselineReady.current) {
-        baselineSum.current   += brightness;
+        baselineRSum.current += r;
+        baselineGSum.current += g;
+        baselineBSum.current += b;
         baselineCount.current += 1;
         if (baselineCount.current >= 30) {
-          baselineValue.current = baselineSum.current / baselineCount.current;
+          baselineR.current = baselineRSum.current / baselineCount.current;
+          baselineG.current = baselineGSum.current / baselineCount.current;
+          baselineB.current = baselineBSum.current / baselineCount.current;
           baselineReady.current = true;
           setIsCalibrating(false);
         }
         return;
       }
 
-      const base  = baselineValue.current;
-      const delta = Math.abs(brightness - base);
-      // Seuil 40% relatif ET 15 points absolus — évite les faux positifs
-      // sur variations d'éclairage ambiant (< 20% typiquement)
-      const fingerOn = base > 0 && delta > 15 && delta / base > 0.40;
+      // ── Détection doigt humain — 3 couches de validation ─────────────────
+
+      // Couche A — Dominance rouge (critère physiologique principal)
+      // Un doigt humain : tissu + sang → rouge passe, vert/bleu absorbés
+      const layerA = ratio > 1.1;
+
+      // Couche B — Plage de luminosité valide (doigt + flash = 40-240 R)
+      const layerB = r >= 40 && r <= 240;
+
+      // Couche C — Delta vs baseline : le ratio doit augmenter significativement
+      // quand le doigt vient couvrir (ombre seule ne change pas le ratio)
+      const baselineRatio = baselineR.current / (baselineG.current + baselineB.current + 1);
+      const layerC = (ratio - baselineRatio) > 0.25;
+
+      const fingerOn = layerA && layerB && layerC;
 
       if (fingerOn) {
         noFingerFrames.current = 0;
@@ -456,7 +533,6 @@ export default function HeartRateScreen() {
         }
       } else {
         noFingerFrames.current += 1;
-        // Hystérésis : 5 trames consécutives sans doigt avant réinitialisation
         if (noFingerFrames.current >= 5) {
           fingerFrames.current = 0;
           setFingerDetected(false);
@@ -467,7 +543,7 @@ export default function HeartRateScreen() {
     }
 
     if (!measuringRef.current) return;
-    samplesRef.current.push({ value: brightness, timestamp: Date.now() });
+    samplesRef.current.push({ r, g, b, timestamp: Date.now() });
     if (samplesRef.current.length % 10 === 0) {
       setSampleCount(samplesRef.current.length);
     }
@@ -493,35 +569,19 @@ export default function HeartRateScreen() {
     if (!onFrameJS) return;
     try {
       if (brightnessPlugin) {
-        // Voie native : BrightnessPlugin.kt lit imageProxy.planes[0] en CPU
-        // sans GPU copy — bypasse le bug toArrayBuffer sur frames AHardwareBuffer
-        const result = brightnessPlugin.call(frame);
-        onFrameJS(typeof result === 'number' ? result : -4);
+        // Voie native : BrightnessPlugin.kt convertit YUV→RGB en CPU
+        // et retourne { r, g, b } — pas de GPU copy, pas de bug AHardwareBuffer
+        const res = brightnessPlugin.call(frame) as { r: number; g: number; b: number } | null;
+        const r = (res && typeof res.r === 'number') ? res.r : -4;
+        const g = (res && typeof res.g === 'number') ? res.g : -4;
+        const b = (res && typeof res.b === 'number') ? res.b : -4;
+        onFrameJS(r, g, b);
       } else {
-        // Fallback JS — peut échouer sur frames GPU (lum:-2), mais on garde
-        // le chemin pour les builds sans le plugin natif chargé
-        const buffer = frame.toArrayBuffer();
-        const data   = new Uint8Array(buffer);
-        const w  = frame.width;
-        const h  = frame.height;
-        const bpr = (frame as any).bytesPerRow ?? w;
-        const r0 = Math.floor(h * 0.30);
-        const r1 = Math.floor(h * 0.70);
-        const c0 = Math.floor(w * 0.30);
-        const c1 = Math.floor(w * 0.70);
-        const rStep = Math.max(1, Math.floor((r1 - r0) / 20));
-        const cStep = Math.max(1, Math.floor((c1 - c0) / 20));
-        let sum = 0, count = 0;
-        for (let r = r0; r < r1; r += rStep) {
-          for (let c = c0; c < c1; c += cStep) {
-            const idx = r * bpr + c;
-            if (idx < data.length) { sum += data[idx]; count++; }
-          }
-        }
-        onFrameJS(count > 0 ? sum / count : -1);
+        // Fallback sans plugin natif — luminance Y uniquement, ratio inconnu
+        onFrameJS(-2, -2, -2);
       }
     } catch {
-      onFrameJS(-2);
+      onFrameJS(-2, -2, -2);
     }
   }, [onFrameJS, brightnessPlugin]);
 
@@ -565,6 +625,7 @@ export default function HeartRateScreen() {
               setBpm(result.bpm);
               setConfidence(result.confidence);
               setSignalQuality(result.signalQuality);
+              setFingerConfidence(result.fingerConfidence);
               setFps(result.fps);
               setHrv(result.hrv ?? null);
               phaseRef.current = 'result';
@@ -595,14 +656,15 @@ export default function HeartRateScreen() {
     }
     fingerFrames.current   = 0;
     measureStarted.current = false;
-    baselineSum.current    = 0;
     baselineCount.current  = 0;
-    baselineValue.current  = 0;
     baselineReady.current  = false;
+    baselineR.current      = 0; baselineRSum.current = 0;
+    baselineG.current      = 0; baselineGSum.current = 0;
+    baselineB.current      = 0; baselineBSum.current = 0;
     setIsCalibrating(true);
     setFingerDetected(false);
     setFingerProgress(0);
-    setCameraReady(false); // reset pour que onInitialized re-déclenche le torch
+    setCameraReady(false);
     phaseRef.current = 'waiting';
     setPhase('waiting');
   }, [hasPermission, requestPermission]);
@@ -612,17 +674,19 @@ export default function HeartRateScreen() {
     measuringRef.current   = false;
     measureStarted.current = false;
     fingerFrames.current   = 0;
-    noFingerFrames.current  = 0;
-    baselineSum.current    = 0;
+    noFingerFrames.current = 0;
     baselineCount.current  = 0;
-    baselineValue.current  = 0;
     baselineReady.current  = false;
+    baselineR.current      = 0; baselineRSum.current = 0;
+    baselineG.current      = 0; baselineGSum.current = 0;
+    baselineB.current      = 0; baselineBSum.current = 0;
     setIsCalibrating(true);
     setFingerProgress(0);
     heartAnim.stopAnimation();
     heartAnim.setValue(1);
     setBpm(null);
     setSignalQuality(0);
+    setFingerConfidence(0);
     setHrv(null);
     setErrorMsg('');
     setFingerDetected(false);
@@ -957,7 +1021,7 @@ export default function HeartRateScreen() {
               </View>
             </View>
 
-            {/* Signal PPG */}
+            {/* Signal PPG + ratio couleur */}
             <View style={{ width: '100%', marginTop: vs(6) }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: vs(4) }}>
                 <ThemedText style={{ fontSize: fs(11), color: 'rgba(255,255,255,0.45)' }}>Signal PPG</ThemedText>
@@ -970,6 +1034,15 @@ export default function HeartRateScreen() {
               </View>
               <View style={{ width: '100%', height: vs(6), backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden' }}>
                 <View style={{ height: vs(6), width: `${Math.min(100, Math.max(0, Math.round((debugBrightness / 220) * 100)))}%` as any, backgroundColor: 'rgba(229,57,53,0.7)', borderRadius: 3 }} />
+              </View>
+              {/* Ratio dominance rouge — visible uniquement en mesure */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: vs(4) }}>
+                <ThemedText style={{ fontSize: fs(10), color: 'rgba(255,255,255,0.30)' }}>
+                  Ratio rouge R/(G+B)
+                </ThemedText>
+                <ThemedText style={{ fontSize: fs(10), color: debugRatio > 1.1 ? '#81C784' : 'rgba(255,80,80,0.7)' }}>
+                  {debugRatio.toFixed(2)} {debugRatio > 1.3 ? '✓ doigt' : debugRatio > 1.1 ? '~ incertain' : '✗ non doigt'}
+                </ThemedText>
               </View>
             </View>
 
