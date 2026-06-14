@@ -539,7 +539,7 @@ export default function HeartRateScreen() {
 
   const samplesRef        = useRef<Sample[]>([]);
   const measuringRef      = useRef(false);
-  const countdownRef      = useRef<NodeJS.Timeout>();
+  const countdownRef      = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
   const heartAnim         = useRef(new Animated.Value(1)).current;
   const phaseRef          = useRef<Phase>('disclaimer');
   const fingerFrames      = useRef(0);
@@ -659,7 +659,7 @@ export default function HeartRateScreen() {
 
   // ── Frame processor — runs at camera FPS (~30fps) ─────────────────────────
 
-  const frameProcessor = useFrameProcessor((frame) => {
+  const frameProcessor = useFrameProcessor((frame: any) => {
     'worklet';
     if (!onFrameJS) return;
     try {
@@ -1009,7 +1009,7 @@ export default function HeartRateScreen() {
         {/* ── Camera unique — reste montée pendant waiting ET measuring ────── */}
         {/* Position fixe dans l'arbre JSX → React ne la démonte jamais        */}
         <Camera
-          style={StyleSheet.absoluteFillObject}
+          style={StyleSheet.absoluteFill}
           device={device}
           isActive={true}
           torch={cameraReady && hasTorch ? 'on' : 'off'}
@@ -1021,7 +1021,7 @@ export default function HeartRateScreen() {
 
         {/* ── Overlay sombre pendant la mesure (caméra reste allumée derrière) */}
         {isMeasuring && (
-          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.88)' }]} />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.88)' }]} />
         )}
 
         {/* ── UI Attente ───────────────────────────────────────────────────── */}
