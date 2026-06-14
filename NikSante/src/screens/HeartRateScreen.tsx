@@ -408,7 +408,6 @@ export default function HeartRateScreen() {
   const baselineValue     = useRef(0);
   const baselineReady     = useRef(false);
   const noFingerFrames    = useRef(0);
-  const badSignalSeconds  = useRef(0);
 
   // ── Heartbeat animation ───────────────────────────────────────────────────
 
@@ -539,36 +538,10 @@ export default function HeartRateScreen() {
     // Double vibration : mesure démarrée
     Vibration.vibrate([0, 80, 80, 80]);
 
-    badSignalSeconds.current = 0;
     let remaining = 15;
     countdownRef.current = setInterval(() => {
       remaining -= 1;
       setCountdown(remaining);
-
-      // ── Détection signal instable (chaque seconde) ──────────────────────────
-      // Prend la dernière seconde d'échantillons (~30 trames à 30 fps)
-      const recent = samplesRef.current.slice(-30);
-      if (recent.length >= 10) {
-        const vals = recent.map(s => s.value);
-        const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
-        const std  = Math.sqrt(vals.reduce((a, v) => a + (v - mean) ** 2, 0) / vals.length);
-        if (std < 1.0) {
-          // Signal plat : pas de pulsation détectable (doigt mal positionné ou retiré)
-          badSignalSeconds.current += 1;
-          if (badSignalSeconds.current >= 5) {
-            clearInterval(countdownRef.current);
-            measuringRef.current = false;
-            heartAnim.stopAnimation();
-            setErrorMsg('Signal instable depuis 5 secondes — replacez votre doigt bien à plat sur l\'objectif et recommencez.');
-            phaseRef.current = 'error';
-            setPhase('error');
-            Vibration.vibrate(200);
-            return;
-          }
-        } else {
-          badSignalSeconds.current = 0;
-        }
-      }
 
       if (remaining <= 0) {
         clearInterval(countdownRef.current);
@@ -640,7 +613,6 @@ export default function HeartRateScreen() {
     measureStarted.current = false;
     fingerFrames.current   = 0;
     noFingerFrames.current  = 0;
-    badSignalSeconds.current = 0;
     baselineSum.current    = 0;
     baselineCount.current  = 0;
     baselineValue.current  = 0;
