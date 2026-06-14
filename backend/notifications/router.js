@@ -58,6 +58,23 @@ router.post('/register', authMiddleware, async (req, res) => {
   }
 });
 
+// ── GET /api/notifications/stats ─────────────────────────────────────────────
+// Retourne le nombre de tokens push enregistrés (pour l'admin).
+
+router.get('/stats', adminOrKey, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT push_token FROM users WHERE push_token IS NOT NULL'
+    );
+    const all    = rows.map(r => r.push_token);
+    const valid  = ExpoSDK ? all.filter(t => ExpoSDK.isExpoPushToken(t)) : all;
+    res.json({ total: all.length, validExpo: valid.length });
+  } catch (err) {
+    console.error('[Notifications] stats:', err.message);
+    res.status(500).json({ error: 'Erreur base de données' });
+  }
+});
+
 // ── POST /api/notifications/send-update ──────────────────────────────────────
 // Envoie une notification de mise à jour à tous les utilisateurs.
 // Protégé par clé admin (header X-Admin-Key).
