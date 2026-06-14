@@ -139,7 +139,9 @@ export default function FoodScanScreen() {
   // ── Résultats ────────────────────────────────────────────────────────────
 
   if (phase === 'result' && result) {
-    const color = impactColor(result.impact_level);
+    const color        = impactColor(result.impact_level);
+    // Aliment considéré non identifié si confiance < 50%
+    const isIdentified = result.confidence_score >= 0.5;
 
     return (
       <SafeAreaView style={styles.container}>
@@ -149,89 +151,94 @@ export default function FoodScanScreen() {
 
         <ScrollView showsVerticalScrollIndicator={false}>
 
-          {/* Aliment détecté */}
-          <View style={[styles.detectedCard, { borderLeftColor: color }]}>
-            <View style={styles.detectedHeader}>
-              <View style={{ flex: 1 }}>
-                <ThemedText style={styles.sectionLabel}>ALIMENT DÉTECTÉ</ThemedText>
-                <ThemedText style={styles.detectedName}>{result.food}</ThemedText>
-                <ThemedText style={styles.categoryDesc}>{result.category_description}</ThemedText>
-              </View>
-              <View style={[styles.confidenceBadge, { backgroundColor: color + '20', borderColor: color }]}>
-                <ThemedText style={[styles.confidenceText, { color }]}>
-                  {Math.round(result.confidence_score * 100)}%
-                </ThemedText>
-              </View>
-            </View>
-          </View>
-
-          {/* Impact glycémique */}
-          <View style={[styles.impactCard, { borderLeftColor: color }]}>
-            <ThemedText style={styles.sectionLabel}>IMPACT GLYCÉMIQUE ESTIMÉ</ThemedText>
-            <View style={styles.impactRow}>
-              <ThemedText style={[styles.impactValue, { color }]}>
-                {result.impact_level === 'None'
-                  ? 'Nul'
-                  : `+${result.impact_mg_dl.min}–${result.impact_mg_dl.max} mg/dL`}
-              </ThemedText>
-              <View style={[styles.impactBadge, { backgroundColor: color + '20', borderColor: color }]}>
-                <ThemedText style={[styles.impactBadgeText, { color }]}>
-                  {impactLabel(result.impact_level)}
-                </ThemedText>
-              </View>
-            </View>
-            <ThemedText style={styles.impactTips}>💡 {result.advice}</ThemedText>
-          </View>
-
-          {/* Données glycémiques */}
-          <View style={styles.nutriCard}>
-            <ThemedText style={styles.nutriTitle}>Données glycémiques (portion {150}g)</ThemedText>
-            <View style={styles.nutriGrid}>
-              <NutriBox
-                label="Glucides"
-                value={`${result.carbs_used}g`}
-                color="#F57C00"
-              />
-              <NutriBox
-                label="Index GI"
-                value={`${result.glycemic_index}`}
-                color={result.glycemic_index < 40 ? '#388E3C' : result.glycemic_index < 70 ? '#F57C00' : '#B71C1C'}
-              />
-              <NutriBox
-                label="Charge GL"
-                value={`${result.glycemic_load.toFixed(1)}`}
-                color="#7B1FA2"
-              />
-              <NutriBox
-                label="Source"
-                value={result.carbs_source === 'label_ocr' ? 'Étiquette' : 'Base'}
-                color="#1565C0"
-              />
-            </View>
-
-            {result.glycemic_index > 0 && (
-              <View style={styles.giRow}>
-                <ThemedText style={styles.giLabel}>Index glycémique</ThemedText>
-                <View style={styles.giBar}>
-                  <View style={[
-                    styles.giFill,
-                    {
-                      width: `${result.glycemic_index}%` as any,
-                      backgroundColor: result.glycemic_index < 40 ? '#388E3C' : result.glycemic_index < 70 ? '#F57C00' : '#B71C1C',
-                    }
-                  ]} />
+          {isIdentified ? (
+            <>
+              {/* Aliment détecté */}
+              <View style={[styles.detectedCard, { borderLeftColor: color }]}>
+                <View style={styles.detectedHeader}>
+                  <View style={{ flex: 1 }}>
+                    <ThemedText style={styles.sectionLabel}>ALIMENT DÉTECTÉ</ThemedText>
+                    <ThemedText style={styles.detectedName}>{result.food}</ThemedText>
+                    <ThemedText style={styles.categoryDesc}>{result.category_description}</ThemedText>
+                  </View>
+                  <View style={[styles.confidenceBadge, { backgroundColor: color + '20', borderColor: color }]}>
+                    <ThemedText style={[styles.confidenceText, { color }]}>
+                      {Math.round(result.confidence_score * 100)}%
+                    </ThemedText>
+                  </View>
                 </View>
-                <ThemedText style={styles.giValue}>{result.glycemic_index}/100</ThemedText>
               </View>
-            )}
-          </View>
 
-          {/* Avertissement IA */}
-          <View style={styles.aiWarning}>
-            <ThemedText style={styles.aiWarningText}>
-              ⚠️ L'IA peut faire des erreurs dans l'identification des aliments. Veuillez toujours vérifier le résultat.
-            </ThemedText>
-          </View>
+              {/* Impact glycémique */}
+              <View style={[styles.impactCard, { borderLeftColor: color }]}>
+                <ThemedText style={styles.sectionLabel}>IMPACT GLYCÉMIQUE ESTIMÉ</ThemedText>
+                <View style={styles.impactRow}>
+                  <ThemedText style={[styles.impactValue, { color }]}>
+                    {result.impact_level === 'None'
+                      ? 'Nul'
+                      : `+${result.impact_mg_dl.min}–${result.impact_mg_dl.max} mg/dL`}
+                  </ThemedText>
+                  <View style={[styles.impactBadge, { backgroundColor: color + '20', borderColor: color }]}>
+                    <ThemedText style={[styles.impactBadgeText, { color }]}>
+                      {impactLabel(result.impact_level)}
+                    </ThemedText>
+                  </View>
+                </View>
+                <ThemedText style={styles.impactTips}>💡 {result.advice}</ThemedText>
+              </View>
+
+              {/* Données glycémiques */}
+              <View style={styles.nutriCard}>
+                <ThemedText style={styles.nutriTitle}>Données glycémiques (portion 150g)</ThemedText>
+                <View style={styles.nutriGrid}>
+                  <NutriBox label="Glucides"  value={`${result.carbs_used}g`}           color="#F57C00" />
+                  <NutriBox label="Index GI"  value={`${result.glycemic_index}`}         color={result.glycemic_index < 40 ? '#388E3C' : result.glycemic_index < 70 ? '#F57C00' : '#B71C1C'} />
+                  <NutriBox label="Charge GL" value={`${result.glycemic_load.toFixed(1)}`} color="#7B1FA2" />
+                  <NutriBox label="Source"    value={result.carbs_source === 'label_ocr' ? 'Étiquette' : 'Base'} color="#1565C0" />
+                </View>
+                {result.glycemic_index > 0 && (
+                  <View style={styles.giRow}>
+                    <ThemedText style={styles.giLabel}>Index glycémique</ThemedText>
+                    <View style={styles.giBar}>
+                      <View style={[styles.giFill, {
+                        width: `${result.glycemic_index}%` as any,
+                        backgroundColor: result.glycemic_index < 40 ? '#388E3C' : result.glycemic_index < 70 ? '#F57C00' : '#B71C1C',
+                      }]} />
+                    </View>
+                    <ThemedText style={styles.giValue}>{result.glycemic_index}/100</ThemedText>
+                  </View>
+                )}
+              </View>
+
+              {/* Avertissement IA */}
+              <View style={styles.aiWarning}>
+                <ThemedText style={styles.aiWarningText}>
+                  ⚠️ L'IA peut faire des erreurs dans l'identification des aliments. Veuillez toujours vérifier le résultat.
+                </ThemedText>
+              </View>
+            </>
+          ) : (
+            /* ── Aliment non identifié ─────────────────────────────────── */
+            <>
+              <View style={styles.notFoundCard}>
+                <ThemedText style={styles.notFoundEmoji}>🔍</ThemedText>
+                <ThemedText style={styles.notFoundTitle}>Aliment non identifié</ThemedText>
+                <ThemedText style={styles.notFoundMsg}>
+                  L'IA n'a pas pu reconnaître cet aliment avec suffisamment de certitude.
+                  Aucune donnée glycémique ne peut être fournie pour éviter toute information erronée.
+                </ThemedText>
+              </View>
+
+              <View style={styles.notFoundTipsCard}>
+                <ThemedText style={styles.notFoundTipsTitle}>📋  Comment bien scanner ?</ThemedText>
+                <ThemedText style={styles.notFoundTip}>• Privilégiez les aliments avec une <ThemedText style={styles.notFoundTipBold}>étiquette nutritionnelle</ThemedText> sur l'emballage</ThemedText>
+                <ThemedText style={styles.notFoundTip}>• Scannez des aliments <ThemedText style={styles.notFoundTipBold}>facilement identifiables</ThemedText> : fruits, légumes, produits emballés</ThemedText>
+                <ThemedText style={styles.notFoundTip}>• Assurez-vous que l'aliment est <ThemedText style={styles.notFoundTipBold}>bien éclairé et centré</ThemedText> dans le cadre</ThemedText>
+                <ThemedText style={styles.notFoundTip}>• Évitez les plats cuisinés <ThemedText style={styles.notFoundTipBold}>sans emballage</ThemedText> ou les mélanges complexes</ThemedText>
+                <ThemedText style={styles.notFoundTip}>• Rapprochez la caméra si l'image est <ThemedText style={styles.notFoundTipBold}>floue</ThemedText></ThemedText>
+              </View>
+            </>
+          )}
 
           {/* Bouton rescan */}
           <View style={styles.actions}>
@@ -274,7 +281,7 @@ export default function FoodScanScreen() {
       {/* Conseil étiquette */}
       <View style={styles.labelTip}>
         <ThemedText style={styles.labelTipText}>
-          💡 Pour de meilleurs résultats, pointez vers l'étiquette nutritionnelle de l'emballage. Vous pouvez aussi scanner un aliment sans emballage.
+          📋 Scannez uniquement des aliments avec étiquette nutritionnelle ou facilement identifiables (fruits, légumes, produits emballés). Les plats cuisinés sans emballage ne peuvent pas être analysés.
         </ThemedText>
       </View>
 
@@ -408,6 +415,24 @@ const styles = StyleSheet.create({
     padding: s(12),
   },
   labelTipText: { fontSize: fs(12), color: '#fff', lineHeight: vs(18), textAlign: 'center' },
+
+  // Aliment non identifié
+  notFoundCard: {
+    margin: s(16), backgroundColor: '#fff', borderRadius: 16, padding: s(24),
+    alignItems: 'center',
+    elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 4,
+  },
+  notFoundEmoji: { fontSize: fs(52), marginBottom: vs(12) },
+  notFoundTitle: { fontSize: fs(20), fontWeight: 'bold', color: '#B71C1C', marginBottom: vs(10), textAlign: 'center' },
+  notFoundMsg:   { fontSize: fs(13), color: '#555', lineHeight: vs(21), textAlign: 'center' },
+
+  notFoundTipsCard: {
+    marginHorizontal: s(16), marginBottom: vs(12), backgroundColor: '#FFF8E1', borderRadius: 16,
+    padding: s(16), borderLeftWidth: 4, borderLeftColor: '#F57C00',
+  },
+  notFoundTipsTitle: { fontSize: fs(14), fontWeight: '800', color: '#E65100', marginBottom: vs(12) },
+  notFoundTip:       { fontSize: fs(13), color: '#5D4037', lineHeight: vs(22), marginBottom: vs(4) },
+  notFoundTipBold:   { fontWeight: '700', color: '#333' },
 
   actions:       { paddingHorizontal: s(16) },
   scanAgainBtn:  { backgroundColor: '#388E3C', borderRadius: 12, paddingVertical: vs(16), alignItems: 'center' },
