@@ -188,9 +188,10 @@ interface PPGResult {
   bpm:              number | null;
   confidence:       number;
   signalQuality:    number;
-  fingerConfidence: number;   // 0–100 : certitude que c'était un doigt humain
+  fingerConfidence: number;
   isFingerDetected: boolean;
   isValid:          boolean;
+  isUncertain:      boolean;   // confidence 70–84 % : résultat affiché avec avertissement
   fps:              number;
   message:          string;
   hrv?:             HRVData;
@@ -206,21 +207,17 @@ function analyzePPG(samples: Sample[]): PPGResult {
   const fail = (msg: string, sq = 0): PPGResult => ({
     bpm: null, confidence: 0, signalQuality: sq,
     fingerConfidence: 0, isFingerDetected: false,
-    isValid: false, fps: 0, message: msg,
+    isValid: false, isUncertain: false, fps: 0, message: msg,
   });
 
   if (samples.length < 120) return fail('Pas assez de données — gardez le doigt immobile sur la caméra');
 
-  // ── 0. Vérification post-hoc dominance rouge (doigt humain) ──────────────
-  // Un doigt humain sous flash produit R >> G ≈ B.
-  // ratio = R / (G + B) : doigt réel > 1.1, ombre/objet < 0.6
-  const avgR   = samples.reduce((s, p) => s + p.r, 0) / samples.length;
-  const avgG   = samples.reduce((s, p) => s + p.g, 0) / samples.length;
-  const avgB   = samples.reduce((s, p) => s + p.b, 0) / samples.length;
-  const ratio  = avgR / (avgG + avgB + 1);
+  // ── 0. Dominance rouge post-hoc ──────────────────────────────────────────
+  const avgR  = samples.reduce((s, p) => s + p.r, 0) / samples.length;
+  const avgG  = samples.reduce((s, p) => s + p.g, 0) / samples.length;
+  const avgB  = samples.reduce((s, p) => s + p.b, 0) / samples.length;
+  const ratio = avgR / (avgG + avgB + 1);
 
-  // Score de confiance doigt : 0-100 basé sur la dominance rouge
-  // ratio 0.6 → fc=0 | ratio 1.1 → fc=50 | ratio 1.5 → fc=85 | ratio 2.0 → fc=100
   const fingerConfidence = Math.min(100, Math.max(0,
     Math.round((ratio - 0.6) / (2.0 - 0.6) * 100)
   ));
@@ -235,13 +232,12 @@ function analyzePPG(samples: Sample[]): PPGResult {
   if (avgR < 60 || avgR > 220) {
     return {
       ...fail(avgR < 60 ? 'Signal trop sombre — appuyez légèrement sur l\'objectif' : 'Signal surexposé — réduisez la pression', 0),
-      fingerConfidence, isFingerDetected: ratio >= 1.2,
+      fingerConfidence, isFingerDetected: true,
       debug: { avgRed: avgR, ratio, rrIntervals: [], variance: 0 },
     };
   }
 
-  // Signal PPG : canal rouge — flash LED + doigt → lumière rouge dominante,
-  // pénétration profonde dans les capillaires, modulation hémoglobine maximale.
+  // Signal PPG : canal rouge — pénétration profonde sous flash LED
   const vals = samples.map(s => s.r);
   const ts   = samples.map(s => s.timestamp);
   const dur  = (ts[ts.length - 1] - ts[0]) / 1000;
@@ -251,67 +247,37 @@ function analyzePPG(samples: Sample[]): PPGResult {
 
   const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
   const std  = Math.sqrt(vals.reduce((s, v) => s + (v - mean) ** 2, 0) / vals.length);
-  const cv   = std / (mean || 1);
+  const cv   = std / (mean || 1);  // std_normalized = std / mean
 
-  if (std < 0.5)   return fail('Signal trop plat — repositionnez le doigt sur l\'objectif');
-  if (cv < 0.0008) return fail('Signal trop plat — appuyez légèrement, laissez le flash dégagé');
-  if (cv > 0.25)   return fail('Signal instable — restez parfaitement immobile, réduisez la pression');
-
-  // ── fingerScore composite (4 critères) ───────────────────────────────────
-  // Valide que le signal provient bien d'un doigt humain avec pulsation détectable.
-  // Rejet si score < 80 : mesure rejetée même si BPM calculable.
-  const autocorrPeak = autocorrelationPeak(vals, fps);
-
-  // Critère 1 — Dominance rouge (physiologique) :
-  //   ratio ≥ 1.35 → score 100 (valide) | 1.2–1.35 → interpolé (incertain) | < 1.2 déjà rejeté
-  const ratioScore     = ratio >= 1.35 ? 100 : Math.max(0, (ratio - 1.2) / 0.15 * 100);
-  // Critère 2 — Luminosité optimale [60,220], pic à 140
-  const lumScore       = Math.max(0, 100 - Math.abs(avgR - 140) / 80 * 100);
-  // Critère 3 — Périodicité cardiaque (autocorrélation normalisée 0–1)
-  const periodicityScore = Math.min(100, autocorrPeak * 100);
-  // Critère 4 — Stabilité signal (CV faible = signal propre)
-  const stabilityScore = Math.max(0, Math.min(100, (1 - cv / 0.25) * 100));
-
-  const fingerScore = Math.round(
-    0.35 * ratioScore + 0.25 * lumScore + 0.25 * periodicityScore + 0.15 * stabilityScore
-  );
-
-  if (fingerScore < 80) {
-    return {
-      ...fail(`Score doigt insuffisant (${fingerScore}/100) — repositionnez le doigt et recommencez`, 0),
-      fingerConfidence, isFingerDetected: ratio >= 1.2,
-      debug: { avgRed: avgR, ratio, rrIntervals: [], variance: 0 },
-    };
-  }
+  // Seuils CV resserrés : 1 % min (signal trop plat) — 20 % max (trop bruité)
+  if (cv < 0.01) return fail('Signal trop plat — appuyez légèrement, laissez le flash dégagé');
+  if (cv > 0.20) return fail('Signal trop instable — restez parfaitement immobile');
 
   // ── 1. Z-score normalization + suppression outliers (|z| > 3) ────────────
-  // Normalise l'amplitude : invariant aux variations de luminosité inter-mesures.
   const normalized = vals.map(v => (v - mean) / std);
   const clean      = normalized.map(v => (Math.abs(v) > 3 ? 0 : v));
 
-  // ── 2. Détrend (fenêtre 2.5 s → HP effectif ≈ 0.4 Hz, bien sous 0.8 Hz) ──
+  // ── 2. Détrend 2.5 s (HP ≈ 0.4 Hz) ─────────────────────────────────────
   const trendWin  = Math.max(5, Math.round(fps * 2.5));
   const trend     = movingAvg(clean, trendWin);
   const detrended = clean.map((v, i) => v - trend[i]);
 
-  // ── 3. Bandpass 0.8–3 Hz ──────────────────────────────────────────────────
-  // LP 3 Hz  : fenêtre W ≈ 0.44 × fps / 3  (≈ 4 samples à 30 fps)
-  // HP 0.8 Hz: déjà assuré par le détrend 2.5 s (élimine < 0.4 Hz)
-  const smW      = Math.max(2, Math.round(fps * 0.04));            // anti-bruit 40 ms
-  const lpW      = Math.max(2, Math.round(fps * 0.44 / 3));        // LP 3 Hz
+  // ── 3. Bandpass 0.8–3 Hz ─────────────────────────────────────────────────
+  const smW      = Math.max(2, Math.round(fps * 0.04));
+  const lpW      = Math.max(2, Math.round(fps * 0.44 / 3));
   const filtered = movingAvg(movingAvg(detrended, smW), lpW);
 
-  // ── 4. SNR temporel ───────────────────────────────────────────────────────
-  const sigMax   = Math.max(...filtered);
-  const sigMin   = Math.min(...filtered);
-  const amp      = sigMax - sigMin;
+  // ── 4. SNR temporel ──────────────────────────────────────────────────────
+  const sigMax = Math.max(...filtered);
+  const sigMin = Math.min(...filtered);
+  const amp    = sigMax - sigMin;
   if (amp < 1e-10) return fail('Amplitude PPG nulle — repositionnez le doigt');
 
   const noiseArr = filtered.map((v, i) => detrended[i] - v);
   const noiseRMS = Math.sqrt(noiseArr.reduce((s, v) => s + v * v, 0) / noiseArr.length);
   const snr      = noiseRMS > 0 ? amp / noiseRMS : 0;
 
-  // ── 5. Détection de pics (seuil 40%, distance min 333 ms = 180 BPM max) ──
+  // ── 5. Détection de pics ─────────────────────────────────────────────────
   const peakThr = sigMin + amp * 0.40;
   const minDist = Math.max(3, Math.floor(fps * 0.333));
   const peaks: number[] = [];
@@ -327,12 +293,12 @@ function analyzePPG(samples: Sample[]): PPGResult {
   if (peaks.length < 4) {
     return {
       bpm: null, confidence: 0, signalQuality: Math.round(Math.min(40, snr * 5)),
-      isValid: false, fps,
+      isValid: false, isUncertain: false, fps,
       message: `Signal PPG insuffisant (${peaks.length} pics) — repositionnez le doigt`,
     };
   }
 
-  // ── 6. Intervalles RR — plage 0.8–3 Hz (48–180 BPM) ─────────────────────
+  // ── 6. Intervalles RR (48–180 BPM) ──────────────────────────────────────
   const rr: number[] = [];
   for (let i = 1; i < peaks.length; i++) {
     const dt = (ts[peaks[i]] - ts[peaks[i - 1]]) / 1000;
@@ -348,9 +314,9 @@ function analyzePPG(samples: Sample[]): PPGResult {
   const iqrV     = q3 - q1;
   const cleanRR  = rr.filter(v => v >= q1 - 1.5 * iqrV && v <= q3 + 1.5 * iqrV);
 
-  if (cleanRR.length < 3) return fail('Trop d\'artefacts — réessayez parfaitement immobile');
+  if (cleanRR.length < 3) return fail('Trop d\'artefacts RR — réessayez parfaitement immobile');
 
-  // ── 8. BPM par détection de pics (médiane RR) ────────────────────────────
+  // ── 8. BPM médiane RR ────────────────────────────────────────────────────
   const sortedC  = [...cleanRR].sort((a, b) => a - b);
   const medRR    = sortedC[Math.floor(sortedC.length / 2)];
   const bpmPeaks = Math.round(60 / medRR);
@@ -359,12 +325,11 @@ function analyzePPG(samples: Sample[]): PPGResult {
     return fail(`BPM hors plage 48–180 BPM (${bpmPeaks}) — réessayez`);
   }
 
-  // ── 9. DFT ciblée 0.8–3 Hz — second estimateur fréquentiel ──────────────
+  // ── 9. DFT 0.8–3 Hz ──────────────────────────────────────────────────────
   const dft    = computeDFT(filtered, ts);
   const bpmDFT = dft.bpm;
   const diff   = Math.abs(bpmPeaks - bpmDFT);
 
-  // Détection d'harmonique : DFT peut trouver le 2e harmonique (bpmDFT ≈ 2×bpmPeaks)
   const isHarmonic = Math.abs(bpmDFT - 2 * bpmPeaks) <= 8
                   || Math.abs(bpmPeaks - 2 * bpmDFT) <= 8;
 
@@ -373,34 +338,25 @@ function analyzePPG(samples: Sample[]): PPGResult {
   let coherenceMsg: string;
 
   if (isHarmonic) {
-    // Harmonique fréquentielle → pics temporels plus fiables
-    bpm            = bpmPeaks;
-    coherenceScore = 0.80;
-    coherenceMsg   = `Accord méthodes (harmonique DFT corrigée)`;
+    bpm = bpmPeaks; coherenceScore = 0.80;
+    coherenceMsg = `Accord méthodes (harmonique DFT corrigée)`;
   } else if (diff <= 5) {
-    // Accord parfait ≤ 5 BPM : fusion pondérée (DFT 55%, pics 45%)
-    bpm            = Math.round(bpmPeaks * 0.45 + bpmDFT * 0.55);
-    coherenceScore = 1.0;
-    coherenceMsg   = `Mesure fiable — accord Δ${diff} BPM`;
+    bpm = Math.round(bpmPeaks * 0.45 + bpmDFT * 0.55); coherenceScore = 1.0;
+    coherenceMsg = `Mesure fiable — accord Δ${diff} BPM`;
   } else if (diff <= 12) {
-    // Accord partiel : DFT prioritaire (plus robuste au bruit d'amplitude)
-    bpm            = bpmDFT;
-    coherenceScore = 0.70;
-    coherenceMsg   = `Mesure acceptable — Δ${diff} BPM entre méthodes`;
+    bpm = bpmDFT; coherenceScore = 0.70;
+    coherenceMsg = `Mesure acceptable — Δ${diff} BPM entre méthodes`;
   } else {
-    // Désaccord : signal ambigu, DFT conservée, confiance très basse
-    bpm            = bpmDFT;
-    coherenceScore = 0.38;
-    coherenceMsg   = `Signal ambigu — Δ${diff} BPM, réessayez immobile`;
+    bpm = bpmDFT; coherenceScore = 0.38;
+    coherenceMsg = `Signal ambigu — Δ${diff} BPM, réessayez immobile`;
   }
 
-  // Rejet si divergence extrême ou BPM fusionné hors plage
   if (diff > 30 || bpm < 48 || bpm > 180) {
     return fail(`Mesure incohérente (pics ${bpmPeaks} / DFT ${bpmDFT} BPM) — réessayez immobile`);
   }
 
-  // ── 10. Cohérence temporelle multi-fenêtres ───────────────────────────────
-  const wSz   = Math.max(2, Math.floor(cleanRR.length / 3));
+  // ── 10. Cohérence temporelle multi-fenêtres ──────────────────────────────
+  const wSz = Math.max(2, Math.floor(cleanRR.length / 3));
   const wBPMs: number[] = [];
   for (let s = 0; s + wSz <= cleanRR.length; s += Math.max(1, Math.floor(wSz / 2))) {
     const w    = cleanRR.slice(s, s + wSz);
@@ -411,20 +367,43 @@ function analyzePPG(samples: Sample[]): PPGResult {
     ? wBPMs.reduce((s, b) => s + (b - bpm) ** 2, 0) / wBPMs.length
     : 0;
 
-  // Rejet : BPM élevé + forte variance temporelle → artefact de mouvement
+  // Rejet si variation BPM consécutive > 15 BPM → instabilité de mouvement
+  if (wBPMs.length > 1) {
+    for (let i = 1; i < wBPMs.length; i++) {
+      if (Math.abs(wBPMs[i] - wBPMs[i - 1]) > 15) {
+        return fail('BPM instable entre fenêtres (> 15 BPM) — restez parfaitement immobile');
+      }
+    }
+  }
+  // Rejet BPM élevé + forte variance → activité physique ou bruit
   if (bpm > 110 && bpmVar > 300) {
-    return fail('BPM élevé instable — mouvement détecté, gardez le doigt parfaitement immobile');
+    return fail('BPM élevé instable — activité ou bruit — gardez le doigt immobile');
   }
 
-  // ── 11. Scores qualité et confiance ──────────────────────────────────────
-  const diffs      = cleanRR.slice(1).map((v, i) => Math.abs(v - cleanRR[i]));
-  const rmssd      = Math.sqrt(diffs.reduce((s, d) => s + d * d, 0) / (diffs.length || 1));
+  // ── 11. HRV préliminaire + variance RR ───────────────────────────────────
+  const diffs   = cleanRR.slice(1).map((v, i) => Math.abs(v - cleanRR[i]));
+  const rmssd   = Math.sqrt(diffs.reduce((s, d) => s + d * d, 0) / (diffs.length || 1));
   const regularity = Math.max(0, 1 - rmssd / medRR);
-  const snrScore   = Math.min(1, snr / 8);
-  const dftSNR     = Math.min(1, dft.snr / 5);   // SNR fréquentiel de la DFT
-  const peakScore  = Math.min(1, cleanRR.length / 10);
-  const sampScore  = Math.min(1, samples.length / (fps * 12));
-  const consScore  = Math.max(0, 1 - bpmVar / 400);
+
+  const rrMeanSec  = cleanRR.reduce((a, b) => a + b, 0) / cleanRR.length;
+  const rrVariance = cleanRR.reduce((s, v) => s + (v - rrMeanSec) ** 2, 0) / cleanRR.length;
+  // Normalisation [0,1] : 0 = régulier, 1 = très variable (0.05 s² = seuil max)
+  const rrVarNorm  = Math.min(1, rrVariance / 0.05);
+
+  // ── 12. Autocorrélation (sur signal filtré — plus précis que signal brut) ─
+  const autocorrPeak = autocorrelationPeak(filtered, fps);
+
+  // ── 13. periodicityScore : autocorrélation + régularité RR ───────────────
+  const periodicityScore = Math.min(100,
+    0.6 * autocorrPeak * 100 + 0.4 * (1 - rrVarNorm) * 100
+  );
+
+  // ── 14. Scores qualité globaux ────────────────────────────────────────────
+  const snrScore  = Math.min(1, snr / 8);
+  const dftSNR    = Math.min(1, dft.snr / 5);
+  const peakScore = Math.min(1, cleanRR.length / 10);
+  const sampScore = Math.min(1, samples.length / (fps * 12));
+  const consScore = Math.max(0, 1 - bpmVar / 400);
 
   const signalQuality = Math.round(Math.min(100,
     25 * snrScore + 20 * dftSNR + 20 * regularity + 20 * peakScore + 15 * sampScore
@@ -435,32 +414,59 @@ function analyzePPG(samples: Sample[]): PPGResult {
   );
   const confidence = Math.round(Math.min(96, rawConf * coherenceScore));
 
-  // ── 12. HRV (RMSSD + SDNN) ───────────────────────────────────────────────
-  // rmssd déjà calculé en secondes → conversion ms
-  const rmssdMs   = Math.round(rmssd * 1000);
-  const rrMeanSec = cleanRR.reduce((a, b) => a + b, 0) / cleanRR.length;
-  const sdnnMs    = Math.round(
+  // ── 15. fingerScore composite ─────────────────────────────────────────────
+  // ratioScore : sigmoïde centrée à 1.3, k=10
+  //   ratio 1.2 → ~27 | 1.3 → 50 | 1.35 → 62 | 1.5 → 88 | 1.8 → 98
+  const ratioScore    = Math.round(100 / (1 + Math.exp(-10 * (ratio - 1.3))));
+  const lumScore      = Math.round(Math.max(0, 100 - Math.abs(avgR - 140) / 80 * 100));
+  const stabilityScore = Math.round(consScore * 100);
+
+  const fingerScore = Math.round(
+    0.35 * ratioScore + 0.25 * lumScore + 0.25 * periodicityScore + 0.15 * stabilityScore
+  );
+
+  // ── 16. finalScore ────────────────────────────────────────────────────────
+  const finalScore = Math.round(
+    0.3 * fingerScore + 0.3 * signalQuality + 0.4 * stabilityScore
+  );
+
+  // ── 17. Gates de rejet ────────────────────────────────────────────────────
+  if (fingerScore < 75) {
+    return {
+      ...fail(`Signal doigt insuffisant (score ${fingerScore}/100) — repositionnez et recommencez`, signalQuality),
+      fingerConfidence, isFingerDetected: true,
+      debug: { avgRed: avgR, ratio, rrIntervals: cleanRR.map(v => Math.round(v * 1000)), variance: rrVariance },
+    };
+  }
+  if (confidence < 70) {
+    return {
+      ...fail(`Confiance insuffisante (${confidence}%) — réessayez parfaitement immobile`, signalQuality),
+      fingerConfidence, isFingerDetected: true,
+      debug: { avgRed: avgR, ratio, rrIntervals: cleanRR.map(v => Math.round(v * 1000)), variance: rrVariance },
+    };
+  }
+
+  // ── 18. HRV complet ───────────────────────────────────────────────────────
+  const rmssdMs = Math.round(rmssd * 1000);
+  const sdnnMs  = Math.round(
     Math.sqrt(cleanRR.reduce((s, v) => s + (v - rrMeanSec) ** 2, 0) / cleanRR.length) * 1000
   );
-  // Score de récupération : fonction racine carrée normalisée sur 100 ms de référence
-  // RMSSD 20 ms → ~45 | 40 ms → ~63 | 60 ms → ~77 | 80 ms → ~89
   const recovery = Math.min(98, Math.max(5, Math.round(Math.sqrt(rmssdMs / 100) * 100)));
   const hrv: HRVData = {
-    rmssdMs, sdnnMs,
-    recovery,
+    rmssdMs, sdnnMs, recovery,
     stress: 100 - recovery,
     advice: getHRVAdvice(recovery),
   };
 
-  // Variance des intervalles RR (pour debug)
-  const rrMeanDbg = cleanRR.reduce((a, b) => a + b, 0) / cleanRR.length;
-  const rrVariance = cleanRR.reduce((s, v) => s + (v - rrMeanDbg) ** 2, 0) / cleanRR.length;
+  // confidence 70–84 % : résultat affiché mais signalé comme incertain
+  const isUncertain = confidence < 85;
 
   return {
     bpm, confidence, signalQuality,
     fingerConfidence,
     isFingerDetected: true,
-    isValid: confidence >= 45 && signalQuality >= 25,
+    isValid: true,
+    isUncertain,
     fps,
     message: coherenceMsg,
     hrv,
@@ -493,6 +499,7 @@ export default function HeartRateScreen() {
   const [hrv,              setHrv]              = useState<HRVData | null>(null);
   const [debugRatio,       setDebugRatio]       = useState(0);
   const [fingerConfidence, setFingerConfidence] = useState(0);
+  const [isUncertain,      setIsUncertain]      = useState(false);
 
   // hasTorch : true si la caméra arrière supporte le torch (flash LED continu)
   // Sur quasi tous les téléphones Android modernes, hasTorch = true sur la caméra arrière
@@ -669,23 +676,16 @@ export default function HeartRateScreen() {
         setTimeout(() => {
           const result = analyzePPG(samplesRef.current);
           if (result.bpm !== null) {
-            // Rejet si confiance ou qualité signal insuffisante
-            if (result.confidence < 85 || result.signalQuality < 85) {
-              setErrorMsg(
-                `Signal insuffisant — confiance ${result.confidence}%, qualité ${result.signalQuality}%.\nAppuyez légèrement votre doigt à plat sur l'objectif et recommencez.`
-              );
-              phaseRef.current = 'error';
-              setPhase('error');
-            } else {
-              setBpm(result.bpm);
-              setConfidence(result.confidence);
-              setSignalQuality(result.signalQuality);
-              setFingerConfidence(result.fingerConfidence);
-              setFps(result.fps);
-              setHrv(result.hrv ?? null);
-              phaseRef.current = 'result';
-              setPhase('result');
-            }
+            // analyzePPG rejette déjà confidence < 70 → ici, confidence ≥ 70 toujours
+            setBpm(result.bpm);
+            setConfidence(result.confidence);
+            setSignalQuality(result.signalQuality);
+            setFingerConfidence(result.fingerConfidence);
+            setFps(result.fps);
+            setHrv(result.hrv ?? null);
+            setIsUncertain(result.isUncertain);
+            phaseRef.current = 'result';
+            setPhase('result');
           } else {
             setErrorMsg(result.message);
             phaseRef.current = 'error';
@@ -743,6 +743,7 @@ export default function HeartRateScreen() {
     setSignalQuality(0);
     setFingerConfidence(0);
     setHrv(null);
+    setIsUncertain(false);
     setErrorMsg('');
     setFingerDetected(false);
     phaseRef.current = 'instruction';
@@ -1190,6 +1191,17 @@ export default function HeartRateScreen() {
           </ThemedText>
         </View>
 
+        {/* Avertissement mesure incertaine (confidence 70–84 %) */}
+        {isUncertain && (
+          <View style={styles.uncertainBox}>
+            <ThemedText style={styles.uncertainTitle}>⚠️ Mesure incertaine</ThemedText>
+            <ThemedText style={styles.uncertainText}>
+              La confiance de cette mesure est de {confidence}% — en dessous de 85%. Le résultat affiché est une estimation approximative.{'\n'}
+              Restez parfaitement immobile et réessayez pour une mesure plus fiable.
+            </ThemedText>
+          </View>
+        )}
+
         <View style={styles.warningBox}>
           <ThemedText style={styles.warningText}>
             ⚠️ Cette estimation est fournie à titre informatif uniquement. Elle ne constitue pas un dispositif médical.
@@ -1408,6 +1420,14 @@ const styles = StyleSheet.create({
   },
   bpmBadgeText:   { fontSize: fs(14), fontWeight: '700' },
   confidenceText: { fontSize: fs(11), color: '#aaa', textAlign: 'center' },
+
+  // Uncertain measurement warning
+  uncertainBox: {
+    width: '100%', backgroundColor: '#FFF3E0', borderRadius: 14,
+    padding: s(16), borderLeftWidth: 4, borderLeftColor: '#F57C00',
+  },
+  uncertainTitle: { fontSize: fs(14), fontWeight: 'bold', color: '#E65100', marginBottom: vs(6) },
+  uncertainText:  { fontSize: fs(13), color: '#BF360C', lineHeight: vs(20) },
 
   // HRV card
   hrvCard: {
