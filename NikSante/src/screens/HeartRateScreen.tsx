@@ -203,7 +203,7 @@ interface PPGResult {
   };
 }
 
-function analyzePPG(samples: Sample[]): PPGResult {
+function analyzePPG(samples: Sample[], baselineAvgR = 0): PPGResult {
   const fail = (msg: string, sq = 0): PPGResult => ({
     bpm: null, confidence: 0, signalQuality: sq,
     fingerConfidence: 0, isFingerDetected: false,
@@ -229,9 +229,13 @@ function analyzePPG(samples: Sample[]): PPGResult {
       debug: { avgRed: avgR, ratio, rrIntervals: [], variance: 0 },
     };
   }
-  if (avgR < 60 || avgR > 220) {
+  // Plage luminosité relative à la baseline (mesurée sans doigt) — plus robuste
+  // aux variations de luminosité ambiante qu'un seuil fixe [60, 220]
+  const lumLow  = baselineAvgR > 10 ? baselineAvgR * 0.5 : 60;
+  const lumHigh = baselineAvgR > 10 ? baselineAvgR * 1.8 : 220;
+  if (avgR < lumLow || avgR > lumHigh) {
     return {
-      ...fail(avgR < 60 ? 'Signal trop sombre — appuyez légèrement sur l\'objectif' : 'Signal surexposé — réduisez la pression', 0),
+      ...fail(avgR < lumLow ? 'Signal trop sombre — appuyez légèrement sur l\'objectif' : 'Signal surexposé — réduisez la pression', 0),
       fingerConfidence, isFingerDetected: true,
       debug: { avgRed: avgR, ratio, rrIntervals: [], variance: 0 },
     };
@@ -293,9 +297,19 @@ function analyzePPG(samples: Sample[]): PPGResult {
   if (peaks.length < 4) {
     return {
       bpm: null, confidence: 0, signalQuality: Math.round(Math.min(40, snr * 5)),
+      fingerConfidence, isFingerDetected: ratio >= 1.2,
       isValid: false, isUncertain: false, fps,
       message: `Signal PPG insuffisant (${peaks.length} pics) — repositionnez le doigt`,
     };
+  }
+
+  // Variance d'amplitude des pics — trop variable = mouvement ou mauvais contact
+  const peakAmps    = peaks.map(i => filtered[i]);
+  const peakAmpMean = peakAmps.reduce((a, b) => a + b, 0) / peakAmps.length;
+  const peakAmpStd  = Math.sqrt(peakAmps.reduce((s, v) => s + (v - peakAmpMean) ** 2, 0) / peakAmps.length);
+  const peakAmpCv   = Math.abs(peakAmpMean) > 0 ? peakAmpStd / Math.abs(peakAmpMean) : 1;
+  if (peakAmpCv > 0.4) {
+    return fail('Amplitude des pics trop variable — gardez le doigt parfaitement immobile');
   }
 
   // ── 6. Intervalles RR (48–180 BPM) ──────────────────────────────────────
@@ -389,6 +403,11 @@ function analyzePPG(samples: Sample[]): PPGResult {
   const rrVariance = cleanRR.reduce((s, v) => s + (v - rrMeanSec) ** 2, 0) / cleanRR.length;
   // Normalisation [0,1] : 0 = régulier, 1 = très variable (0.05 s² = seuil max)
   const rrVarNorm  = Math.min(1, rrVariance / 0.05);
+  // Rejet si écart-type RR > 12 % de la moyenne — intervalles trop irréguliers
+  const rrStd = Math.sqrt(rrVariance);
+  if (rrStd > 0.12 * rrMeanSec) {
+    return fail(`Intervalles RR trop irréguliers (σ=${Math.round(rrStd * 1000)} ms) — réessayez immobile`);
+  }
 
   // ── 12. Autocorrélation (sur signal filtré — plus précis que signal brut) ─
   const autocorrPeak = autocorrelationPeak(filtered, fps);
@@ -409,23 +428,24 @@ function analyzePPG(samples: Sample[]): PPGResult {
     25 * snrScore + 20 * dftSNR + 20 * regularity + 20 * peakScore + 15 * sampScore
   ));
 
-  const rawConf = Math.round(
-    28 * regularity + 22 * snrScore + 18 * dftSNR + 16 * consScore + 10 * peakScore + 6 * sampScore
-  );
-  const confidence = Math.round(Math.min(96, rawConf * coherenceScore));
-
-  // ── 15. fingerScore composite ─────────────────────────────────────────────
+  // ── 15. fingerScore — calculé avant confidence (utilisé dans sa formule) ──
   // ratioScore : sigmoïde centrée à 1.3, k=10
   //   ratio 1.2 → ~27 | 1.3 → 50 | 1.35 → 62 | 1.5 → 88 | 1.8 → 98
-  const ratioScore    = Math.round(100 / (1 + Math.exp(-10 * (ratio - 1.3))));
-  const lumScore      = Math.round(Math.max(0, 100 - Math.abs(avgR - 140) / 80 * 100));
+  const ratioScore     = Math.round(100 / (1 + Math.exp(-10 * (ratio - 1.3))));
+  const lumScore       = Math.round(Math.max(0, 100 - Math.abs(avgR - 140) / 80 * 100));
   const stabilityScore = Math.round(consScore * 100);
 
   const fingerScore = Math.round(
     0.35 * ratioScore + 0.25 * lumScore + 0.25 * periodicityScore + 0.15 * stabilityScore
   );
 
-  // ── 16. finalScore ────────────────────────────────────────────────────────
+  // ── 16. Confiance : 4 composantes égales × accord inter-méthodes ─────────
+  // fingerScore, signalQuality, periodicityScore, stabilityScore — poids égaux 25%
+  // coherenceScore pénalise les mesures avec forte divergence pics/DFT
+  const rawConf    = 0.25 * fingerScore + 0.25 * signalQuality + 0.25 * periodicityScore + 0.25 * stabilityScore;
+  const confidence = Math.round(Math.min(96, rawConf * coherenceScore));
+
+  // ── 17. finalScore ────────────────────────────────────────────────────────
   const finalScore = Math.round(
     0.3 * fingerScore + 0.3 * signalQuality + 0.4 * stabilityScore
   );
@@ -525,6 +545,7 @@ export default function HeartRateScreen() {
   const baselineGSum      = useRef(0);
   const baselineBSum      = useRef(0);
   const noFingerFrames    = useRef(0);
+  const prevBpmRef        = useRef<number | null>(null); // EMA inter-mesures
 
   // ── Heartbeat animation ───────────────────────────────────────────────────
 
@@ -674,10 +695,16 @@ export default function HeartRateScreen() {
         Vibration.vibrate(300);
 
         setTimeout(() => {
-          const result = analyzePPG(samplesRef.current);
+          const result = analyzePPG(samplesRef.current, baselineR.current);
           if (result.bpm !== null) {
-            // analyzePPG rejette déjà confidence < 70 → ici, confidence ≥ 70 toujours
-            setBpm(result.bpm);
+            // EMA temporelle : finalBPM = 0.7 × précédent + 0.3 × nouveau
+            // Atténue les variations inter-mesures sans introduire trop de latence
+            const rawBpm   = result.bpm;
+            const finalBPM = prevBpmRef.current !== null
+              ? Math.round(0.7 * prevBpmRef.current + 0.3 * rawBpm)
+              : rawBpm;
+            prevBpmRef.current = finalBPM;
+            setBpm(finalBPM);
             setConfidence(result.confidence);
             setSignalQuality(result.signalQuality);
             setFingerConfidence(result.fingerConfidence);
@@ -744,6 +771,7 @@ export default function HeartRateScreen() {
     setFingerConfidence(0);
     setHrv(null);
     setIsUncertain(false);
+    prevBpmRef.current = null;
     setErrorMsg('');
     setFingerDetected(false);
     phaseRef.current = 'instruction';
