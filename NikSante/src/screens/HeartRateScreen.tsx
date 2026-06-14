@@ -418,8 +418,11 @@ function analyzePPG(samples: Sample[], baselineAvgR = 0): PPGResult {
   );
 
   // ── 14. Scores qualité globaux ────────────────────────────────────────────
-  const snrScore  = Math.min(1, snr / 8);
-  const dftSNR    = Math.min(1, dft.snr / 5);
+  // Références SNR recalibrées pour PPG mobile réel (15 s, ~30 fps)
+  // SNR temporel ref 5 (était 8) : SNR ≥ 5 = excellent, 2–4 = acceptable
+  // SNR fréquentiel ref 4 (était 5) : DFT SNR ≥ 4 = excellent, 2–3 = acceptable
+  const snrScore  = Math.min(1, snr / 5);
+  const dftSNR    = Math.min(1, dft.snr / 4);
   const peakScore = Math.min(1, cleanRR.length / 10);
   const sampScore = Math.min(1, samples.length / (fps * 12));
   const consScore = Math.max(0, 1 - bpmVar / 400);
@@ -439,11 +442,14 @@ function analyzePPG(samples: Sample[], baselineAvgR = 0): PPGResult {
     0.35 * ratioScore + 0.25 * lumScore + 0.25 * periodicityScore + 0.15 * stabilityScore
   );
 
-  // ── 16. Confiance : 4 composantes égales × accord inter-méthodes ─────────
-  // fingerScore, signalQuality, periodicityScore, stabilityScore — poids égaux 25%
-  // coherenceScore pénalise les mesures avec forte divergence pics/DFT
+  // ── 16. Confiance : 4 composantes égales × calibration × accord ──────────
+  // Facteur 1.15 : rawConf 74 → confidence 85 pour mesures de bonne qualité.
+  // coherenceScore appliqué avec amortissement (0.7 + 0.3×score) :
+  //   accord parfait (1.0) → ×1.0 | partiel (0.70) → ×0.91 | ambigu (0.38) → ×0.81
   const rawConf    = 0.25 * fingerScore + 0.25 * signalQuality + 0.25 * periodicityScore + 0.25 * stabilityScore;
-  const confidence = Math.round(Math.min(96, rawConf * coherenceScore));
+  const confidence = Math.round(Math.min(96,
+    rawConf * 1.15 * (0.7 + 0.3 * coherenceScore)
+  ));
 
   // ── 17. finalScore ────────────────────────────────────────────────────────
   const finalScore = Math.round(
