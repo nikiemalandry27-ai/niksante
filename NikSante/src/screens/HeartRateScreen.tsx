@@ -65,9 +65,9 @@ import { s, fs, vs } from '@/utils/responsive';
 type Phase = 'disclaimer' | 'instruction' | 'waiting' | 'measuring' | 'processing' | 'result' | 'error';
 
 interface Sample {
-  r:         number;  // canal rouge  (détection doigt + signal PPG)
-  g:         number;  // canal vert   (signal PPG principal — meilleure sensibilité hémoglobine)
-  b:         number;  // canal bleu   (utilisé pour ratio couleur)
+  r:         number;  // canal rouge  (détection doigt ET signal PPG — pénétration maximale sous flash)
+  g:         number;  // canal vert   (ratio couleur uniquement — R est le signal PPG principal)
+  b:         number;  // canal bleu   (ratio couleur uniquement)
   timestamp: number;
 }
 
@@ -160,6 +160,30 @@ function computeDFT(signal: number[], timestamps: number[]): { bpm: number; snr:
   return { bpm: Math.round(freqs[peakIdx] * 60), snr };
 }
 
+// Pic d'autocorrélation normalisée dans la plage 48–180 BPM.
+// Mesure la périodicité du signal : 0 = aléatoire, 1 = parfaitement périodique.
+// Utilisé dans fingerScore pour vérifier qu'un signal cardiaque est bien présent.
+function autocorrelationPeak(signal: number[], fps: number): number {
+  const N    = signal.length;
+  const mean = signal.reduce((a, b) => a + b, 0) / N;
+  const x    = signal.map(v => v - mean);
+  const r0   = x.reduce((s, v) => s + v * v, 0);
+  if (r0 < 1e-10) return 0;
+
+  // Lag min → 180 BPM (0.333 s) ; lag max → 48 BPM (1.25 s)
+  const lagMin = Math.max(1, Math.round(fps * 0.333));
+  const lagMax = Math.min(N - 1, Math.round(fps * 1.25));
+
+  let peak = 0;
+  for (let lag = lagMin; lag <= lagMax; lag++) {
+    let sum = 0;
+    for (let i = 0; i < N - lag; i++) sum += x[i] * x[i + lag];
+    const r = sum / r0;
+    if (r > peak) peak = r;
+  }
+  return Math.max(0, peak);
+}
+
 interface PPGResult {
   bpm:              number | null;
   confidence:       number;
@@ -201,23 +225,24 @@ function analyzePPG(samples: Sample[]): PPGResult {
     Math.round((ratio - 0.6) / (2.0 - 0.6) * 100)
   ));
 
-  if (ratio < 1.1) {
+  if (ratio < 1.2) {
     return {
-      ...fail(`Aucun doigt détecté — couvrez uniquement l'objectif (ratio couleur ${ratio.toFixed(2)} < 1.1)`, 0),
+      ...fail(`Aucun doigt détecté — couvrez uniquement l'objectif (ratio ${ratio.toFixed(2)} < 1.2)`, 0),
       fingerConfidence, isFingerDetected: false,
       debug: { avgRed: avgR, ratio, rrIntervals: [], variance: 0 },
     };
   }
-  if (avgR < 30 || avgR > 245) {
+  if (avgR < 60 || avgR > 220) {
     return {
-      ...fail(avgR < 30 ? 'Signal trop sombre — appuyez légèrement sur l\'objectif' : 'Signal surexposé — réduisez la pression', 0),
-      fingerConfidence, isFingerDetected: ratio >= 1.1,
+      ...fail(avgR < 60 ? 'Signal trop sombre — appuyez légèrement sur l\'objectif' : 'Signal surexposé — réduisez la pression', 0),
+      fingerConfidence, isFingerDetected: ratio >= 1.2,
       debug: { avgRed: avgR, ratio, rrIntervals: [], variance: 0 },
     };
   }
 
-  // Signal PPG : canal vert (meilleure absorption par l'hémoglobine en réflexion)
-  const vals = samples.map(s => s.g);
+  // Signal PPG : canal rouge — flash LED + doigt → lumière rouge dominante,
+  // pénétration profonde dans les capillaires, modulation hémoglobine maximale.
+  const vals = samples.map(s => s.r);
   const ts   = samples.map(s => s.timestamp);
   const dur  = (ts[ts.length - 1] - ts[0]) / 1000;
   const fps  = Math.round(samples.length / dur);
@@ -228,11 +253,41 @@ function analyzePPG(samples: Sample[]): PPGResult {
   const std  = Math.sqrt(vals.reduce((s, v) => s + (v - mean) ** 2, 0) / vals.length);
   const cv   = std / (mean || 1);
 
+  if (std < 0.5)   return fail('Signal trop plat — repositionnez le doigt sur l\'objectif');
   if (cv < 0.0008) return fail('Signal trop plat — appuyez légèrement, laissez le flash dégagé');
   if (cv > 0.25)   return fail('Signal instable — restez parfaitement immobile, réduisez la pression');
 
-  // ── 1. Suppression outliers (> 3σ) ───────────────────────────────────────
-  const clean = vals.map(v => (Math.abs(v - mean) > std * 3 ? mean : v));
+  // ── fingerScore composite (4 critères) ───────────────────────────────────
+  // Valide que le signal provient bien d'un doigt humain avec pulsation détectable.
+  // Rejet si score < 80 : mesure rejetée même si BPM calculable.
+  const autocorrPeak = autocorrelationPeak(vals, fps);
+
+  // Critère 1 — Dominance rouge (physiologique) :
+  //   ratio ≥ 1.35 → score 100 (valide) | 1.2–1.35 → interpolé (incertain) | < 1.2 déjà rejeté
+  const ratioScore     = ratio >= 1.35 ? 100 : Math.max(0, (ratio - 1.2) / 0.15 * 100);
+  // Critère 2 — Luminosité optimale [60,220], pic à 140
+  const lumScore       = Math.max(0, 100 - Math.abs(avgR - 140) / 80 * 100);
+  // Critère 3 — Périodicité cardiaque (autocorrélation normalisée 0–1)
+  const periodicityScore = Math.min(100, autocorrPeak * 100);
+  // Critère 4 — Stabilité signal (CV faible = signal propre)
+  const stabilityScore = Math.max(0, Math.min(100, (1 - cv / 0.25) * 100));
+
+  const fingerScore = Math.round(
+    0.35 * ratioScore + 0.25 * lumScore + 0.25 * periodicityScore + 0.15 * stabilityScore
+  );
+
+  if (fingerScore < 80) {
+    return {
+      ...fail(`Score doigt insuffisant (${fingerScore}/100) — repositionnez le doigt et recommencez`, 0),
+      fingerConfidence, isFingerDetected: ratio >= 1.2,
+      debug: { avgRed: avgR, ratio, rrIntervals: [], variance: 0 },
+    };
+  }
+
+  // ── 1. Z-score normalization + suppression outliers (|z| > 3) ────────────
+  // Normalise l'amplitude : invariant aux variations de luminosité inter-mesures.
+  const normalized = vals.map(v => (v - mean) / std);
+  const clean      = normalized.map(v => (Math.abs(v) > 3 ? 0 : v));
 
   // ── 2. Détrend (fenêtre 2.5 s → HP effectif ≈ 0.4 Hz, bien sous 0.8 Hz) ──
   const trendWin  = Math.max(5, Math.round(fps * 2.5));
@@ -1040,8 +1095,8 @@ export default function HeartRateScreen() {
                 <ThemedText style={{ fontSize: fs(10), color: 'rgba(255,255,255,0.30)' }}>
                   Ratio rouge R/(G+B)
                 </ThemedText>
-                <ThemedText style={{ fontSize: fs(10), color: debugRatio > 1.1 ? '#81C784' : 'rgba(255,80,80,0.7)' }}>
-                  {debugRatio.toFixed(2)} {debugRatio > 1.3 ? '✓ doigt' : debugRatio > 1.1 ? '~ incertain' : '✗ non doigt'}
+                <ThemedText style={{ fontSize: fs(10), color: debugRatio > 1.35 ? '#81C784' : debugRatio > 1.2 ? '#FFB300' : 'rgba(255,80,80,0.7)' }}>
+                  {debugRatio.toFixed(2)} {debugRatio > 1.35 ? '✓ doigt' : debugRatio > 1.2 ? '~ incertain' : '✗ non doigt'}
                 </ThemedText>
               </View>
             </View>
