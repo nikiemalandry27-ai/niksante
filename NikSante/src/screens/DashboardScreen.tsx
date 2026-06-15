@@ -272,10 +272,12 @@ export default function DashboardScreen() {
               <ThemedText style={styles.sleepCardEmpty}>Non enregistré · Appuyez pour ajouter</ThemedText>
             )}
           </View>
-          <View style={[styles.sleepScoreBadge, { borderColor: healthScore.color, backgroundColor: healthScore.color + '18' }]}>
-            <ThemedText style={[styles.sleepScoreNum, { color: healthScore.color }]}>{healthScore.total}<ThemedText style={[styles.sleepScoreOver, { color: healthScore.color }]}>/100</ThemedText></ThemedText>
-            <ThemedText style={[styles.sleepScoreTag, { color: healthScore.color }]}>{healthScore.label}</ThemedText>
-          </View>
+          {healthScore && (
+            <View style={[styles.sleepScoreBadge, { borderColor: healthScore.color, backgroundColor: healthScore.color + '18' }]}>
+              <ThemedText style={[styles.sleepScoreNum, { color: healthScore.color }]}>{healthScore.total}<ThemedText style={[styles.sleepScoreOver, { color: healthScore.color }]}>/100</ThemedText></ThemedText>
+              <ThemedText style={[styles.sleepScoreTag, { color: healthScore.color }]}>{healthScore.label}</ThemedText>
+            </View>
+          )}
         </TouchableOpacity>
 
         {/* ── Statistiques ── */}

@@ -208,19 +208,21 @@ export default function SleepScreen() {
         </View>
 
         {/* ── Score de santé ── */}
-        <View style={[styles.scoreCard, { borderLeftColor: score.color }]}>
-          <View style={styles.scoreRow}>
-            <View>
-              <ThemedText style={styles.scoreLabel}>SCORE DE SANTÉ</ThemedText>
-              <ThemedText style={[styles.scoreValue, { color: score.color }]}>{score.total}</ThemedText>
-              <ThemedText style={[styles.scoreTag, { color: score.color }]}>{score.label}</ThemedText>
-            </View>
-            <View style={styles.scoreBreakdown}>
-              <ScoreBar label="Sommeil"  value={score.sleepScore}   color="#1565C0" />
-              <ScoreBar label="Glycémie" value={score.glucoseScore} color="#388E3C" />
+        {score ? (
+          <View style={[styles.scoreCard, { borderLeftColor: score.color }]}>
+            <View style={styles.scoreRow}>
+              <View>
+                <ThemedText style={styles.scoreLabel}>SCORE DE SANTÉ</ThemedText>
+                <ThemedText style={[styles.scoreValue, { color: score.color }]}>{score.total}</ThemedText>
+                <ThemedText style={[styles.scoreTag, { color: score.color }]}>{score.label}</ThemedText>
+              </View>
+              <View style={styles.scoreBreakdown}>
+                <ScoreBar label="Sommeil"  value={score.sleepScore}   color="#1565C0" />
+                <ScoreBar label="Glycémie" value={score.glucoseScore} color="#388E3C" />
+              </View>
             </View>
           </View>
-        </View>
+        ) : null}
 
         {/* ── Formulaire ── */}
         <View style={styles.formCard}>

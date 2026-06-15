@@ -149,47 +149,50 @@ export function generateInsights(
 export function computeHealthScore(
   sleepEntries: SleepEntry[],
   glucoseHistory: GlucoseEntry[],
-): HealthScore {
+): HealthScore | null {
   const recentSleep   = sleepEntries.slice(0, 7);
   const recentGlucose = last7DaysGlucose(glucoseHistory);
 
-  // ── Score sommeil (40 %) ──────────────────────────────────────────────────
-  let sleepScore = 50;
+  const hasSleep   = recentSleep.length > 0;
+  const hasGlucose = recentGlucose.length > 0;
 
-  if (recentSleep.length > 0) {
+  if (!hasSleep && !hasGlucose) return null;
+
+  // ── Score sommeil ─────────────────────────────────────────────────────────
+  let sleepScore = 0;
+  if (hasSleep) {
     const avgDur  = recentSleep.reduce((a, b) => a + b.duration, 0) / recentSleep.length;
     const avgQual = recentSleep.reduce((a, b) => a + b.quality,  0) / recentSleep.length;
-
     const durScore =
-      avgDur < 5   ? 20 :
-      avgDur < 6   ? 50 :
-      avgDur < 7   ? 70 :
-      avgDur <= 9  ? 100 : 80;
-
-    const qualScore  = ((avgQual - 1) / 4) * 100;
-    const regScore   = Math.max(0, 100 - (bedtimeStdMinutes(recentSleep) / 120) * 100);
-
+      avgDur < 5  ? 20 :
+      avgDur < 6  ? 50 :
+      avgDur < 7  ? 70 :
+      avgDur <= 9 ? 100 : 80;
+    const qualScore = ((avgQual - 1) / 4) * 100;
+    const regScore  = Math.max(0, 100 - (bedtimeStdMinutes(recentSleep) / 120) * 100);
     sleepScore = Math.round(durScore * 0.4 + qualScore * 0.4 + regScore * 0.2);
   }
 
-  // ── Score glycémie (60 %) ────────────────────────────────────────────────
-  let glucoseScore = 50;
-
-  if (recentGlucose.length > 0) {
-    const inRange = recentGlucose.filter(e => e.value >= 70 && e.value <= 180).length;
-    const tir     = (inRange / recentGlucose.length) * 100;
-
-    const avg = recentGlucose.reduce((a, b) => a + b.value, 0) / recentGlucose.length;
-    const std = Math.sqrt(
-      recentGlucose.reduce((s, e) => s + (e.value - avg) ** 2, 0) / recentGlucose.length
-    );
+  // ── Score glycémie ────────────────────────────────────────────────────────
+  let glucoseScore = 0;
+  if (hasGlucose) {
+    const inRange   = recentGlucose.filter(e => e.value >= 70 && e.value <= 180).length;
+    const tir       = (inRange / recentGlucose.length) * 100;
+    const avg       = recentGlucose.reduce((a, b) => a + b.value, 0) / recentGlucose.length;
+    const std       = Math.sqrt(recentGlucose.reduce((s, e) => s + (e.value - avg) ** 2, 0) / recentGlucose.length);
     const stabScore = Math.max(0, 100 - (std / 50) * 100);
-
     glucoseScore = Math.round(tir * 0.6 + stabScore * 0.4);
   }
 
-  // ── Score total ───────────────────────────────────────────────────────────
-  const total = Math.round(sleepScore * 0.40 + glucoseScore * 0.60);
+  // ── Score total (pondéré selon données disponibles) ───────────────────────
+  let total: number;
+  if (hasSleep && hasGlucose) {
+    total = Math.round(sleepScore * 0.40 + glucoseScore * 0.60);
+  } else if (hasSleep) {
+    total = sleepScore;
+  } else {
+    total = glucoseScore;
+  }
 
   const label = total >= 80 ? 'Excellent' : total >= 60 ? 'Bon' : total >= 40 ? 'Moyen' : 'À améliorer';
   const color = total >= 80 ? '#388E3C'   : total >= 60 ? '#FBC02D' : total >= 40 ? '#F57C00' : '#B71C1C';
