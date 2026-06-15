@@ -273,8 +273,8 @@ export default function DashboardScreen() {
             )}
           </View>
           <View style={[styles.sleepScoreBadge, { borderColor: healthScore.color, backgroundColor: healthScore.color + '18' }]}>
-            <ThemedText style={[styles.sleepScoreNum, { color: healthScore.color }]}>{healthScore.total}</ThemedText>
-            <ThemedText style={[styles.sleepScoreTag, { color: healthScore.color }]}>Score</ThemedText>
+            <ThemedText style={[styles.sleepScoreNum, { color: healthScore.color }]}>{healthScore.total}<ThemedText style={[styles.sleepScoreOver, { color: healthScore.color }]}>/100</ThemedText></ThemedText>
+            <ThemedText style={[styles.sleepScoreTag, { color: healthScore.color }]}>{healthScore.label}</ThemedText>
           </View>
         </TouchableOpacity>
 
@@ -505,11 +505,13 @@ const styles = StyleSheet.create({
   sleepCardSub:   { fontSize: fs(11), color: '#888', marginTop: vs(2) },
   sleepCardEmpty: { fontSize: fs(13), color: '#aaa', fontStyle: 'italic' },
   sleepScoreBadge: {
-    width: s(54), height: s(54), borderRadius: s(27), borderWidth: 2,
+    minWidth: s(72), paddingHorizontal: s(10), paddingVertical: vs(6),
+    borderRadius: s(12), borderWidth: 2,
     alignItems: 'center', justifyContent: 'center', marginLeft: s(12),
   },
-  sleepScoreNum: { fontSize: fs(20), fontWeight: 'bold', lineHeight: vs(24) },
-  sleepScoreTag: { fontSize: fs(9), fontWeight: '700' },
+  sleepScoreNum:  { fontSize: fs(18), fontWeight: 'bold', lineHeight: vs(22) },
+  sleepScoreOver: { fontSize: fs(11), fontWeight: '600' },
+  sleepScoreTag:  { fontSize: fs(10), fontWeight: '700', marginTop: vs(1) },
 
   // Stats
   statsRow: { flexDirection: 'row', marginHorizontal: s(20), marginBottom: vs(12), gap: s(10) },
