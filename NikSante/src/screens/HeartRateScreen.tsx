@@ -236,10 +236,10 @@ function analyzePPG(samples: Sample[], baselineAvgR = 0): PPGResult {
       debug: { avgRed: avgR, ratio, rrIntervals: [], variance: 0 },
     };
   }
-  // Plage luminosité relative à la baseline (mesurée sans doigt).
-  // Bornes élargies pour tolérer le lock Camera2 (AE fixe peut décaler avgR
-  // de ×2-4 vs mode auto) — le check ratio ci-dessus couvre déjà "pas de doigt".
-  const lumLow  = baselineAvgR > 10 ? Math.max(25, baselineAvgR * 0.15) : 25;
+  // lumLow fixé à 3 : le check ratio R/(G+B) ci-dessus couvre déjà "pas de doigt".
+  // La baseline est mesurée en mode auto (sans doigt), le lock Camera2 peut
+  // produire un avgR 5-10× plus faible → un seuil relatif rejette systématiquement.
+  const lumLow  = 3;
   const lumHigh = baselineAvgR > 10 ? baselineAvgR * 5.0 : 252;
   if (avgR < lumLow || avgR > lumHigh) {
     return {

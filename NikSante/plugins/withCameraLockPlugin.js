@@ -31,8 +31,8 @@ const LOCK_METHODS = `
           .setCaptureRequestOption(CaptureRequest.CONTROL_AE_MODE,  CaptureRequest.CONTROL_AE_MODE_OFF)
           // Temps d'exposition : 16 ms (≈ 62 fps max, compatible 30 fps)
           .setCaptureRequestOption(CaptureRequest.SENSOR_EXPOSURE_TIME, 16_000_000L)
-          // ISO 600 — bon compromis bruit/sensibilité sous flash LED
-          .setCaptureRequestOption(CaptureRequest.SENSOR_SENSITIVITY, 600)
+          // ISO 1600 — signal suffisant même sur appareils peu sensibles sous flash LED
+          .setCaptureRequestOption(CaptureRequest.SENSOR_SENSITIVITY, 1600)
           // Désactive l'auto white-balance (stabilise le ratio R/G)
           .setCaptureRequestOption(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_OFF)
           // Désactive l'auto-focus (inutile, doigt collé sur l'objectif)
