@@ -248,22 +248,28 @@ function analyzePPG(samples: Sample[], _baselineAvgR = 0): PPGResult {
   const lpWin    = Math.max(2, Math.round(fps / 6));
   const filtered = movingAvg(detrended, lpWin);
 
-  const sigMax = Math.max(...filtered);
-  const sigMin = Math.min(...filtered);
+  // ── 5b. IIR léger (EMA α=0.2) — lisse le bruit résiduel ─────────────────
+  const iirSig: number[] = [filtered[0]];
+  for (let i = 1; i < filtered.length; i++) {
+    iirSig.push(0.8 * iirSig[i - 1] + 0.2 * filtered[i]);
+  }
+
+  const sigMax = Math.max(...iirSig);
+  const sigMin = Math.min(...iirSig);
   if (sigMax - sigMin < 1e-8) return fail('Signal nul après filtrage — repositionnez le doigt');
 
   // ── 6. Détection de pics — maxima locaux + seuil léger + fusion minDist ──
-  const fMean       = filtered.reduce((a, b) => a + b, 0) / filtered.length;
-  const fStd        = Math.sqrt(filtered.reduce((s, v) => s + (v - fMean) ** 2, 0) / filtered.length);
+  const fMean       = iirSig.reduce((a, b) => a + b, 0) / iirSig.length;
+  const fStd        = Math.sqrt(iirSig.reduce((s, v) => s + (v - fMean) ** 2, 0) / iirSig.length);
   const threshold   = fMean + 0.3 * fStd;
   const minDist     = Math.max(3, Math.floor(fps * 0.250)); // 240 BPM max
 
   const allPeaks: number[] = [];
-  for (let i = 1; i < filtered.length - 1; i++) {
+  for (let i = 1; i < iirSig.length - 1; i++) {
     if (
-      filtered[i] > threshold &&
-      filtered[i] > filtered[i - 1] &&
-      filtered[i] > filtered[i + 1]
+      iirSig[i] > threshold &&
+      iirSig[i] > iirSig[i - 1] &&
+      iirSig[i] > iirSig[i + 1]
     ) allPeaks.push(i);
   }
 
@@ -271,7 +277,7 @@ function analyzePPG(samples: Sample[], _baselineAvgR = 0): PPGResult {
   for (const p of allPeaks) {
     if (peaks.length === 0 || p - peaks[peaks.length - 1] >= minDist) {
       peaks.push(p);
-    } else if (filtered[p] > filtered[peaks[peaks.length - 1]]) {
+    } else if (iirSig[p] > iirSig[peaks[peaks.length - 1]]) {
       peaks[peaks.length - 1] = p;
     }
   }
@@ -279,13 +285,19 @@ function analyzePPG(samples: Sample[], _baselineAvgR = 0): PPGResult {
   if (peaks.length < 4) {
     return {
       bpm: null, confidence: 0,
-      signalQuality: Math.round(peaks.length / 4 * 30),
+      signalQuality: 0,
       fingerConfidence, isFingerDetected: true,
       isValid: false, isUncertain: false, fps,
-      message: `Signal trop bruité — repositionnez le doigt bien à plat sur l'objectif`,
+      message: 'Restez immobile et appuyez légèrement votre doigt sur la caméra',
       debug: { avgRed: avgR, ratio, rrIntervals: [], variance: 0 },
     };
   }
+
+  // Variabilité d'amplitude des pics
+  const peakAmps  = peaks.map(i => iirSig[i]);
+  const ampMean   = peakAmps.reduce((a, b) => a + b, 0) / peakAmps.length;
+  const ampStd    = Math.sqrt(peakAmps.reduce((s, v) => s + (v - ampMean) ** 2, 0) / peakAmps.length);
+  const peakAmpCv = ampMean > 1e-9 ? ampStd / ampMean : 1;
 
   // ── 7. Intervalles RR (40–200 BPM) ──────────────────────────────────────
   const rr: number[] = [];
@@ -317,18 +329,23 @@ function analyzePPG(samples: Sample[], _baselineAvgR = 0): PPGResult {
     };
   }
 
-  // ── 9. Validation principale — régularité temporelle (RR) ───────────────
+  // ── 9. Régularité RR — pénalité progressive, rejet seulement si extrême ──
   const rrMean     = cleanRR.reduce((a, b) => a + b, 0) / cleanRR.length;
   const rrVariance = cleanRR.reduce((s, v) => s + (v - rrMean) ** 2, 0) / cleanRR.length;
   const rrStd      = Math.sqrt(rrVariance);
+  const rrRatio    = rrStd / rrMean;
 
-  if (rrStd > 0.25 * rrMean) {
+  if (rrRatio > 0.5 && peakAmpCv > 1.0) {
     return {
-      ...fail(`Rythme trop irrégulier (σ=${Math.round(rrStd * 1000)} ms > 25 % du RR moyen) — réessayez immobile`),
+      ...fail('Signal perturbé détecté — Restez immobile et appuyez légèrement votre doigt sur la caméra'),
       fingerConfidence, isFingerDetected: true,
       debug: { avgRed: avgR, ratio, rrIntervals: cleanRR.map(v => Math.round(v * 1000)), variance: rrVariance },
     };
   }
+
+  const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+  const noisePenaltyRR  = clamp((rrRatio   - 0.15) / 0.20, 0, 1);
+  const noisePenaltyAmp = clamp((peakAmpCv - 0.30) / 0.50, 0, 1);
 
   // ── 10. BPM — médiane RR ────────────────────────────────────────────────
   const sortedC  = [...cleanRR].sort((a, b) => a - b);
@@ -340,7 +357,7 @@ function analyzePPG(samples: Sample[], _baselineAvgR = 0): PPGResult {
   }
 
   // ── 11. DFT — validation croisée ────────────────────────────────────────
-  const dft    = computeDFT(filtered, ts);
+  const dft    = computeDFT(iirSig, ts);
   const bpmDFT = dft.bpm;
   const diff   = Math.abs(bpmPeaks - bpmDFT);
 
@@ -369,13 +386,15 @@ function analyzePPG(samples: Sample[], _baselineAvgR = 0): PPGResult {
     return fail(`BPM hors plage physiologique (${bpm}) — réessayez`);
   }
 
-  // ── 12. Score de qualité — régularité temporelle ────────────────────────
-  // quality = 1 − rrStd/rrMean → 0.80+ : excellent | 0.60–0.80 : correct | < 0.60 : faible
-  const qualityRaw    = Math.max(0, 1 - rrStd / rrMean);
-  const signalQuality = Math.round(qualityRaw * 100);
+  // ── 12. Score qualité — pénalités progressives (bruit RR + amplitude) ───
+  const signalQuality = Math.round(Math.max(0, 100 * (1 - (noisePenaltyRR + noisePenaltyAmp) / 2)));
 
-  // ── 13. Confiance ───────────────────────────────────────────────────────
-  const confidence = Math.round(Math.min(96, signalQuality * (0.70 + 0.30 * coherenceScore)));
+  // ── 13. Confiance — moyenne fingerScore/qualité/stabilité/périodicité × DFT
+  const fingerScore      = fingerConfidence / 100;
+  const stabilityScore   = Math.max(0, 1 - rrRatio);
+  const periodicityScore = coherenceScore;
+  const meanScore = (fingerScore + signalQuality / 100 + stabilityScore + periodicityScore) / 4;
+  const confidence = Math.round(Math.min(96, meanScore * coherenceScore * 100));
 
   // ── 14. HRV ─────────────────────────────────────────────────────────────
   const diffs    = cleanRR.slice(1).map((v, i) => Math.abs(v - cleanRR[i]));
