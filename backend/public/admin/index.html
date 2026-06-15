@@ -516,15 +516,23 @@
       } else if (data.sent === 0 && data.total === 0) {
         showNotifResult('warn', `⚠️ Aucun token push enregistré — aucun utilisateur n'a ouvert l'app.`);
       } else if (data.sent === 0) {
-        const errDetail = data.errors && data.errors.length > 0
-          ? `\n\nErreurs Expo : ${data.errors.join(' | ')}`
+        const removedNote = data.removed > 0
+          ? `\n🗑 ${data.removed} token${data.removed !== 1 ? 's' : ''} obsolète${data.removed !== 1 ? 's' : ''} supprimé${data.removed !== 1 ? 's' : ''} automatiquement (mauvais projet Expo ou révoqués).`
           : '';
-        showNotifResult('warn', `⚠️ 0/${data.total} notification${data.total !== 1 ? 's' : ''} envoyée — les tokens ont tous échoué (tokens expirés ou révoqués).${errDetail}`);
+        const errDetail = data.errors && data.errors.length > 0
+          ? `\n\nErreurs Expo :\n${data.errors.join('\n')}`
+          : '';
+        showNotifResult('warn', `⚠️ 0/${data.total} notification${data.total !== 1 ? 's' : ''} envoyée.${removedNote}${errDetail}\n\nLes utilisateurs doivent rouvrir l'app pour enregistrer un nouveau token.`);
+        if (data.removed > 0) loadTokenCount();
       } else {
-        showNotifResult('success', `✅ Notification envoyée à ${data.sent} utilisateur${data.sent !== 1 ? 's' : ''} sur ${data.total}.`);
+        const removedNote = data.removed > 0
+          ? ` (${data.removed} token${data.removed !== 1 ? 's' : ''} obsolète${data.removed !== 1 ? 's' : ''} supprimé${data.removed !== 1 ? 's' : ''} automatiquement)`
+          : '';
+        showNotifResult('success', `✅ Notification envoyée à ${data.sent}/${data.total} utilisateur${data.sent !== 1 ? 's' : ''}.${removedNote}`);
         document.getElementById('notif-version').value   = '';
         document.getElementById('notif-changelog').value = '';
         document.getElementById('notif-title').value     = '';
+        if (data.removed > 0) loadTokenCount();
       }
     } catch (err) {
       showNotifResult('error', `❌ Erreur réseau : ${err.message}`);

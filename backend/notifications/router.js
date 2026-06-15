@@ -98,52 +98,66 @@ router.post('/send-update', adminOrKey, async (req, res) => {
   }
 
   try {
-    // Récupère tous les tokens valides
     const { rows } = await pool.query(
-      'SELECT push_token FROM users WHERE push_token IS NOT NULL'
+      'SELECT id, push_token FROM users WHERE push_token IS NOT NULL'
     );
 
-    const tokens = rows
-      .map(r => r.push_token)
-      .filter(t => ExpoSDK.isExpoPushToken(t));
+    const users = rows.filter(r => ExpoSDK.isExpoPushToken(r.push_token));
 
-    if (tokens.length === 0) {
+    if (users.length === 0) {
       return res.json({ sent: 0, total: 0, message: 'Aucun token enregistré' });
     }
 
-    const notifTitle    = title    || `🆕 NikSanté ${version} disponible !`;
-    const notifBody     = body     || changelog || 'Une nouvelle version est disponible. Mettez à jour pour profiter des améliorations.';
+    const notifTitle     = title    || `🆕 NikSanté ${version} disponible !`;
+    const notifBody      = body     || changelog || 'Une nouvelle version est disponible. Mettez à jour pour profiter des améliorations.';
     const notifChangelog = changelog || '';
 
-    const messages = tokens.map((to) => ({
-      to,
-      channelId: 'updates',
-      sound:     'default',
-      title:     notifTitle,
-      body:      notifBody,
-      data:      { type: 'update', version, changelog: notifChangelog },
-      priority:  'high',
-    }));
+    let sent    = 0;
+    let removed = 0;
+    const errs  = [];
 
-    // Expo recommande d'envoyer par chunks de 100
-    const chunks = expo.chunkPushNotifications(messages);
-    let sent   = 0;
-    const errs = [];
-
-    for (const chunk of chunks) {
+    // Envoi individuel : évite l'erreur "same project" quand la BDD contient
+    // des tokens de projets Expo différents mélangés (ex : après changement d'ID).
+    // Supprime automatiquement les tokens invalides / révoqués.
+    for (const user of users) {
       try {
-        const tickets = await expo.sendPushNotificationsAsync(chunk);
-        tickets.forEach((ticket) => {
-          if (ticket.status === 'ok') sent++;
-          else if (ticket.message) errs.push(ticket.message);
-        });
+        const [ticket] = await expo.sendPushNotificationsAsync([{
+          to:        user.push_token,
+          channelId: 'updates',
+          sound:     'default',
+          title:     notifTitle,
+          body:      notifBody,
+          data:      { type: 'update', version, changelog: notifChangelog },
+          priority:  'high',
+        }]);
+
+        if (ticket.status === 'ok') {
+          sent++;
+        } else {
+          const detail = ticket.details?.error || '';
+          const msg    = ticket.message || detail || 'Erreur inconnue';
+          errs.push(`[…${user.push_token.slice(-6)}] ${msg}`);
+          if (
+            detail === 'DeviceNotRegistered' ||
+            msg.includes('same project') ||
+            msg.includes('InvalidCredentials')
+          ) {
+            await pool.query('UPDATE users SET push_token = NULL WHERE id = $1', [user.id]);
+            removed++;
+          }
+        }
       } catch (err) {
-        errs.push(err.message);
+        const msg = err.message || 'Erreur inconnue';
+        errs.push(`[…${user.push_token.slice(-6)}] ${msg}`);
+        if (msg.includes('same project') || msg.includes('InvalidCredentials')) {
+          await pool.query('UPDATE users SET push_token = NULL WHERE id = $1', [user.id]);
+          removed++;
+        }
       }
     }
 
-    console.log(`[Notifications] Envoi v${version} : ${sent}/${tokens.length}`);
-    res.json({ sent, total: tokens.length, errors: errs.slice(0, 5) });
+    console.log(`[Notifications] Envoi v${version} : ${sent}/${users.length} (${removed} token(s) supprimé(s))`);
+    res.json({ sent, total: users.length, removed, errors: errs.slice(0, 10) });
 
   } catch (err) {
     console.error('[Notifications] send-update:', err.message);
