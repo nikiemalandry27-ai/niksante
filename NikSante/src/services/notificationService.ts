@@ -2,7 +2,7 @@ import * as Device from 'expo-device';
 import { Platform, Linking, Alert } from 'react-native';
 import api from './api';
 
-const EXPO_PROJECT_ID = 'ba5142f5-0308-47bb-b9a8-f4d6777002ce';
+const EXPO_PROJECT_ID = 'f12328b2-8542-4782-b20c-1c83dbaa9557';
 const PLAY_STORE_URL  = 'market://details?id=com.niksante.app';
 const PLAY_STORE_WEB  = 'https://play.google.com/store/apps/details?id=com.niksante.app';
 
