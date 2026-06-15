@@ -236,10 +236,11 @@ function analyzePPG(samples: Sample[], baselineAvgR = 0): PPGResult {
       debug: { avgRed: avgR, ratio, rrIntervals: [], variance: 0 },
     };
   }
-  // Plage luminosité relative à la baseline (mesurée sans doigt) — plus robuste
-  // aux variations de luminosité ambiante qu'un seuil fixe [60, 220]
-  const lumLow  = baselineAvgR > 10 ? baselineAvgR * 0.5 : 60;
-  const lumHigh = baselineAvgR > 10 ? baselineAvgR * 1.8 : 220;
+  // Plage luminosité relative à la baseline (mesurée sans doigt).
+  // Bornes élargies pour tolérer le lock Camera2 (AE fixe peut décaler avgR
+  // de ×2-4 vs mode auto) — le check ratio ci-dessus couvre déjà "pas de doigt".
+  const lumLow  = baselineAvgR > 10 ? Math.max(25, baselineAvgR * 0.15) : 25;
+  const lumHigh = baselineAvgR > 10 ? baselineAvgR * 5.0 : 252;
   if (avgR < lumLow || avgR > lumHigh) {
     return {
       ...fail(avgR < lumLow ? 'Signal trop sombre — appuyez légèrement sur l\'objectif' : 'Signal surexposé — réduisez la pression', 0),
@@ -383,7 +384,9 @@ function analyzePPG(samples: Sample[], baselineAvgR = 0): PPGResult {
   }
 
   // ── 10. Cohérence temporelle multi-fenêtres ──────────────────────────────
-  const wSz = Math.max(2, Math.floor(cleanRR.length / 3));
+  // Minimum 3 intervalles par fenêtre — median d'une fenêtre de 2 est trop bruité
+  // et peut déclencher le rejet "BPM instable" sur de la variabilité normale.
+  const wSz = Math.max(3, Math.floor(cleanRR.length / 3));
   const wBPMs: number[] = [];
   for (let s = 0; s + wSz <= cleanRR.length; s += Math.max(1, Math.floor(wSz / 2))) {
     const w    = cleanRR.slice(s, s + wSz);
@@ -418,7 +421,9 @@ function analyzePPG(samples: Sample[], baselineAvgR = 0): PPGResult {
   const rrVarNorm  = Math.min(1, rrVariance / 0.05);
   // Rejet si écart-type RR > 12 % de la moyenne — intervalles trop irréguliers
   const rrStd = Math.sqrt(rrVariance);
-  if (rrStd > 0.12 * rrMeanSec) {
+  // 15 % au lieu de 12 % : tolère mieux la VFC élevée (sportifs, repos profond)
+  // Ex. 72 bpm → rrMean 833 ms → limite 125 ms — couvre ~95 % des adultes sains
+  if (rrStd > 0.15 * rrMeanSec) {
     return fail(`Intervalles RR trop irréguliers (σ=${Math.round(rrStd * 1000)} ms) — réessayez immobile`);
   }
 
