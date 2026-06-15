@@ -255,7 +255,7 @@ export default function DashboardScreen() {
         {/* ── Carte sommeil ── */}
         <TouchableOpacity style={styles.sleepCard} onPress={handleSleep} activeOpacity={0.8}>
           <View style={styles.sleepCardLeft}>
-            <ThemedText style={styles.sleepCardLabel}>SOMMEIL CE SOIR</ThemedText>
+            <ThemedText style={styles.sleepCardLabel}>TEMPS DE SOMMEIL</ThemedText>
             {todaySleep ? (
               <>
                 <ThemedText style={styles.sleepCardValue}>
