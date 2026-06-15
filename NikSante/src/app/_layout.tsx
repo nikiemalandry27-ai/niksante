@@ -9,6 +9,7 @@ import * as SplashScreen from 'expo-splash-screen';
 
 import { useAuthStore }     from '@/store/authStore';
 import { useSettingsStore } from '@/store/settingsStore';
+import { useSleepStore }    from '@/store/sleepStore';
 import {
   registerForPushNotifications,
   sendTokenToBackend,
@@ -112,6 +113,7 @@ export default function RootLayout() {
 
   const { isAuthenticated, isLoading, initAuth } = useAuthStore();
   const initSettings = useSettingsStore((s) => s.initSettings);
+  const initSleep    = useSleepStore((s) => s.initSleep);
 
   // Splash visible tant que l'animation ET l'auth ne sont pas terminées
   const [animDone, setAnimDone] = useState(false);
@@ -125,6 +127,7 @@ export default function RootLayout() {
   useEffect(() => {
     initAuth();
     initSettings();
+    initSleep();
   }, []);
 
   // ── 2. Marquer auth terminée ──────────────────────────────────────────────

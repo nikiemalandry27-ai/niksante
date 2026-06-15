@@ -83,13 +83,13 @@ export default function TabsLayout() {
         }}
       />
 
-      {/* ── Fréquence cardiaque ── */}
+      {/* ── Sommeil ── */}
       <Tabs.Screen
-        name="heart-rate"
+        name="sleep"
         options={{
-          title: 'Fréq. cardiaque',
-          tabBarIcon: ({ color, focused }) => (
-            <Text style={{ fontSize: focused ? 24 : 22 }}>❤️</Text>
+          title: 'Sommeil',
+          tabBarIcon: ({ focused }) => (
+            <Text style={{ fontSize: focused ? 24 : 22 }}>🌙</Text>
           ),
         }}
       />

@@ -13,6 +13,7 @@ export type PrivateRoute =
   | '/(tabs)/dashboard'
   | '/(tabs)/add-glucose'
   | '/(tabs)/profile'
+  | '/(tabs)/sleep'
   | '/history'
   | '/emergency'
   | '/food-scan'

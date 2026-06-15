@@ -20,6 +20,8 @@ import { useRouter } from 'expo-router';
 
 import { useGlucoseStore, MEAL_CONTEXT_META, MealContext } from '@/store/glucoseStore';
 import { useAuthStore } from '@/store/authStore';
+import { useSleepStore, SLEEP_QUALITY_META } from '@/store/sleepStore';
+import { computeHealthScore } from '@/utils/insightEngine';
 import {
   getGlucoseStatus,
   getAIMessage,
@@ -86,6 +88,11 @@ export default function DashboardScreen() {
   const [loggingOut, setLoggingOut] = useState(false);
   const glucoseUnit = useSettingsStore((s) => s.glucoseUnit);
 
+  const sleepEntries  = useSleepStore(s => s.entries);
+  const getTodaySleep = useSleepStore(s => s.getTodaySleep);
+  const todaySleep    = getTodaySleep();
+  const healthScore   = computeHealthScore(sleepEntries, glucoseHistory);
+
   useEffect(() => { initGlucose(); }, []);
 
   // ── IA + statut ──
@@ -114,6 +121,7 @@ export default function DashboardScreen() {
   const handleAddGlucose = () => router.navigate('/(tabs)/add-glucose');
   const handleEmergency  = () => router.push('/emergency');
   const handleSeeAll     = () => router.push('/history');
+  const handleSleep      = () => router.navigate('/(tabs)/sleep' as any);
 
   const handleLogout = () => {
     Alert.alert(
@@ -244,6 +252,32 @@ export default function DashboardScreen() {
             ) : null}
           </View>
         )}
+
+        {/* ── Carte sommeil ── */}
+        <TouchableOpacity style={styles.sleepCard} onPress={handleSleep} activeOpacity={0.8}>
+          <View style={styles.sleepCardLeft}>
+            <ThemedText style={styles.sleepCardLabel}>SOMMEIL CE SOIR</ThemedText>
+            {todaySleep ? (
+              <>
+                <ThemedText style={styles.sleepCardValue}>
+                  {SLEEP_QUALITY_META[todaySleep.quality].emoji}{' '}
+                  {todaySleep.duration % 1 === 0
+                    ? `${todaySleep.duration}h`
+                    : `${Math.floor(todaySleep.duration)}h${Math.round((todaySleep.duration % 1) * 60)}min`}
+                </ThemedText>
+                <ThemedText style={styles.sleepCardSub}>
+                  {todaySleep.bedTime} → {todaySleep.wakeTime}
+                </ThemedText>
+              </>
+            ) : (
+              <ThemedText style={styles.sleepCardEmpty}>Non enregistré · Appuyez pour ajouter</ThemedText>
+            )}
+          </View>
+          <View style={[styles.sleepScoreBadge, { borderColor: healthScore.color, backgroundColor: healthScore.color + '18' }]}>
+            <ThemedText style={[styles.sleepScoreNum, { color: healthScore.color }]}>{healthScore.total}</ThemedText>
+            <ThemedText style={[styles.sleepScoreTag, { color: healthScore.color }]}>Score</ThemedText>
+          </View>
+        </TouchableOpacity>
 
         {/* ── Statistiques ── */}
         <View style={styles.statsRow}>
@@ -458,6 +492,25 @@ const styles = StyleSheet.create({
   aiBody:       { fontSize: fs(13), color: '#444', lineHeight: vs(19) },
   aiSuggestion: { fontSize: fs(12), color: '#555', marginTop: vs(8), lineHeight: vs(18) },
   aiAction:     { fontSize: fs(12), color: '#B71C1C', marginTop: vs(8), fontWeight: '700' },
+
+  // Sommeil
+  sleepCard: {
+    marginHorizontal: s(20), marginBottom: vs(12),
+    backgroundColor: '#EDE7F6', borderRadius: 16, padding: s(16),
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3,
+  },
+  sleepCardLeft:  { flex: 1 },
+  sleepCardLabel: { fontSize: fs(10), color: '#7B1FA2', fontWeight: '700', letterSpacing: 0.6, marginBottom: vs(4) },
+  sleepCardValue: { fontSize: fs(22), fontWeight: 'bold', color: '#4A148C' },
+  sleepCardSub:   { fontSize: fs(11), color: '#888', marginTop: vs(2) },
+  sleepCardEmpty: { fontSize: fs(13), color: '#aaa', fontStyle: 'italic' },
+  sleepScoreBadge: {
+    width: s(54), height: s(54), borderRadius: s(27), borderWidth: 2,
+    alignItems: 'center', justifyContent: 'center', marginLeft: s(12),
+  },
+  sleepScoreNum: { fontSize: fs(20), fontWeight: 'bold', lineHeight: vs(24) },
+  sleepScoreTag: { fontSize: fs(9), fontWeight: '700' },
 
   // Stats
   statsRow: { flexDirection: 'row', marginHorizontal: s(20), marginBottom: vs(12), gap: s(10) },
