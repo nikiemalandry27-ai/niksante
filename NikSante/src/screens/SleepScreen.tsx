@@ -111,14 +111,30 @@ const tp = StyleSheet.create({
 // ---------------------------------------------------------------------------
 
 export default function SleepScreen() {
-  const entries         = useSleepStore(s => s.entries);
-  const initSleep       = useSleepStore(s => s.initSleep);
-  const addSleep        = useSleepStore(s => s.addSleep);
-  const deleteSleep     = useSleepStore(s => s.deleteSleep);
-  const getTodaySleep   = useSleepStore(s => s.getTodaySleep);
-  const avgDuration     = useSleepStore(s => s.getAverageDuration)();
-  const regularity      = useSleepStore(s => s.getSleepRegularity)();
-  const glucoseHistory  = useGlucoseStore(s => s.glucoseHistory);
+  const entries        = useSleepStore(s => s.entries);
+  const initSleep      = useSleepStore(s => s.initSleep);
+  const addSleep       = useSleepStore(s => s.addSleep);
+  const deleteSleep    = useSleepStore(s => s.deleteSleep);
+  const avgDuration    = useSleepStore(s => s.getAverageDuration)();
+  const regularity     = useSleepStore(s => s.getSleepRegularity)();
+  const glucoseHistory = useGlucoseStore(s => s.glucoseHistory);
+
+  // ── Date sélectionnée (défaut : aujourd'hui) ────────────────────────────
+  const [selectedDate, setSelectedDate] = useState(todayStr());
+
+  const goToPrevDay = () => {
+    const d = new Date(selectedDate + 'T12:00:00');
+    d.setDate(d.getDate() - 1);
+    setSelectedDate(d.toISOString().split('T')[0]);
+  };
+  const goToNextDay = () => {
+    if (selectedDate >= todayStr()) return;
+    const d = new Date(selectedDate + 'T12:00:00');
+    d.setDate(d.getDate() + 1);
+    setSelectedDate(d.toISOString().split('T')[0]);
+  };
+
+  const existingEntry = entries.find(e => e.date === selectedDate) ?? null;
 
   // ── État du formulaire ──────────────────────────────────────────────────
   const [bedTime,  setBedTime]  = useState('22:30');
@@ -129,16 +145,21 @@ export default function SleepScreen() {
 
   useEffect(() => { initSleep(); }, []);
 
-  // Pré-remplit si entrée aujourd'hui existe
-  const todaySleep = getTodaySleep();
+  // Pré-remplit le formulaire quand on change de date
   useEffect(() => {
-    if (todaySleep) {
-      setBedTime(todaySleep.bedTime);
-      setWakeTime(todaySleep.wakeTime);
-      setQuality(todaySleep.quality);
-      setNotes(todaySleep.notes ?? '');
+    if (existingEntry) {
+      setBedTime(existingEntry.bedTime);
+      setWakeTime(existingEntry.wakeTime);
+      setQuality(existingEntry.quality);
+      setNotes(existingEntry.notes ?? '');
+    } else {
+      setBedTime('22:30');
+      setWakeTime('06:30');
+      setQuality(3);
+      setNotes('');
     }
-  }, [todaySleep?.id]);
+    setSaved(false);
+  }, [selectedDate, existingEntry?.id]);
 
   const duration = computeSleepDuration(bedTime, wakeTime);
   const insights = generateInsights(entries, glucoseHistory);
@@ -146,12 +167,12 @@ export default function SleepScreen() {
 
   const handleSave = async () => {
     await addSleep({
-      date:     todayStr(),
+      date: selectedDate,
       bedTime,
       wakeTime,
       duration,
       quality,
-      notes:    notes.trim() || undefined,
+      notes: notes.trim() || undefined,
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -205,6 +226,25 @@ export default function SleepScreen() {
         <View style={styles.formCard}>
           <ThemedText style={styles.sectionTitle}>Enregistrer votre nuit</ThemedText>
 
+          {/* Sélecteur de date */}
+          <View style={styles.dateNav}>
+            <TouchableOpacity onPress={goToPrevDay} style={styles.dateNavBtn}>
+              <ThemedText style={styles.dateNavArrow}>‹</ThemedText>
+            </TouchableOpacity>
+            <ThemedText style={styles.dateNavLabel}>
+              {selectedDate === todayStr()
+                ? "Aujourd'hui"
+                : formatDate(selectedDate)}
+            </ThemedText>
+            <TouchableOpacity
+              onPress={goToNextDay}
+              style={styles.dateNavBtn}
+              disabled={selectedDate >= todayStr()}
+            >
+              <ThemedText style={[styles.dateNavArrow, selectedDate >= todayStr() && { color: '#ccc' }]}>›</ThemedText>
+            </TouchableOpacity>
+          </View>
+
           {/* Sélecteurs d'heure */}
           <View style={styles.timeRow}>
             <TimePicker label="COUCHER"  value={bedTime}  onChange={setBedTime}  />
@@ -255,7 +295,7 @@ export default function SleepScreen() {
             onPress={handleSave}
           >
             <ThemedText style={styles.saveBtnText}>
-              {saved ? '✓ Enregistré !' : todaySleep ? 'Mettre à jour' : 'Enregistrer'}
+              {saved ? '✓ Enregistré !' : existingEntry ? 'Mettre à jour' : 'Enregistrer'}
             </ThemedText>
           </TouchableOpacity>
         </View>
@@ -384,6 +424,14 @@ const styles = StyleSheet.create({
     elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3,
   },
   sectionTitle: { fontSize: fs(13), fontWeight: '700', color: '#555', letterSpacing: 0.3, marginBottom: vs(14) },
+
+  dateNav: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginBottom: vs(16), backgroundColor: '#f5f5f5', borderRadius: 12, paddingVertical: vs(8),
+  },
+  dateNavBtn:   { paddingHorizontal: s(16), paddingVertical: vs(4) },
+  dateNavArrow: { fontSize: fs(22), color: '#388E3C', fontWeight: 'bold' },
+  dateNavLabel: { fontSize: fs(13), fontWeight: '700', color: '#333', textTransform: 'capitalize', flex: 1, textAlign: 'center' },
 
   timeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: vs(18) },
   durationPill: {
