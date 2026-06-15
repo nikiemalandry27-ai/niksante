@@ -257,7 +257,7 @@ function analyzePPG(samples: Sample[], _baselineAvgR = 0): PPGResult {
   // pics "enterrés" par une dérive lente de baseline (typique après lock AE caméra).
   const fMean         = filtered.reduce((a, b) => a + b, 0) / filtered.length;
   const fStd          = Math.sqrt(filtered.reduce((s, v) => s + (v - fMean) ** 2, 0) / filtered.length);
-  const peakThreshold = fMean + 0.5 * fStd;
+  const peakThreshold = fMean + 0.3 * fStd;
   const minDist       = Math.max(3, Math.floor(fps * 0.300)); // 200 BPM max
 
   const peaks: number[] = [];
