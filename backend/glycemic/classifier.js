@@ -43,8 +43,22 @@ Rules:
 
 ---
 
+STEP 3 — CONFIDENCE
+
+Set confidence to 0.0 (zero) in ANY of these cases:
+- The image is not a food item (person, object, document, scenery, hand, etc.)
+- The image is too dark, blurry, or low quality to identify the food
+- The dish is a complex mixed meal that cannot be classified into a single category
+- You are guessing without any visual basis
+
+Set confidence between 0.1 and 0.49 when the food is partially recognizable but uncertain.
+Set confidence >= 0.5 ONLY when you can clearly and confidently identify the food.
+
+---
+
 STRICT RULES:
 - NEVER hallucinate numeric values
+- NEVER give a high confidence score to mask uncertainty
 - Output valid JSON ONLY — no markdown, no explanation
 
 OUTPUT:

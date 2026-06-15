@@ -37,6 +37,26 @@ router.post('/analyze-image', async (req, res) => {
     const categories     = await getAllCategories();
     const classification = await classifyImage(rawB64, categories);
 
+    // Aliment non identifié — on bloque immédiatement sans calculer d'impact
+    if (classification.category === 'unknown' || classification.confidence < 0.5) {
+      return res.json({
+        food:                  classification.product_name || 'Non identifié',
+        category_resolved:     'unknown',
+        category_description:  'Aliment non identifié',
+        glycemic_index:        0,
+        carbs_used:            0,
+        glycemic_load:         0,
+        label_carbs_per_100g:  null,
+        label_sugars_per_100g: null,
+        carbs_source:          'category_db',
+        extraction_source:     classification.extraction_source,
+        impact_mg_dl:          { min: 0, max: 0 },
+        impact_level:          'None',
+        confidence_score:      classification.confidence,
+        advice:                '',
+      });
+    }
+
     const dbCategory = (await getCategoryByKey(classification.category))
       ?? (await getCategoryByKey('unknown'));
 
