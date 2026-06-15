@@ -26,7 +26,7 @@ function todayStr(): string {
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00');
-  return d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+  return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
 function formatDuration(h: number): string {
@@ -288,13 +288,12 @@ export default function SleepScreen() {
             <ThemedText style={styles.sectionTitle}>Historique (7 derniers jours)</ThemedText>
             {recent7.map(entry => {
               const meta = SLEEP_QUALITY_META[entry.quality];
-              const isToday = entry.date === todayStr();
               return (
                 <View key={entry.id} style={[styles.historyItem, { borderLeftColor: meta.color }]}>
                   <View style={{ flex: 1 }}>
                     <View style={styles.historyTop}>
                       <ThemedText style={styles.historyDate}>
-                        {isToday ? "Aujourd'hui" : formatDate(entry.date)}
+                        {formatDate(entry.date)}
                       </ThemedText>
                       <View style={[styles.qualityTag, { backgroundColor: meta.color + '22' }]}>
                         <ThemedText style={[styles.qualityTagText, { color: meta.color }]}>
