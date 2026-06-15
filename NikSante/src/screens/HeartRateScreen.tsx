@@ -167,29 +167,6 @@ function computeDFT(signal: number[], timestamps: number[]): { bpm: number; snr:
   return { bpm: Math.round(freqs[peakIdx] * 60), snr };
 }
 
-// Pic d'autocorrélation normalisée dans la plage 48–180 BPM.
-// Mesure la périodicité du signal : 0 = aléatoire, 1 = parfaitement périodique.
-// Utilisé dans fingerScore pour vérifier qu'un signal cardiaque est bien présent.
-function autocorrelationPeak(signal: number[], fps: number): number {
-  const N    = signal.length;
-  const mean = signal.reduce((a, b) => a + b, 0) / N;
-  const x    = signal.map(v => v - mean);
-  const r0   = x.reduce((s, v) => s + v * v, 0);
-  if (r0 < 1e-10) return 0;
-
-  // Lag min → 180 BPM (0.333 s) ; lag max → 48 BPM (1.25 s)
-  const lagMin = Math.max(1, Math.round(fps * 0.333));
-  const lagMax = Math.min(N - 1, Math.round(fps * 1.25));
-
-  let peak = 0;
-  for (let lag = lagMin; lag <= lagMax; lag++) {
-    let sum = 0;
-    for (let i = 0; i < N - lag; i++) sum += x[i] * x[i + lag];
-    const r = sum / r0;
-    if (r > peak) peak = r;
-  }
-  return Math.max(0, peak);
-}
 
 interface PPGResult {
   bpm:              number | null;
