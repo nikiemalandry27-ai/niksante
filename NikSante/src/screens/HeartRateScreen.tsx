@@ -252,18 +252,20 @@ function analyzePPG(samples: Sample[], _baselineAvgR = 0): PPGResult {
   const sigMin = Math.min(...filtered);
   if (sigMax - sigMin < 1e-8) return fail('Signal nul après filtrage — repositionnez le doigt');
 
-  // ── 6. Détection de pics adaptative sur signal lissé (mean + 0.5 × std) ──
-  const sMean         = smooth.reduce((a, b) => a + b, 0) / smooth.length;
-  const sStd          = Math.sqrt(smooth.reduce((s, v) => s + (v - sMean) ** 2, 0) / smooth.length);
-  const peakThreshold = sMean + 0.5 * sStd;
+  // ── 6. Détection de pics adaptative sur signal filtré (centré sur 0 après détrend) ──
+  // Utilise filtered (et non smooth) : après détrend, le signal oscille autour de 0 → pas de
+  // pics "enterrés" par une dérive lente de baseline (typique après lock AE caméra).
+  const fMean         = filtered.reduce((a, b) => a + b, 0) / filtered.length;
+  const fStd          = Math.sqrt(filtered.reduce((s, v) => s + (v - fMean) ** 2, 0) / filtered.length);
+  const peakThreshold = fMean + 0.5 * fStd;
   const minDist       = Math.max(3, Math.floor(fps * 0.300)); // 200 BPM max
 
   const peaks: number[] = [];
-  for (let i = 1; i < smooth.length - 1; i++) {
+  for (let i = 1; i < filtered.length - 1; i++) {
     if (
-      smooth[i] > peakThreshold &&
-      smooth[i] > smooth[i - 1] &&
-      smooth[i] > smooth[i + 1] &&
+      filtered[i] > peakThreshold &&
+      filtered[i] > filtered[i - 1] &&
+      filtered[i] > filtered[i + 1] &&
       (peaks.length === 0 || i - peaks[peaks.length - 1] >= minDist)
     ) peaks.push(i);
   }
