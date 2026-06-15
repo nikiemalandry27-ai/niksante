@@ -88,10 +88,9 @@ export default function DashboardScreen() {
   const [loggingOut, setLoggingOut] = useState(false);
   const glucoseUnit = useSettingsStore((s) => s.glucoseUnit);
 
-  const sleepEntries  = useSleepStore(s => s.entries);
-  const getTodaySleep = useSleepStore(s => s.getTodaySleep);
-  const todaySleep    = getTodaySleep();
-  const healthScore   = computeHealthScore(sleepEntries, glucoseHistory);
+  const sleepEntries = useSleepStore(s => s.entries);
+  const todaySleep   = sleepEntries.find(e => e.date === new Date().toISOString().split('T')[0]) ?? null;
+  const healthScore  = computeHealthScore(sleepEntries, glucoseHistory);
 
   useEffect(() => { initGlucose(); }, []);
 
