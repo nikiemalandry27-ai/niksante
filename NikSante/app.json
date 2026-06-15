@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "niksante",
     "userInterfaceStyle": "automatic",
-    "description": "Application mobile gratuite de suivi du diabète : enregistrement de glycémie, scanner alimentaire IA, mesure de fréquence cardiaque, rappels de mesure, tableaux de bord et conseils d'urgence hypoglycémie / hyperglycémie.",
+    "description": "Application mobile gratuite de suivi du diabète : enregistrement de glycémie, scanner alimentaire IA, suivi du sommeil, rappels de mesure, tableaux de bord et conseils d'urgence hypoglycémie / hyperglycémie.",
     "keywords": [
       "diabète",
       "glycémie",
@@ -23,7 +23,7 @@
       "bundleIdentifier": "com.niksante.app",
       "buildNumber": "1",
       "infoPlist": {
-        "NSCameraUsageDescription": "NikSanté utilise la caméra pour scanner vos aliments et mesurer votre fréquence cardiaque.",
+        "NSCameraUsageDescription": "NikSanté utilise la caméra pour scanner vos aliments.",
         "NSPhotoLibraryUsageDescription": "NikSanté peut accéder à vos photos pour analyser vos aliments."
       }
     },
@@ -56,12 +56,10 @@
     "plugins": [
       "expo-router",
       "./plugins/withCameraProguard",
-      "./plugins/withBrightnessPlugin",
-      "./plugins/withCameraLockPlugin",
       [
         "react-native-vision-camera",
         {
-          "cameraPermissionText": "NikSanté utilise la caméra pour scanner vos aliments et mesurer votre fréquence cardiaque.",
+          "cameraPermissionText": "NikSanté utilise la caméra pour scanner vos aliments.",
           "enableMicrophonePermission": false,
           "enableFrameProcessors": true
         }

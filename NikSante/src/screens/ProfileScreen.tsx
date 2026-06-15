@@ -103,7 +103,7 @@ NikSanté est une application mobile gratuite permettant aux personnes diabétiq
 
 • Enregistrer et visualiser leurs mesures de glycémie
 • Scanner des aliments pour estimer leur impact glycémique via l'IA
-• Mesurer leur fréquence cardiaque indicative via la caméra
+• Suivre leur sommeil et obtenir des insights sur leur récupération
 • Recevoir des alertes en cas de valeurs anormales
 
 2. AVERTISSEMENT MÉDICAL IMPORTANT
@@ -130,13 +130,13 @@ Vous vous engagez à ne pas :
 • Tenter d'accéder aux données d'autres utilisateurs
 • Perturber le fonctionnement des serveurs ou de la base de données
 
-5. MESURE DE FRÉQUENCE CARDIAQUE
-La fonctionnalité de mesure de fréquence cardiaque utilise la caméra et le flash du téléphone (photopléthysmographie — PPG). Cette mesure est purement indicative :
+5. SUIVI DU SOMMEIL
+La fonctionnalité de suivi du sommeil vous permet d'enregistrer vos heures de coucher et de lever, d'évaluer la qualité de votre sommeil et de recevoir des insights personnalisés. Ces informations sont purement indicatives :
 
-• Elle ne remplace pas un dispositif médical homologué
-• La précision peut varier selon les conditions d'éclairage, les mouvements et les caractéristiques individuelles
-• Ne pas l'utiliser pour toute décision médicale relative au cœur
-• En cas de symptômes cardiaques, consultez immédiatement un médecin
+• Elles ne remplacent pas un avis médical professionnel
+• La qualité du sommeil est auto-évaluée et subjective
+• Ne pas l'utiliser pour diagnostiquer des troubles du sommeil
+• En cas de troubles persistants du sommeil, consultez un médecin
 
 6. DISPONIBILITÉ DU SERVICE
 NikSanté est fourni "tel quel". Nous nous efforçons de maintenir le service disponible en permanence mais ne garantissons pas une disponibilité ininterrompue. Le service peut être suspendu pour maintenance ou mise à jour.
