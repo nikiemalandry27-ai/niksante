@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "NikSanté – Diabète & Glycémie",
+    "name": "NikSanté",
     "slug": "niksante",
     "version": "1.1.9",
     "orientation": "portrait",
@@ -23,7 +23,7 @@
       "bundleIdentifier": "com.niksante.app",
       "buildNumber": "1",
       "infoPlist": {
-        "NSCameraUsageDescription": "NikSanté utilise la caméra pour scanner vos aliments et calculer leur impact glycémique.",
+        "NSCameraUsageDescription": "NikSanté utilise la caméra pour scanner vos aliments et mesurer votre fréquence cardiaque.",
         "NSPhotoLibraryUsageDescription": "NikSanté peut accéder à vos photos pour analyser vos aliments."
       }
     },
@@ -38,7 +38,10 @@
       "package": "com.niksante.app",
       "versionCode": 14,
       "googleServicesFile": "./google-services.json",
-      "newArchEnabled": false
+      "newArchEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA"
+      ]
     },
     "web": {
       "output": "static",
@@ -81,9 +84,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "ba5142f5-0308-47bb-b9a8-f4d6777002ce"
+        "projectId": "f12328b2-8542-4782-b20c-1c83dbaa9557"
       }
     },
-    "owner": "relwende"
+    "owner": "relnikiema"
   }
 }
