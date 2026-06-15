@@ -54,6 +54,7 @@
       "expo-router",
       "./plugins/withCameraProguard",
       "./plugins/withBrightnessPlugin",
+      "./plugins/withCameraLockPlugin",
       [
         "react-native-vision-camera",
         {

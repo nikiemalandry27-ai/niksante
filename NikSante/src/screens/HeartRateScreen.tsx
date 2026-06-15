@@ -18,7 +18,14 @@ import {
   Linking,
   Alert,
   Vibration,
+  NativeModules,
 } from 'react-native';
+
+// Module natif de verrouillage caméra (absent en Expo Go — dégradé silencieux)
+const CameraLockModule = (NativeModules as any).CameraLockModule as {
+  lockForPPG:   () => Promise<boolean>;
+  unlockCamera: () => Promise<boolean>;
+} | null;
 
 // runOnJS de react-native-reanimated ne fonctionne PAS dans le runtime
 // react-native-worklets-core utilisé par VisionCamera v4.
@@ -314,7 +321,7 @@ function analyzePPG(samples: Sample[], baselineAvgR = 0): PPGResult {
   const peakAmpMean = peakAmps.reduce((a, b) => a + b, 0) / peakAmps.length;
   const peakAmpStd  = Math.sqrt(peakAmps.reduce((s, v) => s + (v - peakAmpMean) ** 2, 0) / peakAmps.length);
   const peakAmpCv   = Math.abs(peakAmpMean) > 0 ? peakAmpStd / Math.abs(peakAmpMean) : 1;
-  if (peakAmpCv > 0.4) {
+  if (peakAmpCv > 0.50) {
     return fail('Amplitude des pics trop variable — gardez le doigt parfaitement immobile');
   }
 
@@ -692,6 +699,8 @@ export default function HeartRateScreen() {
     startHeartbeat();
     // Double vibration : mesure démarrée
     Vibration.vibrate([0, 80, 80, 80]);
+    // Verrouille AE/AWB/AF pour stabiliser l'amplitude du signal PPG
+    CameraLockModule?.lockForPPG().catch(() => {});
 
     let remaining = 15;
     countdownRef.current = setInterval(() => {
@@ -730,6 +739,8 @@ export default function HeartRateScreen() {
             phaseRef.current = 'error';
             setPhase('error');
           }
+          // Déverrouille la caméra dans tous les cas (résultat ou erreur)
+          CameraLockModule?.unlockCamera().catch(() => {});
         }, 400);
       }
     }, 1000);
@@ -1012,6 +1023,7 @@ export default function HeartRateScreen() {
           style={StyleSheet.absoluteFill}
           device={device}
           isActive={true}
+          exposure={0}
           torch={cameraReady && hasTorch ? 'on' : 'off'}
           video={true}
           pixelFormat="yuv"
