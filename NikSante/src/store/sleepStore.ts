@@ -15,14 +15,25 @@ export const SLEEP_QUALITY_META: Record<SleepQuality, { label: string; emoji: st
   5: { label: 'Excellent', emoji: '🌟', color: '#1565C0' },
 };
 
+export type WakeFeeling = 1 | 2 | 3 | 4 | 5;
+
+export const WAKE_FEELING_META: Record<WakeFeeling, { label: string; emoji: string; color: string }> = {
+  1: { label: 'Épuisé',    emoji: '😵', color: '#B71C1C' },
+  2: { label: 'Fatigué',   emoji: '😞', color: '#F57C00' },
+  3: { label: 'Normal',    emoji: '😐', color: '#FBC02D' },
+  4: { label: 'Reposé',    emoji: '🙂', color: '#388E3C' },
+  5: { label: 'Top forme', emoji: '🤩', color: '#1565C0' },
+};
+
 export interface SleepEntry {
-  id:       string;
-  date:     string;    // YYYY-MM-DD
-  bedTime:  string;    // HH:MM (24h)
-  wakeTime: string;    // HH:MM (24h)
-  duration: number;    // heures (calculé)
-  quality:  SleepQuality;
-  notes?:   string;
+  id:           string;
+  date:         string;    // YYYY-MM-DD
+  bedTime:      string;    // HH:MM (24h)
+  wakeTime:     string;    // HH:MM (24h)
+  duration:     number;    // heures (calculé)
+  quality:      SleepQuality;
+  wakeFeeling?: WakeFeeling; // énergie ressentie au réveil
+  notes?:       string;
 }
 
 interface SleepState {
