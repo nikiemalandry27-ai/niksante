@@ -318,15 +318,13 @@ function analyzePPG(samples: Sample[], _baselineAvgR = 0): PPGResult {
   }
 
   // ── 9. Validation principale — régularité temporelle (RR) ───────────────
-  // Règle : peaks >= 6 ET rrStd < 20 % de rrMean → ACCEPT, sinon REJECT.
-  // L'amplitude des pics n'est PAS utilisée comme critère (AE OFF = amplitude fixe mais variable en apparence).
   const rrMean     = cleanRR.reduce((a, b) => a + b, 0) / cleanRR.length;
   const rrVariance = cleanRR.reduce((s, v) => s + (v - rrMean) ** 2, 0) / cleanRR.length;
   const rrStd      = Math.sqrt(rrVariance);
 
-  if (rrStd > 0.22 * rrMean) {
+  if (rrStd > 0.25 * rrMean) {
     return {
-      ...fail(`Rythme trop irrégulier (σ=${Math.round(rrStd * 1000)} ms > 22 % du RR moyen) — réessayez immobile`),
+      ...fail(`Rythme trop irrégulier (σ=${Math.round(rrStd * 1000)} ms > 25 % du RR moyen) — réessayez immobile`),
       fingerConfidence, isFingerDetected: true,
       debug: { avgRed: avgR, ratio, rrIntervals: cleanRR.map(v => Math.round(v * 1000)), variance: rrVariance },
     };
