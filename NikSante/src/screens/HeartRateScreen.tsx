@@ -252,16 +252,19 @@ function analyzePPG(samples: Sample[], _baselineAvgR = 0): PPGResult {
   const sigMin = Math.min(...filtered);
   if (sigMax - sigMin < 1e-8) return fail('Signal nul après filtrage — repositionnez le doigt');
 
-  // ── 6. Détection de pics — maxima locaux purs, fusion par fenêtre minDist ──
-  // Pas de seuil d'amplitude : le filtre passe-bas + détrend suffisent à supprimer
-  // le bruit. On garde un seul pic par fenêtre minDist (le plus haut).
-  const minDist = Math.max(3, Math.floor(fps * 0.300)); // 200 BPM max
+  // ── 6. Détection de pics — maxima locaux + seuil léger + fusion minDist ──
+  const fMean       = filtered.reduce((a, b) => a + b, 0) / filtered.length;
+  const fStd        = Math.sqrt(filtered.reduce((s, v) => s + (v - fMean) ** 2, 0) / filtered.length);
+  const threshold   = fMean + 0.3 * fStd;
+  const minDist     = Math.max(3, Math.floor(fps * 0.250)); // 240 BPM max
 
   const allPeaks: number[] = [];
   for (let i = 1; i < filtered.length - 1; i++) {
-    if (filtered[i] > filtered[i - 1] && filtered[i] > filtered[i + 1]) {
-      allPeaks.push(i);
-    }
+    if (
+      filtered[i] > threshold &&
+      filtered[i] > filtered[i - 1] &&
+      filtered[i] > filtered[i + 1]
+    ) allPeaks.push(i);
   }
 
   const peaks: number[] = [];
@@ -288,7 +291,7 @@ function analyzePPG(samples: Sample[], _baselineAvgR = 0): PPGResult {
   const rr: number[] = [];
   for (let i = 1; i < peaks.length; i++) {
     const dt = (ts[peaks[i]] - ts[peaks[i - 1]]) / 1000;
-    if (dt >= 0.300 && dt <= 1.500) rr.push(dt);
+    if (dt >= 0.300 && dt <= 2.000) rr.push(dt);
   }
 
   if (rr.length < 3) {
@@ -321,9 +324,9 @@ function analyzePPG(samples: Sample[], _baselineAvgR = 0): PPGResult {
   const rrVariance = cleanRR.reduce((s, v) => s + (v - rrMean) ** 2, 0) / cleanRR.length;
   const rrStd      = Math.sqrt(rrVariance);
 
-  if (rrStd > 0.20 * rrMean) {
+  if (rrStd > 0.22 * rrMean) {
     return {
-      ...fail(`Rythme trop irrégulier (σ=${Math.round(rrStd * 1000)} ms > 20 % du RR moyen) — réessayez immobile`),
+      ...fail(`Rythme trop irrégulier (σ=${Math.round(rrStd * 1000)} ms > 22 % du RR moyen) — réessayez immobile`),
       fingerConfidence, isFingerDetected: true,
       debug: { avgRed: avgR, ratio, rrIntervals: cleanRR.map(v => Math.round(v * 1000)), variance: rrVariance },
     };
