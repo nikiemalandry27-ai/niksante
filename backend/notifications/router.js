@@ -140,7 +140,8 @@ router.post('/send-update', adminOrKey, async (req, res) => {
           if (
             detail === 'DeviceNotRegistered' ||
             msg.includes('same project') ||
-            msg.includes('InvalidCredentials')
+            msg.includes('InvalidCredentials') ||
+            msg.includes('FCM server key')
           ) {
             await pool.query('UPDATE users SET push_token = NULL WHERE id = $1', [user.id]);
             removed++;
@@ -149,7 +150,7 @@ router.post('/send-update', adminOrKey, async (req, res) => {
       } catch (err) {
         const msg = err.message || 'Erreur inconnue';
         errs.push(`[…${user.push_token.slice(-6)}] ${msg}`);
-        if (msg.includes('same project') || msg.includes('InvalidCredentials')) {
+        if (msg.includes('same project') || msg.includes('InvalidCredentials') || msg.includes('FCM server key')) {
           await pool.query('UPDATE users SET push_token = NULL WHERE id = $1', [user.id]);
           removed++;
         }
