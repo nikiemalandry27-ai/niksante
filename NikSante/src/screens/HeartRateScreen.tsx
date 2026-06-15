@@ -252,31 +252,34 @@ function analyzePPG(samples: Sample[], _baselineAvgR = 0): PPGResult {
   const sigMin = Math.min(...filtered);
   if (sigMax - sigMin < 1e-8) return fail('Signal nul après filtrage — repositionnez le doigt');
 
-  // ── 6. Détection de pics adaptative sur signal filtré (centré sur 0 après détrend) ──
-  // Utilise filtered (et non smooth) : après détrend, le signal oscille autour de 0 → pas de
-  // pics "enterrés" par une dérive lente de baseline (typique après lock AE caméra).
-  const fMean         = filtered.reduce((a, b) => a + b, 0) / filtered.length;
-  const fStd          = Math.sqrt(filtered.reduce((s, v) => s + (v - fMean) ** 2, 0) / filtered.length);
-  const peakThreshold = fMean + 0.3 * fStd;
-  const minDist       = Math.max(3, Math.floor(fps * 0.300)); // 200 BPM max
+  // ── 6. Détection de pics — maxima locaux purs, fusion par fenêtre minDist ──
+  // Pas de seuil d'amplitude : le filtre passe-bas + détrend suffisent à supprimer
+  // le bruit. On garde un seul pic par fenêtre minDist (le plus haut).
+  const minDist = Math.max(3, Math.floor(fps * 0.300)); // 200 BPM max
 
-  const peaks: number[] = [];
+  const allPeaks: number[] = [];
   for (let i = 1; i < filtered.length - 1; i++) {
-    if (
-      filtered[i] > peakThreshold &&
-      filtered[i] > filtered[i - 1] &&
-      filtered[i] > filtered[i + 1] &&
-      (peaks.length === 0 || i - peaks[peaks.length - 1] >= minDist)
-    ) peaks.push(i);
+    if (filtered[i] > filtered[i - 1] && filtered[i] > filtered[i + 1]) {
+      allPeaks.push(i);
+    }
   }
 
-  if (peaks.length < 6) {
+  const peaks: number[] = [];
+  for (const p of allPeaks) {
+    if (peaks.length === 0 || p - peaks[peaks.length - 1] >= minDist) {
+      peaks.push(p);
+    } else if (filtered[p] > filtered[peaks[peaks.length - 1]]) {
+      peaks[peaks.length - 1] = p;
+    }
+  }
+
+  if (peaks.length < 4) {
     return {
       bpm: null, confidence: 0,
-      signalQuality: Math.round(peaks.length / 6 * 30),
+      signalQuality: Math.round(peaks.length / 4 * 30),
       fingerConfidence, isFingerDetected: true,
       isValid: false, isUncertain: false, fps,
-      message: `Trop peu de battements détectés (${peaks.length}/6 minimum) — repositionnez le doigt`,
+      message: `Signal trop bruité — repositionnez le doigt bien à plat sur l'objectif`,
       debug: { avgRed: avgR, ratio, rrIntervals: [], variance: 0 },
     };
   }
