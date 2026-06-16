@@ -5,7 +5,7 @@
  * les statistiques détaillées et les actions de gestion du compte.
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   ScrollView,
@@ -16,9 +16,8 @@ import {
   Switch,
   Share,
   Linking,
-  AppState,
-  AppStateStatus,
 } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -45,8 +44,16 @@ const REMINDER_DEFS: Record<ReminderKey, { label: string; hour: number; minute: 
   evening:   { label: 'Soir',       hour: 19, minute: 0, icon: '🌙', desc: '19h00 — Avant le dîner' },
 };
 
-const REMINDER_STORAGE_KEY  = '@niksante_reminders';
-const REMINDER_SHOWN_KEY    = '@niksante_reminders_shown';
+const REMINDER_STORAGE_KEY = '@niksante_reminders';
+const NOTIF_IDS_KEY        = '@niksante_notif_ids';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge:  false,
+  }),
+});
 
 // ---------------------------------------------------------------------------
 // Textes légaux
@@ -166,56 +173,65 @@ export default function ProfileScreen() {
   const [reminders, setReminders] = useState<Record<ReminderKey, boolean>>({
     morning: false, afternoon: false, evening: false,
   });
-  const shownTodayRef = useRef<Record<ReminderKey, string>>({
-    morning: '', afternoon: '', evening: '',
+  const [notifIds, setNotifIds] = useState<Record<ReminderKey, string | null>>({
+    morning: null, afternoon: null, evening: null,
   });
 
   useEffect(() => {
     AsyncStorage.getItem(REMINDER_STORAGE_KEY).then((raw) => {
       if (raw) setReminders(JSON.parse(raw));
     });
-    AsyncStorage.getItem(REMINDER_SHOWN_KEY).then((raw) => {
-      if (raw) shownTodayRef.current = JSON.parse(raw);
+    AsyncStorage.getItem(NOTIF_IDS_KEY).then((raw) => {
+      if (raw) setNotifIds(JSON.parse(raw));
     });
   }, []);
 
-  // Vérifie si l'heure courante correspond à un rappel actif (±30 min)
-  const checkReminders = (enabled: Record<ReminderKey, boolean>) => {
-    const now = new Date();
-    const nowMin = now.getHours() * 60 + now.getMinutes();
-    const today = now.toDateString();
-
-    for (const key of Object.keys(REMINDER_DEFS) as ReminderKey[]) {
-      if (!enabled[key]) continue;
-      if (shownTodayRef.current[key] === today) continue;
-
-      const def = REMINDER_DEFS[key];
-      const defMin = def.hour * 60 + def.minute;
-      const diff = nowMin - defMin;
-
-      if (diff >= 0 && diff <= 30) {
-        shownTodayRef.current[key] = today;
-        AsyncStorage.setItem(REMINDER_SHOWN_KEY, JSON.stringify(shownTodayRef.current));
-        Alert.alert(
-          '🩸 Rappel glycémique',
-          `${def.label} (${def.desc.split('—')[1].trim()}) — Pensez à mesurer votre glycémie !`,
-          [{ text: 'OK' }],
-        );
-        return;
-      }
+  const requestPermission = async (): Promise<boolean> => {
+    const { status } = await Notifications.requestPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission refusée',
+        'Activez les notifications dans les paramètres de votre téléphone pour recevoir les rappels.',
+      );
+      return false;
     }
+    return true;
   };
 
-  // Déclenche la vérification dès que l'app repasse au premier plan
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (state: AppStateStatus) => {
-      if (state === 'active') checkReminders(reminders);
-    });
-    return () => sub.remove();
-  }, [reminders]);
-
   const toggleReminder = async (key: ReminderKey) => {
-    const updated = { ...reminders, [key]: !reminders[key] };
+    const isCurrentlyOn = reminders[key];
+
+    if (!isCurrentlyOn) {
+      const granted = await requestPermission();
+      if (!granted) return;
+
+      const def = REMINDER_DEFS[key];
+      const id  = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Rappel glycémique',
+          body:  `${def.desc} — Pensez à mesurer votre glycémie !`,
+          sound: true,
+        },
+        trigger: {
+          type:    Notifications.SchedulableTriggerInputTypes.DAILY,
+          hour:    def.hour,
+          minute:  def.minute,
+        },
+      });
+
+      const updatedIds = { ...notifIds, [key]: id };
+      setNotifIds(updatedIds);
+      await AsyncStorage.setItem(NOTIF_IDS_KEY, JSON.stringify(updatedIds));
+    } else {
+      const id = notifIds[key];
+      if (id) await Notifications.cancelScheduledNotificationAsync(id);
+
+      const updatedIds = { ...notifIds, [key]: null };
+      setNotifIds(updatedIds);
+      await AsyncStorage.setItem(NOTIF_IDS_KEY, JSON.stringify(updatedIds));
+    }
+
+    const updated = { ...reminders, [key]: !isCurrentlyOn };
     setReminders(updated);
     await AsyncStorage.setItem(REMINDER_STORAGE_KEY, JSON.stringify(updated));
   };
