@@ -618,7 +618,7 @@ export default function ProfileScreen() {
           <View style={modalStyles.handle} />
           <ThemedText style={modalStyles.title}>🔔  Rappels de mesure</ThemedText>
           <ThemedText style={modalStyles.subtitle}>
-            Une alerte s'affiche à l'heure choisie quand vous rouvrez l'application. Les notifications en arrière-plan seront disponibles dans la version APK.
+            Activez des rappels journaliers pour ne jamais oublier de mesurer votre glycémie.
           </ThemedText>
 
           {(Object.keys(REMINDER_DEFS) as ReminderKey[]).map((key) => {
