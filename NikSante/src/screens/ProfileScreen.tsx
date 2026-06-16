@@ -600,6 +600,37 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* ── Soutenir le développeur ── */}
+        <View style={styles.section}>
+          <ThemedText style={styles.sectionTitle}>Soutenir le développeur</ThemedText>
+          <View style={styles.supportCard}>
+            <ThemedText style={styles.supportTitle}>Récompenser ou soutenir</ThemedText>
+            <ThemedText style={styles.supportDesc}>
+              NikSanté est développé bénévolement. Si l'application vous est utile, vous pouvez soutenir le développeur.
+            </ThemedText>
+            <TouchableOpacity
+              style={styles.supportRow}
+              onPress={() => Linking.openURL('mailto:nikiemalandry54@gmail.com')}
+            >
+              <ThemedText style={styles.supportIcon}>✉️</ThemedText>
+              <View style={{ flex: 1 }}>
+                <ThemedText style={styles.supportContactLabel}>Email</ThemedText>
+                <ThemedText style={styles.supportContactValue}>nikiemalandry54@gmail.com</ThemedText>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.supportRow, { borderTopWidth: 1, borderTopColor: '#f0f0f0' }]}
+              onPress={() => Linking.openURL('tel:+22654851415')}
+            >
+              <ThemedText style={styles.supportIcon}>📞</ThemedText>
+              <View style={{ flex: 1 }}>
+                <ThemedText style={styles.supportContactLabel}>Téléphone / WhatsApp</ThemedText>
+                <ThemedText style={styles.supportContactValue}>+226 54 85 14 15</ThemedText>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* ── Déconnexion ── */}
         <View style={styles.section}>
           <TouchableOpacity
@@ -934,6 +965,39 @@ const styles = StyleSheet.create({
     color:      '#388E3C',
     fontWeight: 'bold',
   },
+  supportCard: {
+    marginHorizontal: s(20),
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: s(16),
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+  },
+  supportTitle: {
+    fontSize: fs(15),
+    fontWeight: '700',
+    color: '#222',
+    marginBottom: vs(6),
+  },
+  supportDesc: {
+    fontSize: fs(12),
+    color: '#888',
+    lineHeight: vs(18),
+    marginBottom: vs(14),
+  },
+  supportRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: vs(12),
+    gap: s(12),
+  },
+  supportIcon: { fontSize: fs(22) },
+  supportContactLabel: { fontSize: fs(11), color: '#aaa', fontWeight: '600', marginBottom: vs(2) },
+  supportContactValue: { fontSize: fs(14), color: '#388E3C', fontWeight: '700' },
+
   versionSection: {
     alignItems:   'center',
     paddingTop:   vs(8),
