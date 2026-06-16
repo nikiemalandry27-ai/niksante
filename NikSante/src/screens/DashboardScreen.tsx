@@ -273,6 +273,10 @@ export default function DashboardScreen() {
                     : `${Math.floor(todaySleep.duration)}h${Math.round((todaySleep.duration % 1) * 60)}min`}
                 </ThemedText>
                 <ThemedText style={styles.sleepCardSub}>
+                  {'Nuit du '}
+                  {new Date(todaySleep.date + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                </ThemedText>
+                <ThemedText style={styles.sleepCardSub}>
                   {todaySleep.bedTime} → {todaySleep.wakeTime}
                 </ThemedText>
               </>
@@ -280,7 +284,7 @@ export default function DashboardScreen() {
               <ThemedText style={styles.sleepCardEmpty}>Non enregistré · Appuyez pour ajouter</ThemedText>
             )}
             {healthScore && hasSleepData && (
-              <ThemedText style={styles.sleepScoreHint}>{scoreHint}</ThemedText>
+              <ThemedText style={styles.sleepScoreHint}>{scoreHint} · 7 derniers jours</ThemedText>
             )}
           </View>
           {healthScore && hasSleepData && (
