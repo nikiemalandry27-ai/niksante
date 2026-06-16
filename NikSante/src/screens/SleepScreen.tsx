@@ -537,8 +537,8 @@ const styles = StyleSheet.create({
   scoreTag:       { fontSize: fs(13), fontWeight: '700' },
   scoreBreakdown: { flex: 1, marginLeft: s(20) },
 
-  infoBtn:      { width: s(18), height: s(18), borderRadius: s(9), backgroundColor: '#e8e8e8', alignItems: 'center', justifyContent: 'center' },
-  infoBtnText:  { fontSize: fs(10), fontWeight: '800', color: '#888' },
+  infoBtn:      { width: s(22), height: s(22), borderRadius: s(11), backgroundColor: '#1565C0', alignItems: 'center', justifyContent: 'center' },
+  infoBtnText:  { fontSize: fs(12), fontWeight: '900', color: '#fff' },
 
   scoreInfo:        { marginTop: vs(12), paddingTop: vs(12), borderTopWidth: 1, borderTopColor: '#f0f0f0' },
   scoreInfoTitle:   { fontSize: fs(12), fontWeight: '800', color: '#444', marginBottom: vs(10) },
