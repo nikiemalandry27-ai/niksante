@@ -40,7 +40,10 @@
       "googleServicesFile": "./google-services.json",
       "newArchEnabled": false,
       "permissions": [
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.SCHEDULE_EXACT_ALARM"
       ]
     },
     "web": {
@@ -56,6 +59,16 @@
     "plugins": [
       "expo-router",
       "./plugins/withCameraProguard",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#388E3C",
+          "sounds": [],
+          "androidMode": "default",
+          "androidCollapsedTitle": "NikSanté"
+        }
+      ],
       [
         "react-native-vision-camera",
         {

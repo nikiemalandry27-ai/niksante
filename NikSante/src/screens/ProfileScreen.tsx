@@ -19,6 +19,7 @@ import {
   AppState,
   AppStateStatus,
 } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -47,6 +48,20 @@ const REMINDER_DEFS: Record<ReminderKey, { label: string; hour: number; minute: 
 
 const REMINDER_STORAGE_KEY = '@niksante_reminders';
 const REMINDER_SHOWN_KEY   = '@niksante_reminders_shown';
+const NOTIF_IDS_KEY        = '@niksante_notif_ids';
+
+// Expo Go ne supporte pas les notifications locales Android depuis SDK 53
+const IS_EXPO_GO = Constants.appOwnership === 'expo';
+
+if (!IS_EXPO_GO) {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge:  false,
+    }),
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Textes légaux
@@ -166,6 +181,9 @@ export default function ProfileScreen() {
   const [reminders, setReminders] = useState<Record<ReminderKey, boolean>>({
     morning: false, afternoon: false, evening: false,
   });
+  const [notifIds, setNotifIds] = useState<Record<ReminderKey, string | null>>({
+    morning: null, afternoon: null, evening: null,
+  });
   const shownTodayRef = useRef<Record<ReminderKey, string>>({
     morning: '', afternoon: '', evening: '',
   });
@@ -177,43 +195,76 @@ export default function ProfileScreen() {
     AsyncStorage.getItem(REMINDER_SHOWN_KEY).then((raw) => {
       if (raw) shownTodayRef.current = JSON.parse(raw);
     });
+    AsyncStorage.getItem(NOTIF_IDS_KEY).then((raw) => {
+      if (raw) setNotifIds(JSON.parse(raw));
+    });
   }, []);
 
+  // ── Expo Go : alerte in-app au retour au premier plan ──────────────────
   const checkReminders = (enabled: Record<ReminderKey, boolean>) => {
+    if (!IS_EXPO_GO) return;
     const now    = new Date();
     const nowMin = now.getHours() * 60 + now.getMinutes();
     const today  = now.toDateString();
-
     for (const key of Object.keys(REMINDER_DEFS) as ReminderKey[]) {
       if (!enabled[key]) continue;
       if (shownTodayRef.current[key] === today) continue;
-
-      const def    = REMINDER_DEFS[key];
-      const defMin = def.hour * 60 + def.minute;
-      const diff   = nowMin - defMin;
-
+      const def  = REMINDER_DEFS[key];
+      const diff = nowMin - (def.hour * 60 + def.minute);
       if (diff >= 0 && diff <= 30) {
         shownTodayRef.current[key] = today;
         AsyncStorage.setItem(REMINDER_SHOWN_KEY, JSON.stringify(shownTodayRef.current));
-        Alert.alert(
-          'Rappel glycémique',
-          `${def.label} — ${def.desc.split('—')[1].trim()}. Pensez à mesurer votre glycémie !`,
-          [{ text: 'OK' }],
-        );
+        Alert.alert('Rappel glycémique', `${def.label} — ${def.desc.split('—')[1].trim()}. Pensez à mesurer votre glycémie !`, [{ text: 'OK' }]);
         return;
       }
     }
   };
 
   useEffect(() => {
+    if (!IS_EXPO_GO) return;
     const sub = AppState.addEventListener('change', (state: AppStateStatus) => {
       if (state === 'active') checkReminders(reminders);
     });
     return () => sub.remove();
   }, [reminders]);
 
+  // ── Production : notifications système planifiées ──────────────────────
   const toggleReminder = async (key: ReminderKey) => {
-    const updated = { ...reminders, [key]: !reminders[key] };
+    const isOn = reminders[key];
+
+    if (!IS_EXPO_GO) {
+      if (!isOn) {
+        const { status } = await Notifications.requestPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission refusée', 'Activez les notifications dans les paramètres du téléphone.');
+          return;
+        }
+        const def = REMINDER_DEFS[key];
+        const id  = await Notifications.scheduleNotificationAsync({
+          content: {
+            title: 'Rappel glycémique',
+            body:  `${def.label} — ${def.desc.split('—')[1].trim()}. Pensez à mesurer votre glycémie !`,
+            sound: true,
+          },
+          trigger: {
+            type:   Notifications.SchedulableTriggerInputTypes.DAILY,
+            hour:   def.hour,
+            minute: def.minute,
+          },
+        });
+        const updatedIds = { ...notifIds, [key]: id };
+        setNotifIds(updatedIds);
+        await AsyncStorage.setItem(NOTIF_IDS_KEY, JSON.stringify(updatedIds));
+      } else {
+        const id = notifIds[key];
+        if (id) await Notifications.cancelScheduledNotificationAsync(id);
+        const updatedIds = { ...notifIds, [key]: null };
+        setNotifIds(updatedIds);
+        await AsyncStorage.setItem(NOTIF_IDS_KEY, JSON.stringify(updatedIds));
+      }
+    }
+
+    const updated = { ...reminders, [key]: !isOn };
     setReminders(updated);
     await AsyncStorage.setItem(REMINDER_STORAGE_KEY, JSON.stringify(updated));
   };
