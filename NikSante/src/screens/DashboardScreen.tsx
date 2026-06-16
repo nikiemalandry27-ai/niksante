@@ -92,6 +92,14 @@ export default function DashboardScreen() {
   const todaySleep   = sleepEntries.find(e => e.date === new Date().toISOString().split('T')[0]) ?? null;
   const healthScore  = computeHealthScore(sleepEntries, glucoseHistory);
 
+  const hasSleepData   = sleepEntries.length > 0;
+  const hasGlucoseData = glucoseHistory.length > 0;
+  const scoreHint = hasSleepData && hasGlucoseData
+    ? 'Score = sommeil + glycémie'
+    : hasSleepData
+    ? 'Score = sommeil uniquement'
+    : 'Score = glycémie uniquement';
+
   useEffect(() => { initGlucose(); }, []);
 
   // ── IA + statut ──
@@ -272,9 +280,7 @@ export default function DashboardScreen() {
               <ThemedText style={styles.sleepCardEmpty}>Non enregistré · Appuyez pour ajouter</ThemedText>
             )}
             {healthScore && (
-              <ThemedText style={styles.sleepScoreHint}>
-                Score = sommeil + glycémie
-              </ThemedText>
+              <ThemedText style={styles.sleepScoreHint}>{scoreHint}</ThemedText>
             )}
           </View>
           {healthScore && (
