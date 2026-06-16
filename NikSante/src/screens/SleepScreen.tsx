@@ -148,6 +148,7 @@ export default function SleepScreen() {
   const [wakeFeeling,  setWakeFeeling]  = useState<WakeFeeling | null>(null);
   const [notes,        setNotes]        = useState('');
   const [saved,        setSaved]        = useState(false);
+  const [showScoreInfo, setShowScoreInfo] = useState(false);
 
   useEffect(() => { initSleep(); }, []);
 
@@ -240,7 +241,12 @@ export default function SleepScreen() {
           <View style={[styles.scoreCard, { borderLeftColor: score.color }]}>
             <View style={styles.scoreRow}>
               <View>
-                <ThemedText style={styles.scoreLabel}>SCORE DE SANTÉ</ThemedText>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(6) }}>
+                  <ThemedText style={styles.scoreLabel}>SCORE DE SANTÉ</ThemedText>
+                  <TouchableOpacity onPress={() => setShowScoreInfo(v => !v)} style={styles.infoBtn}>
+                    <ThemedText style={styles.infoBtnText}>?</ThemedText>
+                  </TouchableOpacity>
+                </View>
                 <ThemedText style={[styles.scoreValue, { color: score.color }]}>{score.total}<ThemedText style={[styles.scoreOver, { color: score.color }]}>/100</ThemedText></ThemedText>
                 <ThemedText style={[styles.scoreTag, { color: score.color }]}>{score.label}</ThemedText>
               </View>
@@ -249,6 +255,23 @@ export default function SleepScreen() {
                 <ScoreBar label="Glycémie" value={score.glucoseScore} color="#388E3C" />
               </View>
             </View>
+            {showScoreInfo && (
+              <View style={styles.scoreInfo}>
+                <ThemedText style={styles.scoreInfoTitle}>Comment ce score est calculé</ThemedText>
+
+                <ThemedText style={styles.scoreInfoSection}>Sommeil (40% du total)</ThemedText>
+                <ThemedText style={styles.scoreInfoLine}>• Durée vs objectif perso — 40%</ThemedText>
+                <ThemedText style={styles.scoreInfoLine}>• Qualité ressentie (1-5) — 40%</ThemedText>
+                <ThemedText style={styles.scoreInfoLine}>• Régularité des horaires — 20%</ThemedText>
+                <ThemedText style={styles.scoreInfoHint}>Si l'énergie au réveil est renseignée, elle remplace 30% du calcul pour plus de précision.</ThemedText>
+
+                <ThemedText style={styles.scoreInfoSection}>Glycémie (60% du total)</ThemedText>
+                <ThemedText style={styles.scoreInfoLine}>• Temps dans la cible 70-180 mg/dL — 60%</ThemedText>
+                <ThemedText style={styles.scoreInfoLine}>• Stabilité (faible variabilité) — 40%</ThemedText>
+
+                <ThemedText style={styles.scoreInfoHint}>Si une seule source est disponible, elle représente 100% du score.</ThemedText>
+              </View>
+            )}
           </View>
         ) : null}
 
@@ -513,6 +536,15 @@ const styles = StyleSheet.create({
   scoreOver:      { fontSize: fs(16), fontWeight: '600' },
   scoreTag:       { fontSize: fs(13), fontWeight: '700' },
   scoreBreakdown: { flex: 1, marginLeft: s(20) },
+
+  infoBtn:      { width: s(18), height: s(18), borderRadius: s(9), backgroundColor: '#e8e8e8', alignItems: 'center', justifyContent: 'center' },
+  infoBtnText:  { fontSize: fs(10), fontWeight: '800', color: '#888' },
+
+  scoreInfo:        { marginTop: vs(12), paddingTop: vs(12), borderTopWidth: 1, borderTopColor: '#f0f0f0' },
+  scoreInfoTitle:   { fontSize: fs(12), fontWeight: '800', color: '#444', marginBottom: vs(10) },
+  scoreInfoSection: { fontSize: fs(11), fontWeight: '700', color: '#666', marginTop: vs(6), marginBottom: vs(2) },
+  scoreInfoLine:    { fontSize: fs(11), color: '#777', marginBottom: vs(2), paddingLeft: s(4) },
+  scoreInfoHint:    { fontSize: fs(10), color: '#aaa', fontStyle: 'italic', marginTop: vs(4) },
 
   // Dette de sommeil
   debtCard: {
