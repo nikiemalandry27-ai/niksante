@@ -271,6 +271,11 @@ export default function DashboardScreen() {
             ) : (
               <ThemedText style={styles.sleepCardEmpty}>Non enregistré · Appuyez pour ajouter</ThemedText>
             )}
+            {healthScore && (
+              <ThemedText style={styles.sleepScoreHint}>
+                Score = sommeil + glycémie
+              </ThemedText>
+            )}
           </View>
           {healthScore && (
             <View style={[styles.sleepScoreBadge, { borderColor: healthScore.color, backgroundColor: healthScore.color + '18' }]}>
@@ -506,6 +511,7 @@ const styles = StyleSheet.create({
   sleepCardValue: { fontSize: fs(22), fontWeight: 'bold', color: '#4A148C' },
   sleepCardSub:   { fontSize: fs(11), color: '#888', marginTop: vs(2) },
   sleepCardEmpty: { fontSize: fs(13), color: '#aaa', fontStyle: 'italic' },
+  sleepScoreHint: { fontSize: fs(10), color: '#9C6EBB', marginTop: vs(6), fontStyle: 'italic' },
   sleepScoreBadge: {
     minWidth: s(72), paddingHorizontal: s(10), paddingVertical: vs(6),
     borderRadius: s(12), borderWidth: 2,
