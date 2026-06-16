@@ -25,11 +25,11 @@ const HYPO = {
   color:    '#1565C0',
   bg:       '#E3F2FD',
   symptoms: [
-    '😰  Tremblements, sueurs froides',
-    '💓  Palpitations, cœur qui s\'emballe',
-    '😵  Vertiges, confusion, vision trouble',
-    '😤  Faim soudaine et intense',
-    '😟  Irritabilité, anxiété',
+    'Tremblements, sueurs froides',
+    'Palpitations, cœur qui s\'emballe',
+    'Vertiges, confusion, vision trouble',
+    'Faim soudaine et intense',
+    'Irritabilité, anxiété',
   ],
   actions: [
     { step: '1', text: 'Boire 150–200 ml de jus de fruit ou soda sucré' },
@@ -48,11 +48,11 @@ const HYPER = {
   color:    '#E53935',
   bg:       '#FFF3E0',
   symptoms: [
-    '🥤  Soif intense et persistante',
-    '🚽  Urines fréquentes',
-    '😴  Fatigue, manque d\'énergie',
-    '👁️  Vision floue',
-    '🤕  Maux de tête',
+    'Soif intense et persistante',
+    'Urines fréquentes',
+    'Fatigue, manque d\'énergie',
+    'Vision floue',
+    'Maux de tête',
   ],
   actions: [
     { step: '1', text: 'Boire abondamment de l\'eau (sans sucre)' },
