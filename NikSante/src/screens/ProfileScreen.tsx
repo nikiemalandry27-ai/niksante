@@ -19,7 +19,6 @@ import {
   AppState,
   AppStateStatus,
 } from 'react-native';
-import * as Notifications from 'expo-notifications';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -54,7 +53,9 @@ const NOTIF_IDS_KEY        = '@niksante_notif_ids';
 const IS_EXPO_GO = Constants.appOwnership === 'expo';
 
 if (!IS_EXPO_GO) {
-  Notifications.setNotificationHandler({
+  // Import dynamique : évite de charger le module dans Expo Go
+  const Notifs = require('expo-notifications');
+  Notifs.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowAlert: true,
       shouldPlaySound: true,
@@ -233,21 +234,22 @@ export default function ProfileScreen() {
     const isOn = reminders[key];
 
     if (!IS_EXPO_GO) {
+      const Notifs = require('expo-notifications');
       if (!isOn) {
-        const { status } = await Notifications.requestPermissionsAsync();
+        const { status } = await Notifs.requestPermissionsAsync();
         if (status !== 'granted') {
           Alert.alert('Permission refusée', 'Activez les notifications dans les paramètres du téléphone.');
           return;
         }
         const def = REMINDER_DEFS[key];
-        const id  = await Notifications.scheduleNotificationAsync({
+        const id  = await Notifs.scheduleNotificationAsync({
           content: {
             title: 'Rappel glycémique',
             body:  `${def.label} — ${def.desc.split('—')[1].trim()}. Pensez à mesurer votre glycémie !`,
             sound: true,
           },
           trigger: {
-            type:   Notifications.SchedulableTriggerInputTypes.DAILY,
+            type:   Notifs.SchedulableTriggerInputTypes.DAILY,
             hour:   def.hour,
             minute: def.minute,
           },
@@ -257,7 +259,7 @@ export default function ProfileScreen() {
         await AsyncStorage.setItem(NOTIF_IDS_KEY, JSON.stringify(updatedIds));
       } else {
         const id = notifIds[key];
-        if (id) await Notifications.cancelScheduledNotificationAsync(id);
+        if (id) await Notifs.cancelScheduledNotificationAsync(id);
         const updatedIds = { ...notifIds, [key]: null };
         setNotifIds(updatedIds);
         await AsyncStorage.setItem(NOTIF_IDS_KEY, JSON.stringify(updatedIds));
