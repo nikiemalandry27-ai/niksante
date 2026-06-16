@@ -260,41 +260,6 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        {/* ── Carte sommeil ── */}
-        <TouchableOpacity style={styles.sleepCard} onPress={handleSleep} activeOpacity={0.8}>
-          <View style={styles.sleepCardLeft}>
-            <ThemedText style={styles.sleepCardLabel}>TEMPS DE SOMMEIL</ThemedText>
-            {todaySleep ? (
-              <>
-                <ThemedText style={styles.sleepCardValue}>
-                  {SLEEP_QUALITY_META[todaySleep.quality].emoji}{' '}
-                  {todaySleep.duration % 1 === 0
-                    ? `${todaySleep.duration}h`
-                    : `${Math.floor(todaySleep.duration)}h${Math.round((todaySleep.duration % 1) * 60)}min`}
-                </ThemedText>
-                <ThemedText style={styles.sleepCardSub}>
-                  {'Nuit du '}
-                  {new Date(todaySleep.date + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
-                </ThemedText>
-                <ThemedText style={styles.sleepCardSub}>
-                  {todaySleep.bedTime} → {todaySleep.wakeTime}
-                </ThemedText>
-              </>
-            ) : (
-              <ThemedText style={styles.sleepCardEmpty}>Non enregistré · Appuyez pour ajouter</ThemedText>
-            )}
-            {healthScore && hasSleepData && (
-              <ThemedText style={styles.sleepScoreHint}>{scoreHint} · 7 derniers jours</ThemedText>
-            )}
-          </View>
-          {healthScore && hasSleepData && (
-            <View style={[styles.sleepScoreBadge, { borderColor: healthScore.color, backgroundColor: healthScore.color + '18' }]}>
-              <ThemedText style={[styles.sleepScoreNum, { color: healthScore.color }]}>{healthScore.total}<ThemedText style={[styles.sleepScoreOver, { color: healthScore.color }]}>/100</ThemedText></ThemedText>
-              <ThemedText style={[styles.sleepScoreTag, { color: healthScore.color }]}>{healthScore.label}</ThemedText>
-            </View>
-          )}
-        </TouchableOpacity>
-
         {/* ── Statistiques ── */}
         <View style={styles.statsRow}>
           <StatBox label="MOYENNE"      value={averageGlucose > 0 ? formatGlucose(averageGlucose, glucoseUnit) : '—'} unit={unitLabel(glucoseUnit)} />
@@ -354,11 +319,46 @@ export default function DashboardScreen() {
         {/* ── Courbe d'évolution ── */}
         <GlucoseChart data={glucoseHistory} maxBars={12} unit={glucoseUnit} />
 
-        {/* ── Historique récent ── */}
+        {/* ── Carte sommeil ── */}
+        <TouchableOpacity style={styles.sleepCard} onPress={handleSleep} activeOpacity={0.8}>
+          <View style={styles.sleepCardLeft}>
+            <ThemedText style={styles.sleepCardLabel}>TEMPS DE SOMMEIL</ThemedText>
+            {todaySleep ? (
+              <>
+                <ThemedText style={styles.sleepCardValue}>
+                  {SLEEP_QUALITY_META[todaySleep.quality].emoji}{' '}
+                  {todaySleep.duration % 1 === 0
+                    ? `${todaySleep.duration}h`
+                    : `${Math.floor(todaySleep.duration)}h${Math.round((todaySleep.duration % 1) * 60)}min`}
+                </ThemedText>
+                <ThemedText style={styles.sleepCardSub}>
+                  {'Nuit du '}
+                  {new Date(todaySleep.date + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                </ThemedText>
+                <ThemedText style={styles.sleepCardSub}>
+                  {todaySleep.bedTime} → {todaySleep.wakeTime}
+                </ThemedText>
+              </>
+            ) : (
+              <ThemedText style={styles.sleepCardEmpty}>Non enregistré · Appuyez pour ajouter</ThemedText>
+            )}
+            {healthScore && hasSleepData && (
+              <ThemedText style={styles.sleepScoreHint}>{scoreHint} · 7 derniers jours</ThemedText>
+            )}
+          </View>
+          {healthScore && hasSleepData && (
+            <View style={[styles.sleepScoreBadge, { borderColor: healthScore.color, backgroundColor: healthScore.color + '18' }]}>
+              <ThemedText style={[styles.sleepScoreNum, { color: healthScore.color }]}>{healthScore.total}<ThemedText style={[styles.sleepScoreOver, { color: healthScore.color }]}>/100</ThemedText></ThemedText>
+              <ThemedText style={[styles.sleepScoreTag, { color: healthScore.color }]}>{healthScore.label}</ThemedText>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        {/* ── Historique des mesures glycémiques ── */}
         {glucoseHistory.length > 0 && (
           <View style={styles.historySection}>
             <View style={styles.sectionHeaderRow}>
-              <ThemedText style={styles.sectionTitle}>Historique récent</ThemedText>
+              <ThemedText style={styles.sectionTitle}>Historique des mesures glycémiques</ThemedText>
               <TouchableOpacity onPress={handleSeeAll} style={styles.seeAllBtn}>
                 <ThemedText style={styles.seeAllText}>Voir tout →</ThemedText>
               </TouchableOpacity>
