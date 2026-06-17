@@ -17,6 +17,7 @@ import {
   handleNotificationResponse,
   addNotificationReceivedListener,
   addNotificationResponseReceivedListener,
+  getLastNotificationResponse,
 } from '@/services/notificationService';
 
 // Empêche le splash natif de disparaître avant qu'on soit prêt
@@ -128,6 +129,10 @@ export default function RootLayout() {
     initAuth();
     initSettings();
     initSleep();
+    // App ouverte depuis une notification (état fermé) → redirection Play Store
+    getLastNotificationResponse().then((response) => {
+      if (response) handleNotificationResponse(response);
+    });
   }, []);
 
   // ── 2. Marquer auth terminée ──────────────────────────────────────────────

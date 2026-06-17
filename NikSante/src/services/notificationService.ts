@@ -110,3 +110,13 @@ export function handleNotificationResponse(response: any) {
     Linking.openURL(PLAY_STORE_URL).catch(() => Linking.openURL(PLAY_STORE_WEB));
   }
 }
+
+// Récupère la notification qui a ouvert l'app depuis l'état fermé
+export async function getLastNotificationResponse(): Promise<any> {
+  if (!Notifications) return null;
+  try {
+    return await Notifications.getLastNotificationResponseAsync();
+  } catch {
+    return null;
+  }
+}
