@@ -48,6 +48,7 @@ const REMINDER_DEFS: Record<ReminderKey, { label: string; hour: number; minute: 
 const REMINDER_STORAGE_KEY = '@niksante_reminders';
 const REMINDER_SHOWN_KEY   = '@niksante_reminders_shown';
 const NOTIF_IDS_KEY        = '@niksante_notif_ids';
+const REMINDER_TIMES_KEY   = '@niksante_reminder_times';
 const NOTIF_CHANNEL_ID     = 'niksante-rappels';
 
 const IS_EXPO_GO = Constants.appOwnership === 'expo';
@@ -81,27 +82,35 @@ async function setupNotifications(): Promise<void> {
   });
 }
 
-async function scheduleReminder(key: ReminderKey): Promise<string | null> {
+async function scheduleReminder(key: ReminderKey, hour: number, minute: number): Promise<string | null> {
   if (IS_EXPO_GO) return null;
   const Notifs = require('expo-notifications');
   const def    = REMINDER_DEFS[key];
+
+  // Calcule la prochaine occurrence : si l'heure est déjà passée aujourd'hui → demain
+  const now     = new Date();
+  const trigger = new Date();
+  trigger.setHours(hour, minute, 0, 0);
+  if (trigger <= now) trigger.setDate(trigger.getDate() + 1);
 
   try {
     const id = await Notifs.scheduleNotificationAsync({
       content: {
         title: 'Rappel NikSanté',
-        body:  `${def.label} — ${def.desc.split('—')[1].trim()}. Pensez à mesurer votre glycémie !`,
+        body:  `${def.label} — Pensez à mesurer votre glycémie !`,
         sound: true,
         data:  { key },
       },
       trigger: {
         type:      Notifs.SchedulableTriggerInputTypes.DAILY,
-        hour:      def.hour,
-        minute:    def.minute,
-        channelId: NOTIF_CHANNEL_ID,  // OBLIGATOIRE sur Android
+        hour,
+        minute,
+        channelId: NOTIF_CHANNEL_ID,
       },
     });
-    console.log(`[Notifs] Rappel "${key}" programmé → ID: ${id}`);
+    const h = String(hour).padStart(2, '0');
+    const m = String(minute).padStart(2, '0');
+    console.log(`[Notifs] "${key}" programmé à ${h}:${m} → ID: ${id}. Première occurrence: ${trigger.toLocaleString()}`);
     return id;
   } catch (e) {
     console.error(`[Notifs] Erreur scheduling "${key}":`, e);
@@ -241,14 +250,17 @@ export default function ProfileScreen() {
   const [notifIds, setNotifIds] = useState<Record<ReminderKey, string | null>>({
     morning: null, afternoon: null, evening: null,
   });
+  const [reminderTimes, setReminderTimes] = useState<Record<ReminderKey, { hour: number; minute: number }>>({
+    morning:   { hour: 8,  minute: 0 },
+    afternoon: { hour: 13, minute: 0 },
+    evening:   { hour: 19, minute: 0 },
+  });
   const shownTodayRef = useRef<Record<ReminderKey, string>>({
     morning: '', afternoon: '', evening: '',
   });
 
   useEffect(() => {
-    // Initialise le canal Android dès le montage du composant
     setupNotifications();
-
     AsyncStorage.getItem(REMINDER_STORAGE_KEY).then((raw) => {
       if (raw) setReminders(JSON.parse(raw));
     });
@@ -258,7 +270,34 @@ export default function ProfileScreen() {
     AsyncStorage.getItem(NOTIF_IDS_KEY).then((raw) => {
       if (raw) setNotifIds(JSON.parse(raw));
     });
+    AsyncStorage.getItem(REMINDER_TIMES_KEY).then((raw) => {
+      if (raw) setReminderTimes(JSON.parse(raw));
+    });
   }, []);
+
+  // Ajuste l'heure d'un rappel et reprogramme si actif
+  const adjustReminderTime = async (key: ReminderKey, field: 'hour' | 'minute', delta: number) => {
+    const current = reminderTimes[key];
+    const newVal  = field === 'hour'
+      ? ((current.hour + delta + 24) % 24)
+      : ((current.minute + delta + 60) % 60);
+    const updated = { ...reminderTimes, [key]: { ...current, [field]: newVal } };
+    setReminderTimes(updated);
+    await AsyncStorage.setItem(REMINDER_TIMES_KEY, JSON.stringify(updated));
+
+    // Reprogramme automatiquement si le rappel est actif
+    if (reminders[key] && !IS_EXPO_GO) {
+      const oldId = notifIds[key];
+      if (oldId) await cancelReminder(oldId);
+      const { hour, minute } = updated[key];
+      const id = await scheduleReminder(key, hour, minute);
+      if (id) {
+        const updatedIds = { ...notifIds, [key]: id };
+        setNotifIds(updatedIds);
+        await AsyncStorage.setItem(NOTIF_IDS_KEY, JSON.stringify(updatedIds));
+      }
+    }
+  };
 
   // ── Expo Go : alerte in-app au retour au premier plan ──────────────────
   const checkReminders = (enabled: Record<ReminderKey, boolean>) => {
@@ -310,8 +349,9 @@ export default function ProfileScreen() {
         const oldId = notifIds[key];
         if (oldId) await cancelReminder(oldId);
 
-        // Programme le nouveau rappel quotidien
-        const id = await scheduleReminder(key);
+        // Programme le nouveau rappel quotidien à l'heure personnalisée
+        const { hour, minute } = reminderTimes[key];
+        const id = await scheduleReminder(key, hour, minute);
         if (!id) {
           Alert.alert('Erreur', 'Impossible de programmer le rappel. Réessayez.');
           return;
@@ -771,21 +811,57 @@ export default function ProfileScreen() {
           </ThemedText>
 
           {(Object.keys(REMINDER_DEFS) as ReminderKey[]).map((key) => {
-            const def = REMINDER_DEFS[key];
+            const def  = REMINDER_DEFS[key];
             const isOn = reminders[key];
+            const { hour, minute } = reminderTimes[key];
+            const hh = String(hour).padStart(2, '0');
+            const mm = String(minute).padStart(2, '0');
             return (
-              <View key={key} style={modalStyles.row}>
-                <ThemedText style={modalStyles.rowIcon}>{def.icon}</ThemedText>
-                <View style={modalStyles.rowInfo}>
-                  <ThemedText style={modalStyles.rowLabel}>{def.label}</ThemedText>
-                  <ThemedText style={modalStyles.rowDesc}>{def.desc}</ThemedText>
+              <View key={key} style={modalStyles.reminderBlock}>
+                {/* Ligne principale : icône + label + switch */}
+                <View style={modalStyles.row}>
+                  <ThemedText style={modalStyles.rowIcon}>{def.icon}</ThemedText>
+                  <View style={modalStyles.rowInfo}>
+                    <ThemedText style={modalStyles.rowLabel}>{def.label}</ThemedText>
+                    <ThemedText style={[modalStyles.rowDesc, isOn && { color: '#388E3C', fontWeight: '700' }]}>
+                      {isOn ? `Actif — chaque jour à ${hh}:${mm}` : 'Inactif'}
+                    </ThemedText>
+                  </View>
+                  <Switch
+                    value={isOn}
+                    onValueChange={() => toggleReminder(key)}
+                    trackColor={{ false: '#ddd', true: '#A5D6A7' }}
+                    thumbColor={isOn ? '#388E3C' : '#f4f3f4'}
+                  />
                 </View>
-                <Switch
-                  value={isOn}
-                  onValueChange={() => toggleReminder(key)}
-                  trackColor={{ false: '#ddd', true: '#A5D6A7' }}
-                  thumbColor={isOn ? '#388E3C' : '#f4f3f4'}
-                />
+                {/* Sélecteur d'heure */}
+                <View style={modalStyles.timePicker}>
+                  {/* Heures */}
+                  <View style={modalStyles.timeCol}>
+                    <TouchableOpacity style={modalStyles.timeBtn} onPress={() => adjustReminderTime(key, 'hour', 1)}>
+                      <ThemedText style={modalStyles.timeArrow}>▲</ThemedText>
+                    </TouchableOpacity>
+                    <View style={modalStyles.timeDisplay}>
+                      <ThemedText style={modalStyles.timeDigit}>{hh}</ThemedText>
+                    </View>
+                    <TouchableOpacity style={modalStyles.timeBtn} onPress={() => adjustReminderTime(key, 'hour', -1)}>
+                      <ThemedText style={modalStyles.timeArrow}>▼</ThemedText>
+                    </TouchableOpacity>
+                  </View>
+                  <ThemedText style={modalStyles.timeColon}>:</ThemedText>
+                  {/* Minutes */}
+                  <View style={modalStyles.timeCol}>
+                    <TouchableOpacity style={modalStyles.timeBtn} onPress={() => adjustReminderTime(key, 'minute', 5)}>
+                      <ThemedText style={modalStyles.timeArrow}>▲</ThemedText>
+                    </TouchableOpacity>
+                    <View style={modalStyles.timeDisplay}>
+                      <ThemedText style={modalStyles.timeDigit}>{mm}</ThemedText>
+                    </View>
+                    <TouchableOpacity style={modalStyles.timeBtn} onPress={() => adjustReminderTime(key, 'minute', -5)}>
+                      <ThemedText style={modalStyles.timeArrow}>▼</ThemedText>
+                    </TouchableOpacity>
+                  </View>
+                </View>
               </View>
             );
           })}
@@ -1153,6 +1229,21 @@ const modalStyles = StyleSheet.create({
   },
   closeBtnText: { color: '#fff', fontWeight: 'bold', fontSize: fs(15) },
   legalText: { fontSize: fs(13), color: '#444', lineHeight: vs(22) },
+
+  reminderBlock: {
+    borderTopWidth: 1, borderTopColor: '#f5f5f5', paddingTop: vs(10), marginBottom: vs(4),
+  },
+  timePicker: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: s(6), paddingVertical: vs(8),
+    backgroundColor: '#f8f8f8', borderRadius: 12, marginBottom: vs(6),
+  },
+  timeCol:     { alignItems: 'center', gap: vs(4) },
+  timeBtn:     { width: s(36), height: vs(24), alignItems: 'center', justifyContent: 'center', backgroundColor: '#eee', borderRadius: 6 },
+  timeArrow:   { fontSize: fs(12), color: '#388E3C', fontWeight: 'bold' },
+  timeDisplay: { width: s(48), height: vs(38), alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', borderRadius: 8, borderWidth: 1.5, borderColor: '#e0e0e0' },
+  timeDigit:   { fontSize: fs(20), fontWeight: 'bold', color: '#1a1a1a' },
+  timeColon:   { fontSize: fs(20), fontWeight: 'bold', color: '#1a1a1a', marginBottom: vs(2) },
 });
 
 const repStyles = StyleSheet.create({
