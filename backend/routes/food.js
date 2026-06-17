@@ -156,23 +156,29 @@ router.post('/detect', async (req, res) => {
     return res.status(413).json({ error: 'Image trop grande (max 8 Mo)' });
   }
 
+  const incrementFoodScans = () => {
+    pool.query(`
+      INSERT INTO stats (key, value) VALUES ('food_scans', 1)
+      ON CONFLICT (key) DO UPDATE SET value = stats.value + 1
+    `).catch(err => console.error('[FoodDetect] Stats increment failed:', err.message));
+  };
+
   try {
     let result;
 
     if (process.env.OPENAI_API_KEY) {
       result = await detectWithOpenAI(rawB64);
     } else {
-      // Simulation réaliste avec délai pour reproduire le comportement réel
       await new Promise((r) => setTimeout(r, 1200));
       result = simulateDetection();
     }
 
-    pool.query("UPDATE stats SET value = value + 1 WHERE key = 'food_scans'").catch(() => {});
+    incrementFoodScans();
     res.json(result);
   } catch (err) {
     console.error('[FoodDetect] Erreur OpenAI — passage en simulation :', err.message);
-    const fallback = simulateDetection();
-    res.json({ ...fallback, simulated: true });
+    incrementFoodScans();
+    res.json({ ...simulateDetection(), simulated: true });
   }
 });
 
