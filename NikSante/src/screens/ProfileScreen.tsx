@@ -22,7 +22,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 
 import { useAuthStore }    from '@/store/authStore';
 import { useGlucoseStore } from '@/store/glucoseStore';
@@ -51,7 +51,8 @@ const NOTIF_IDS_KEY        = '@niksante_notif_ids';
 const REMINDER_TIMES_KEY   = '@niksante_reminder_times';
 const NOTIF_CHANNEL_ID     = 'niksante-rappels';
 
-const IS_EXPO_GO = Constants.appOwnership === 'expo';
+// SDK 56+ : appOwnership est supprimé, utiliser executionEnvironment
+const IS_EXPO_GO = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
 // ---------------------------------------------------------------------------
 // Setup notifications (production uniquement)
@@ -331,6 +332,8 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     if (!IS_EXPO_GO) return;
+    // Vérification immédiate au montage ou changement de rappels/heures
+    checkReminders(reminders, reminderTimes);
     // Vérification au retour au premier plan
     const sub = AppState.addEventListener('change', (state: AppStateStatus) => {
       if (state === 'active') checkReminders(reminders, reminderTimes);
