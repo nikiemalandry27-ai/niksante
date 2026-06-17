@@ -803,13 +803,14 @@ export default function ProfileScreen() {
           activeOpacity={1}
           onPress={() => setReminderModal(false)}
         />
-        <View style={modalStyles.sheet}>
+        <View style={[modalStyles.sheet, { maxHeight: '90%' }]}>
           <View style={modalStyles.handle} />
           <ThemedText style={modalStyles.title}>🔔  Rappels de mesure</ThemedText>
           <ThemedText style={modalStyles.subtitle}>
             Activez des rappels journaliers pour ne jamais oublier de mesurer votre glycémie.
           </ThemedText>
 
+          <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0 }}>
           {(Object.keys(REMINDER_DEFS) as ReminderKey[]).map((key) => {
             const def  = REMINDER_DEFS[key];
             const isOn = reminders[key];
@@ -865,6 +866,7 @@ export default function ProfileScreen() {
               </View>
             );
           })}
+          </ScrollView>
 
           <TouchableOpacity style={modalStyles.closeBtn} onPress={() => setReminderModal(false)}>
             <ThemedText style={modalStyles.closeBtnText}>Fermer</ThemedText>
