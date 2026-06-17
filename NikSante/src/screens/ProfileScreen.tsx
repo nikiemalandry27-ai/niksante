@@ -48,13 +48,19 @@ const REMINDER_DEFS: Record<ReminderKey, { label: string; hour: number; minute: 
 const REMINDER_STORAGE_KEY = '@niksante_reminders';
 const REMINDER_SHOWN_KEY   = '@niksante_reminders_shown';
 const NOTIF_IDS_KEY        = '@niksante_notif_ids';
+const NOTIF_CHANNEL_ID     = 'niksante-rappels';
 
-// Expo Go ne supporte pas les notifications locales Android depuis SDK 53
 const IS_EXPO_GO = Constants.appOwnership === 'expo';
 
-if (!IS_EXPO_GO) {
-  // Import dynamique : évite de charger le module dans Expo Go
+// ---------------------------------------------------------------------------
+// Setup notifications (production uniquement)
+// ---------------------------------------------------------------------------
+
+async function setupNotifications(): Promise<void> {
+  if (IS_EXPO_GO) return;
   const Notifs = require('expo-notifications');
+
+  // Handler : affiche la notif même si l'app est au premier plan
   Notifs.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowAlert: true,
@@ -62,6 +68,56 @@ if (!IS_EXPO_GO) {
       shouldSetBadge:  false,
     }),
   });
+
+  // Canal Android OBLIGATOIRE (Android 8+) — sans ça, toutes les notifs sont ignorées silencieusement
+  await Notifs.setNotificationChannelAsync(NOTIF_CHANNEL_ID, {
+    name:              'Rappels glycémie',
+    importance:        Notifs.AndroidImportance.HIGH,
+    vibrationPattern:  [0, 250, 250, 250],
+    lightColor:        '#388E3C',
+    sound:             true,
+    enableVibrate:     true,
+    showBadge:         false,
+  });
+}
+
+async function scheduleReminder(key: ReminderKey): Promise<string | null> {
+  if (IS_EXPO_GO) return null;
+  const Notifs = require('expo-notifications');
+  const def    = REMINDER_DEFS[key];
+
+  try {
+    const id = await Notifs.scheduleNotificationAsync({
+      content: {
+        title: 'Rappel NikSanté',
+        body:  `${def.label} — ${def.desc.split('—')[1].trim()}. Pensez à mesurer votre glycémie !`,
+        sound: true,
+        data:  { key },
+      },
+      trigger: {
+        type:      Notifs.SchedulableTriggerInputTypes.DAILY,
+        hour:      def.hour,
+        minute:    def.minute,
+        channelId: NOTIF_CHANNEL_ID,  // OBLIGATOIRE sur Android
+      },
+    });
+    console.log(`[Notifs] Rappel "${key}" programmé → ID: ${id}`);
+    return id;
+  } catch (e) {
+    console.error(`[Notifs] Erreur scheduling "${key}":`, e);
+    return null;
+  }
+}
+
+async function cancelReminder(id: string): Promise<void> {
+  if (IS_EXPO_GO) return;
+  const Notifs = require('expo-notifications');
+  try {
+    await Notifs.cancelScheduledNotificationAsync(id);
+    console.log(`[Notifs] Rappel annulé → ID: ${id}`);
+  } catch (e) {
+    console.error('[Notifs] Erreur annulation:', e);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -190,6 +246,9 @@ export default function ProfileScreen() {
   });
 
   useEffect(() => {
+    // Initialise le canal Android dès le montage du composant
+    setupNotifications();
+
     AsyncStorage.getItem(REMINDER_STORAGE_KEY).then((raw) => {
       if (raw) setReminders(JSON.parse(raw));
     });
@@ -235,31 +294,37 @@ export default function ProfileScreen() {
 
     if (!IS_EXPO_GO) {
       const Notifs = require('expo-notifications');
+
       if (!isOn) {
+        // Demande de permission
         const { status } = await Notifs.requestPermissionsAsync();
         if (status !== 'granted') {
-          Alert.alert('Permission refusée', 'Activez les notifications dans les paramètres du téléphone.');
+          Alert.alert(
+            'Permission requise',
+            'Activez les notifications dans Paramètres > Applications > NikSanté > Notifications.',
+          );
           return;
         }
-        const def = REMINDER_DEFS[key];
-        const id  = await Notifs.scheduleNotificationAsync({
-          content: {
-            title: 'Rappel glycémique',
-            body:  `${def.label} — ${def.desc.split('—')[1].trim()}. Pensez à mesurer votre glycémie !`,
-            sound: true,
-          },
-          trigger: {
-            type:   Notifs.SchedulableTriggerInputTypes.DAILY,
-            hour:   def.hour,
-            minute: def.minute,
-          },
-        });
+
+        // Annule l'ancien rappel s'il existe (évite les doublons)
+        const oldId = notifIds[key];
+        if (oldId) await cancelReminder(oldId);
+
+        // Programme le nouveau rappel quotidien
+        const id = await scheduleReminder(key);
+        if (!id) {
+          Alert.alert('Erreur', 'Impossible de programmer le rappel. Réessayez.');
+          return;
+        }
+
         const updatedIds = { ...notifIds, [key]: id };
         setNotifIds(updatedIds);
         await AsyncStorage.setItem(NOTIF_IDS_KEY, JSON.stringify(updatedIds));
+
       } else {
+        // Désactivation → annule la notification planifiée
         const id = notifIds[key];
-        if (id) await Notifs.cancelScheduledNotificationAsync(id);
+        if (id) await cancelReminder(id);
         const updatedIds = { ...notifIds, [key]: null };
         setNotifIds(updatedIds);
         await AsyncStorage.setItem(NOTIF_IDS_KEY, JSON.stringify(updatedIds));
