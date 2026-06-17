@@ -299,8 +299,11 @@ export default function ProfileScreen() {
     }
   };
 
-  // ── Expo Go : alerte in-app au retour au premier plan ──────────────────
-  const checkReminders = (enabled: Record<ReminderKey, boolean>) => {
+  // ── Expo Go : alerte in-app (AppState + intervalle toutes les 60s) ──────
+  const checkReminders = (
+    enabled: Record<ReminderKey, boolean>,
+    times: Record<ReminderKey, { hour: number; minute: number }>,
+  ) => {
     if (!IS_EXPO_GO) return;
     const now    = new Date();
     const nowMin = now.getHours() * 60 + now.getMinutes();
@@ -308,12 +311,19 @@ export default function ProfileScreen() {
     for (const key of Object.keys(REMINDER_DEFS) as ReminderKey[]) {
       if (!enabled[key]) continue;
       if (shownTodayRef.current[key] === today) continue;
-      const def  = REMINDER_DEFS[key];
-      const diff = nowMin - (def.hour * 60 + def.minute);
+      const { hour, minute } = times[key];
+      const diff = nowMin - (hour * 60 + minute);
       if (diff >= 0 && diff <= 30) {
         shownTodayRef.current[key] = today;
         AsyncStorage.setItem(REMINDER_SHOWN_KEY, JSON.stringify(shownTodayRef.current));
-        Alert.alert('Rappel glycémique', `${def.label} — ${def.desc.split('—')[1].trim()}. Pensez à mesurer votre glycémie !`, [{ text: 'OK' }]);
+        const def = REMINDER_DEFS[key];
+        const hh  = String(hour).padStart(2, '0');
+        const mm  = String(minute).padStart(2, '0');
+        Alert.alert(
+          'Rappel glycémique',
+          `${def.label} (${hh}:${mm}) — Pensez à mesurer votre glycémie !`,
+          [{ text: 'OK' }],
+        );
         return;
       }
     }
@@ -321,11 +331,14 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     if (!IS_EXPO_GO) return;
+    // Vérification au retour au premier plan
     const sub = AppState.addEventListener('change', (state: AppStateStatus) => {
-      if (state === 'active') checkReminders(reminders);
+      if (state === 'active') checkReminders(reminders, reminderTimes);
     });
-    return () => sub.remove();
-  }, [reminders]);
+    // Vérification toutes les 60s même si l'app est au premier plan
+    const interval = setInterval(() => checkReminders(reminders, reminderTimes), 60_000);
+    return () => { sub.remove(); clearInterval(interval); };
+  }, [reminders, reminderTimes]);
 
   // ── Production : notifications système planifiées ──────────────────────
   const toggleReminder = async (key: ReminderKey) => {
