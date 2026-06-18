@@ -59,6 +59,7 @@ const IS_EXPO_GO = Constants.executionEnvironment === ExecutionEnvironment.Store
 // ---------------------------------------------------------------------------
 
 async function setupNotifications(): Promise<void> {
+  if (IS_EXPO_GO) return;
   try {
     const Notifs = require('expo-notifications');
     Notifs.setNotificationHandler({
@@ -78,11 +79,12 @@ async function setupNotifications(): Promise<void> {
       showBadge:        false,
     });
   } catch (e) {
-    console.log('[Notifs] Setup unavailable:', e);
+    console.error('[Notifs] Setup error:', e);
   }
 }
 
 async function scheduleReminder(key: ReminderKey, hour: number, minute: number): Promise<string | null> {
+  if (IS_EXPO_GO) return null;
   const def = REMINDER_DEFS[key];
   try {
     const Notifs = require('expo-notifications');
@@ -109,6 +111,7 @@ async function scheduleReminder(key: ReminderKey, hour: number, minute: number):
 }
 
 async function cancelReminder(id: string): Promise<void> {
+  if (IS_EXPO_GO) return;
   try {
     const Notifs = require('expo-notifications');
     await Notifs.cancelScheduledNotificationAsync(id);
@@ -275,7 +278,7 @@ export default function ProfileScreen() {
     await AsyncStorage.setItem(REMINDER_TIMES_KEY, JSON.stringify(updated));
 
     // Reprogramme automatiquement si le rappel est actif
-    if (reminders[key]) {
+    if (reminders[key] && !IS_EXPO_GO) {
       const oldId = notifIds[key];
       if (oldId) await cancelReminder(oldId);
       const { hour, minute } = updated[key];
@@ -331,13 +334,13 @@ export default function ProfileScreen() {
     return () => { sub.remove(); clearInterval(interval); };
   }, [reminders, reminderTimes]);
 
-  // ── Notifications système (fonctionne Expo Go + production) ────────────
+  // ── Notifications système planifiées (production uniquement) ───────────
   const toggleReminder = async (key: ReminderKey) => {
     const isOn = reminders[key];
 
-    if (!isOn) {
-      try {
-        const Notifs = require('expo-notifications');
+    if (!IS_EXPO_GO) {
+      const Notifs = require('expo-notifications');
+      if (!isOn) {
         const { status } = await Notifs.requestPermissionsAsync();
         if (status !== 'granted') {
           Alert.alert(
@@ -346,10 +349,8 @@ export default function ProfileScreen() {
           );
           return;
         }
-
         const oldId = notifIds[key];
         if (oldId) await cancelReminder(oldId);
-
         const { hour, minute } = reminderTimes[key];
         const id = await scheduleReminder(key, hour, minute);
         if (id) {
@@ -357,16 +358,13 @@ export default function ProfileScreen() {
           setNotifIds(updatedIds);
           await AsyncStorage.setItem(NOTIF_IDS_KEY, JSON.stringify(updatedIds));
         }
-      } catch (e) {
-        // expo-notifications indisponible — les alertes in-app prendront le relais
-        console.log('[Notifs] Planification indisponible, alertes in-app actives');
+      } else {
+        const id = notifIds[key];
+        if (id) await cancelReminder(id);
+        const updatedIds = { ...notifIds, [key]: null };
+        setNotifIds(updatedIds);
+        await AsyncStorage.setItem(NOTIF_IDS_KEY, JSON.stringify(updatedIds));
       }
-    } else {
-      const id = notifIds[key];
-      if (id) await cancelReminder(id);
-      const updatedIds = { ...notifIds, [key]: null };
-      setNotifIds(updatedIds);
-      await AsyncStorage.setItem(NOTIF_IDS_KEY, JSON.stringify(updatedIds));
     }
 
     const updated = { ...reminders, [key]: !isOn };

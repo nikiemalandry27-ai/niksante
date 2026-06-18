@@ -1,24 +1,29 @@
 import * as Device from 'expo-device';
 import { Platform, Linking, Alert } from 'react-native';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import api from './api';
 
 const EXPO_PROJECT_ID = 'f12328b2-8542-4782-b20c-1c83dbaa9557';
 const PLAY_STORE_URL  = 'market://details?id=com.niksante.app';
 const PLAY_STORE_WEB  = 'https://play.google.com/store/apps/details?id=com.niksante.app';
 
-// expo-notifications est retiré de Expo Go depuis SDK 53 — import conditionnel
+// expo-notifications plante dans Expo Go SDK 53+ (DevicePushTokenAutoRegistration)
+const IS_EXPO_GO = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
 let Notifications: any = null;
-try {
-  Notifications = require('expo-notifications');
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge:  false,
-    }),
-  });
-} catch {
-  // Expo Go — notifications push non disponibles
+if (!IS_EXPO_GO) {
+  try {
+    Notifications = require('expo-notifications');
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge:  false,
+      }),
+    });
+  } catch {
+    // Silencieux
+  }
 }
 
 // ── Enregistrement du token ───────────────────────────────────────────────────
