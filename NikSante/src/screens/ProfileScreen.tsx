@@ -257,6 +257,7 @@ export default function ProfileScreen() {
 
   // ── Modales ──────────────────────────────────────────────────────────────
   const [legalModal, setLegalModal] = useState<'privacy' | 'terms' | null>(null);
+  const [surpoidsExpanded, setSurpoidsExpanded] = useState(false);
 
   // ── Paramètres unité ─────────────────────────────────────────────────────
   const glucoseUnit    = useSettingsStore((s) => s.glucoseUnit);
@@ -573,6 +574,163 @@ export default function ProfileScreen() {
             </View>
           </View>
         )}
+
+        {/* ── Surpoids & Glycémie ── */}
+        <View style={styles.section}>
+          <ThemedText style={styles.sectionTitle}>Surpoids & Diabète</ThemedText>
+          <TouchableOpacity
+            style={[styles.card, { paddingVertical: vs(14) }]}
+            activeOpacity={0.85}
+            onPress={() => setSurpoidsExpanded((v) => !v)}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(10), flex: 1 }}>
+                <View style={{ width: s(40), height: s(40), borderRadius: s(20), backgroundColor: '#FFF3E0', alignItems: 'center', justifyContent: 'center' }}>
+                  <ThemedText style={{ fontSize: fs(20) }}>⚖️</ThemedText>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <ThemedText style={{ fontSize: fs(14), fontWeight: '700', color: '#E65100' }}>
+                    Impact du surpoids sur la glycémie
+                  </ThemedText>
+                  <ThemedText style={{ fontSize: fs(12), color: '#888', marginTop: vs(2) }}>
+                    Comprendre les risques · Conseils pratiques
+                  </ThemedText>
+                </View>
+              </View>
+              <ThemedText style={{ fontSize: fs(20), color: '#E65100', marginLeft: s(8) }}>
+                {surpoidsExpanded ? '▲' : '▼'}
+              </ThemedText>
+            </View>
+
+            {surpoidsExpanded && (
+              <View style={{ marginTop: vs(16) }}>
+
+                {/* Alerte intro */}
+                <View style={{ backgroundColor: '#FFF3E0', borderRadius: 10, padding: s(12), marginBottom: vs(16), borderLeftWidth: 4, borderLeftColor: '#E65100' }}>
+                  <ThemedText style={{ fontSize: fs(12), color: '#BF360C', lineHeight: fs(18), fontWeight: '600' }}>
+                    Le surpoids est l'un des principaux facteurs de risque du diabète de type 2 et complique significativement la gestion du diabète existant.
+                  </ThemedText>
+                </View>
+
+                {/* Impacts */}
+                <ThemedText style={{ fontSize: fs(13), fontWeight: '700', color: '#333', marginBottom: vs(10) }}>
+                  Effets du surpoids sur la glycémie
+                </ThemedText>
+
+                {[
+                  {
+                    icon: '🔴',
+                    title: 'Résistance à l\'insuline',
+                    desc: 'L\'excès de graisse abdominale (viscérale) bloque les récepteurs à l\'insuline. Le pancréas doit produire 2 à 5 fois plus d\'insuline pour le même effet, s\'épuisant progressivement.',
+                  },
+                  {
+                    icon: '📈',
+                    title: 'Hyperglycémie chronique',
+                    desc: 'Lorsque l\'insuline n\'est plus suffisamment efficace, le glucose s\'accumule dans le sang. Une glycémie constamment élevée abîme les vaisseaux sanguins et les nerfs à long terme.',
+                  },
+                  {
+                    icon: '⚠️',
+                    title: 'Risque de diabète type 2 ×3 à ×7',
+                    desc: 'Une personne en surpoids a 3 fois plus de risque de développer un diabète de type 2. En cas d\'obésité sévère (IMC > 35), ce risque est multiplié par 7.',
+                  },
+                  {
+                    icon: '🔥',
+                    title: 'Inflammation chronique',
+                    desc: 'Le tissu adipeux en excès sécrète des substances inflammatoires (cytokines, adipokines) qui aggravent la résistance à l\'insuline et perturbent le métabolisme du glucose.',
+                  },
+                  {
+                    icon: '❤️',
+                    title: 'Complications cardiovasculaires',
+                    desc: 'Surpoids + diabète = risque de crise cardiaque ×4. L\'hypertension, le mauvais cholestérol et la glycémie élevée forment un syndrome métabolique très dangereux.',
+                  },
+                  {
+                    icon: '🌙',
+                    title: 'Perturbation hormonale',
+                    desc: 'Le surpoids élève le cortisol (hormone du stress) et perturbe la leptine (satiété) et la ghréline (faim), créant un cercle vicieux difficile à rompre sans prise en charge.',
+                  },
+                ].map((item, i) => (
+                  <View key={i} style={{ flexDirection: 'row', gap: s(10), marginBottom: vs(12), alignItems: 'flex-start' }}>
+                    <ThemedText style={{ fontSize: fs(18), marginTop: vs(1) }}>{item.icon}</ThemedText>
+                    <View style={{ flex: 1 }}>
+                      <ThemedText style={{ fontSize: fs(13), fontWeight: '700', color: '#333', marginBottom: vs(3) }}>
+                        {item.title}
+                      </ThemedText>
+                      <ThemedText style={{ fontSize: fs(12), color: '#666', lineHeight: fs(18) }}>
+                        {item.desc}
+                      </ThemedText>
+                    </View>
+                  </View>
+                ))}
+
+                {/* Séparateur */}
+                <View style={{ height: 1, backgroundColor: '#eee', marginVertical: vs(16) }} />
+
+                {/* Conseils */}
+                <ThemedText style={{ fontSize: fs(13), fontWeight: '700', color: '#333', marginBottom: vs(10) }}>
+                  Conseils pour contrôler son poids
+                </ThemedText>
+
+                {[
+                  {
+                    icon: '🥗',
+                    title: 'Alimentation à index glycémique bas',
+                    desc: 'Privilégiez les légumes, légumineuses, céréales complètes. Réduisez les sucres rapides, sodas, viennoiseries. Mangez dans l\'ordre : légumes → protéines → féculents.',
+                  },
+                  {
+                    icon: '🚶',
+                    title: '30 min de marche rapide par jour',
+                    desc: 'L\'activité physique est le médicament le plus efficace contre la résistance à l\'insuline. Même 10 min après le repas réduit le pic glycémique de 20 à 30 %.',
+                  },
+                  {
+                    icon: '💧',
+                    title: 'Hydratation avant les repas',
+                    desc: 'Boire un grand verre d\'eau 20 min avant de manger réduit la prise alimentaire et ralentit l\'absorption des glucides. Visez 1,5 à 2 L d\'eau par jour.',
+                  },
+                  {
+                    icon: '😴',
+                    title: 'Dormir 7 à 8 heures',
+                    desc: 'Le manque de sommeil élève le cortisol, augmente la ghréline (faim) et réduit la leptine (satiété), favorisant la prise de poids. Un bon sommeil stabilise aussi la glycémie.',
+                  },
+                  {
+                    icon: '🍽️',
+                    title: 'Contrôler les portions',
+                    desc: 'Utilisez des assiettes plus petites. Mastiquez lentement (20 min minimum par repas). La satiété met du temps à arriver — manger vite entraîne systématiquement un excès calorique.',
+                  },
+                  {
+                    icon: '📏',
+                    title: 'Surveiller le tour de taille',
+                    desc: 'Le tour de taille est plus révélateur que le poids seul. Objectif : < 94 cm pour les hommes, < 80 cm pour les femmes. La graisse abdominale est la plus nocive pour la glycémie.',
+                  },
+                  {
+                    icon: '🩺',
+                    title: 'Suivi médical régulier',
+                    desc: 'Consultez un endocrinologue ou un diététicien au moins 2 fois par an. Un suivi professionnel multiplie par 3 les chances de maintenir un poids santé sur le long terme.',
+                  },
+                ].map((item, i) => (
+                  <View key={i} style={{ flexDirection: 'row', gap: s(10), marginBottom: vs(12), alignItems: 'flex-start', backgroundColor: '#F1F8E9', borderRadius: 8, padding: s(10) }}>
+                    <ThemedText style={{ fontSize: fs(18), marginTop: vs(1) }}>{item.icon}</ThemedText>
+                    <View style={{ flex: 1 }}>
+                      <ThemedText style={{ fontSize: fs(13), fontWeight: '700', color: '#2E7D32', marginBottom: vs(3) }}>
+                        {item.title}
+                      </ThemedText>
+                      <ThemedText style={{ fontSize: fs(12), color: '#555', lineHeight: fs(18) }}>
+                        {item.desc}
+                      </ThemedText>
+                    </View>
+                  </View>
+                ))}
+
+                {/* Avertissement médical */}
+                <View style={{ backgroundColor: '#E3F2FD', borderRadius: 10, padding: s(12), marginTop: vs(4), borderLeftWidth: 4, borderLeftColor: '#1565C0' }}>
+                  <ThemedText style={{ fontSize: fs(11), color: '#1565C0', lineHeight: fs(17) }}>
+                    Ces informations sont à titre éducatif. Consultez votre médecin avant de modifier votre alimentation ou votre activité physique, surtout si vous êtes sous traitement diabétique.
+                  </ThemedText>
+                </View>
+
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
 
         {/* ── Accès rapide ── */}
         <View style={styles.section}>
