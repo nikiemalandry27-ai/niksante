@@ -593,6 +593,108 @@ const CHAPTERS: Chapter[] = [
 
   // ─────────────────────────────────────────────────────────────────────────
   {
+    id: 'weight',
+    color: '#E65100',
+    bg: '#FFF3E0',
+    title: 'Surpoids & Glycémie',
+    subtitle: 'Impacts, risques et conseils pour contrôler son poids',
+    blocks: [
+      {
+        type: 'warning',
+        text: "Le surpoids est l'un des principaux facteurs de risque du diabète de type 2 et complique significativement la gestion d'un diabète existant.",
+      },
+      {
+        type: 'paragraph',
+        text: "L'excès de masse grasse, particulièrement la graisse abdominale (viscérale), perturbe profondément le métabolisme du glucose. Comprendre ce lien est essentiel pour agir efficacement sur son équilibre glycémique.",
+      },
+      {
+        type: 'list',
+        title: "Résistance à l'insuline — mécanisme central",
+        items: [
+          "L'excès de graisse abdominale (viscérale) bloque les récepteurs à l'insuline",
+          "Le pancréas doit produire 2 à 5 fois plus d'insuline pour le même effet",
+          "À terme, les cellules bêta s'épuisent et la glycémie augmente durablement",
+          "C'est le mécanisme central du diabète de type 2 lié au surpoids",
+        ],
+      },
+      {
+        type: 'table',
+        rows: [
+          { label: 'IMC normal (18,5–24,9)',   value: 'Risque diabète T2 — référence', color: '#388E3C' },
+          { label: 'Surpoids (25–29,9)',        value: 'Risque × 3',                   color: '#F57C00' },
+          { label: 'Obésité (30–34,9)',         value: 'Risque × 5',                   color: '#E65100' },
+          { label: 'Obésité sévère (≥ 35)',     value: 'Risque × 7',                   color: '#B71C1C' },
+        ],
+      },
+      {
+        type: 'list',
+        title: 'Autres impacts sur la santé',
+        items: [
+          "Hyperglycémie chronique : le glucose s'accumule et abîme vaisseaux sanguins et nerfs",
+          "Inflammation chronique : le tissu adipeux sécrète des cytokines pro-inflammatoires",
+          "Complications cardiovasculaires : surpoids + diabète = risque d'infarctus × 4",
+          "Syndrome métabolique : surpoids + glycémie élevée + hypertension + mauvais cholestérol",
+          "Perturbation hormonale : cortisol élevé, leptine résistante, ghréline augmentée (faim excessive)",
+          "Apnée du sommeil aggravée : elle-même facteur de résistance à l'insuline",
+        ],
+      },
+      {
+        type: 'list',
+        title: 'Tour de taille — indicateur clé',
+        items: [
+          "Le tour de taille est plus révélateur que le poids seul pour évaluer le risque métabolique",
+          "Risque élevé : > 94 cm (homme) · > 80 cm (femme)",
+          "Risque très élevé : > 102 cm (homme) · > 88 cm (femme)",
+          "La graisse abdominale viscérale est la plus nocive pour le métabolisme",
+          "À mesurer à mi-chemin entre la dernière côte et le haut du bassin",
+        ],
+      },
+      {
+        type: 'list',
+        title: 'Alimentation à index glycémique bas',
+        items: [
+          "Privilégiez légumes, légumineuses, céréales complètes et fruits entiers",
+          "Réduisez sucres rapides, sodas, viennoiseries et aliments ultra-transformés",
+          "Ordre des aliments dans l'assiette : légumes → protéines → féculents (réduit le pic de 30 %)",
+          "Assiette idéale : ½ légumes + ¼ protéines maigres + ¼ féculents à IG bas",
+          "Mastiquez lentement — 20 min minimum par repas — la satiété tarde à arriver",
+        ],
+      },
+      {
+        type: 'list',
+        title: 'Activité physique — le médicament le plus efficace',
+        items: [
+          "30 min de marche rapide par jour améliore significativement la sensibilité à l'insuline",
+          "10 min de marche après le repas réduit le pic glycémique de 20 à 30 %",
+          "Objectif OMS : 150 min d'activité modérée par semaine minimum",
+          "Musculation légère 2×/semaine : améliore la composition corporelle et la glycémie",
+          "Réduire la sédentarité : se lever toutes les heures, préférer les escaliers",
+        ],
+      },
+      {
+        type: 'list',
+        title: 'Hydratation et sommeil',
+        items: [
+          "Boire un grand verre d'eau 20 min avant de manger réduit la prise alimentaire",
+          "Visez 1,5 à 2 L d'eau par jour — l'eau coupe aussi les envies de sucre",
+          "Dormir 7 à 8h : le manque de sommeil élève le cortisol et augmente la faim (ghréline)",
+          "Un bon sommeil améliore la sensibilité à l'insuline du lendemain",
+          "L'apnée du sommeil doit être dépistée et traitée (aggrave le diabète)",
+        ],
+      },
+      {
+        type: 'tip',
+        text: "Perdre seulement 5 à 10 % de son poids corporel suffit souvent à améliorer significativement la glycémie, réduire la tension artérielle et diminuer les doses de médicaments. Chaque kilogramme perdu compte !",
+      },
+      {
+        type: 'warning',
+        text: "Ces informations sont à titre éducatif. Consultez votre médecin ou un diététicien avant de modifier votre alimentation ou votre activité physique, surtout si vous êtes sous traitement diabétique.",
+      },
+    ],
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  {
     id: 'lifestyle',
     color: '#5C6BC0',
     bg: '#E8EAF6',
