@@ -16,6 +16,7 @@ import {
   Switch,
   Share,
   Linking,
+  Platform,
   AppState,
   AppStateStatus,
 } from 'react-native';
@@ -88,6 +89,18 @@ async function scheduleReminder(key: ReminderKey, hour: number, minute: number):
   const def = REMINDER_DEFS[key];
   try {
     const Notifs = require('expo-notifications');
+    // Garantit que le canal existe avant de planifier (idempotent)
+    if (Platform.OS === 'android') {
+      await Notifs.setNotificationChannelAsync(NOTIF_CHANNEL_ID, {
+        name:             'Rappels glycémie',
+        importance:       Notifs.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor:       '#388E3C',
+        sound:            true,
+        enableVibrate:    true,
+        showBadge:        false,
+      });
+    }
     const id = await Notifs.scheduleNotificationAsync({
       content: {
         title: 'Rappel NikSanté',
@@ -105,7 +118,7 @@ async function scheduleReminder(key: ReminderKey, hour: number, minute: number):
     console.log(`[Notifs] "${key}" programmé à ${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')} → ID: ${id}`);
     return id;
   } catch (e) {
-    console.log(`[Notifs] Schedule unavailable pour "${key}":`, e);
+    console.error(`[Notifs] Schedule error pour "${key}":`, e);
     return null;
   }
 }
@@ -357,6 +370,17 @@ export default function ProfileScreen() {
           const updatedIds = { ...notifIds, [key]: id };
           setNotifIds(updatedIds);
           await AsyncStorage.setItem(NOTIF_IDS_KEY, JSON.stringify(updatedIds));
+        }
+        // Guide l'utilisateur à désactiver l'optimisation batterie
+        if (Platform.OS === 'android') {
+          Alert.alert(
+            'Rappel activé',
+            'Pour recevoir les rappels même quand l\'application est fermée, désactivez l\'optimisation batterie pour NikSanté :\n\nParamètres → Applications → NikSanté → Batterie → Aucune restriction',
+            [
+              { text: 'Plus tard', style: 'cancel' },
+              { text: 'Ouvrir les paramètres', onPress: () => Linking.openSettings() },
+            ],
+          );
         }
       } else {
         const id = notifIds[key];
