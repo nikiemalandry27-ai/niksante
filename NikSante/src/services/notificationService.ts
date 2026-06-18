@@ -19,6 +19,7 @@ if (!IS_EXPO_GO) {
         shouldShowAlert: true,
         shouldPlaySound: true,
         shouldSetBadge:  false,
+        priority:        Notifications.AndroidNotificationPriority.MAX,
       }),
     });
   } catch {

@@ -62,16 +62,20 @@ async function setupNotifications(): Promise<void> {
         shouldShowAlert: true,
         shouldPlaySound: true,
         shouldSetBadge:  false,
+        priority:        Notifs.AndroidNotificationPriority.MAX,
       }),
     });
     await Notifs.setNotificationChannelAsync(NOTIF_CHANNEL_ID, {
-      name:             'Rappels glycémie',
-      importance:       Notifs.AndroidImportance.HIGH,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor:       '#388E3C',
-      sound:            true,
-      enableVibrate:    true,
-      showBadge:        false,
+      name:                 'Rappels glycémie',
+      importance:           Notifs.AndroidImportance.MAX,
+      vibrationPattern:     [0, 250, 250, 250],
+      lightColor:           '#388E3C',
+      sound:                true,
+      enableVibrate:        true,
+      enableLights:         true,
+      showBadge:            false,
+      lockscreenVisibility: Notifs.AndroidNotificationVisibility.PUBLIC,
+      bypassDnd:            false,
     });
   } catch (e) {
     console.error('[Notifs] Setup error:', e);
@@ -82,24 +86,43 @@ async function scheduleReminder(key: ReminderKey, hour: number, minute: number):
   const def = REMINDER_DEFS[key];
   try {
     const Notifs = require('expo-notifications');
-    // Garantit que le canal existe avant de planifier (idempotent)
+
+    // Vérifie les permissions + alarmes exactes
+    const perms = await Notifs.getPermissionsAsync();
+    if (perms.status !== 'granted') {
+      const { status } = await Notifs.requestPermissionsAsync();
+      if (status !== 'granted') {
+        console.warn('[Notifs] Permission refusée');
+        return null;
+      }
+    }
+    if (Platform.OS === 'android' && perms.canScheduleExactNotifications === false) {
+      console.warn('[Notifs] canScheduleExactNotifications=false → rappels inexacts en background');
+    }
+
+    // Canal avec importance MAX pour garantir heads-up depuis le background
     if (Platform.OS === 'android') {
       await Notifs.setNotificationChannelAsync(NOTIF_CHANNEL_ID, {
-        name:             'Rappels glycémie',
-        importance:       Notifs.AndroidImportance.HIGH,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor:       '#388E3C',
-        sound:            true,
-        enableVibrate:    true,
-        showBadge:        false,
+        name:                 'Rappels glycémie',
+        importance:           Notifs.AndroidImportance.MAX,
+        vibrationPattern:     [0, 250, 250, 250],
+        lightColor:           '#388E3C',
+        sound:                true,
+        enableVibrate:        true,
+        enableLights:         true,
+        showBadge:            false,
+        lockscreenVisibility: Notifs.AndroidNotificationVisibility.PUBLIC,
+        bypassDnd:            false,
       });
     }
+
     const id = await Notifs.scheduleNotificationAsync({
       content: {
-        title: 'Rappel NikSanté',
-        body:  `${def.label} — Pensez à mesurer votre glycémie !`,
-        sound: true,
-        data:  { key },
+        title:    'Rappel NikSanté',
+        body:     `${def.label} — Pensez à mesurer votre glycémie !`,
+        sound:    true,
+        priority: 'max',
+        data:     { key },
       },
       trigger: {
         type:      Notifs.SchedulableTriggerInputTypes.DAILY,
