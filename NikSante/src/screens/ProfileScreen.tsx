@@ -59,42 +59,33 @@ const IS_EXPO_GO = Constants.executionEnvironment === ExecutionEnvironment.Store
 // ---------------------------------------------------------------------------
 
 async function setupNotifications(): Promise<void> {
-  if (IS_EXPO_GO) return;
-  const Notifs = require('expo-notifications');
-
-  // Handler : affiche la notif même si l'app est au premier plan
-  Notifs.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge:  false,
-    }),
-  });
-
-  // Canal Android OBLIGATOIRE (Android 8+) — sans ça, toutes les notifs sont ignorées silencieusement
-  await Notifs.setNotificationChannelAsync(NOTIF_CHANNEL_ID, {
-    name:              'Rappels glycémie',
-    importance:        Notifs.AndroidImportance.HIGH,
-    vibrationPattern:  [0, 250, 250, 250],
-    lightColor:        '#388E3C',
-    sound:             true,
-    enableVibrate:     true,
-    showBadge:         false,
-  });
+  try {
+    const Notifs = require('expo-notifications');
+    Notifs.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge:  false,
+      }),
+    });
+    await Notifs.setNotificationChannelAsync(NOTIF_CHANNEL_ID, {
+      name:             'Rappels glycémie',
+      importance:       Notifs.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor:       '#388E3C',
+      sound:            true,
+      enableVibrate:    true,
+      showBadge:        false,
+    });
+  } catch (e) {
+    console.log('[Notifs] Setup unavailable:', e);
+  }
 }
 
 async function scheduleReminder(key: ReminderKey, hour: number, minute: number): Promise<string | null> {
-  if (IS_EXPO_GO) return null;
-  const Notifs = require('expo-notifications');
-  const def    = REMINDER_DEFS[key];
-
-  // Calcule la prochaine occurrence : si l'heure est déjà passée aujourd'hui → demain
-  const now     = new Date();
-  const trigger = new Date();
-  trigger.setHours(hour, minute, 0, 0);
-  if (trigger <= now) trigger.setDate(trigger.getDate() + 1);
-
+  const def = REMINDER_DEFS[key];
   try {
+    const Notifs = require('expo-notifications');
     const id = await Notifs.scheduleNotificationAsync({
       content: {
         title: 'Rappel NikSanté',
@@ -109,24 +100,21 @@ async function scheduleReminder(key: ReminderKey, hour: number, minute: number):
         channelId: NOTIF_CHANNEL_ID,
       },
     });
-    const h = String(hour).padStart(2, '0');
-    const m = String(minute).padStart(2, '0');
-    console.log(`[Notifs] "${key}" programmé à ${h}:${m} → ID: ${id}. Première occurrence: ${trigger.toLocaleString()}`);
+    console.log(`[Notifs] "${key}" programmé à ${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')} → ID: ${id}`);
     return id;
   } catch (e) {
-    console.error(`[Notifs] Erreur scheduling "${key}":`, e);
+    console.log(`[Notifs] Schedule unavailable pour "${key}":`, e);
     return null;
   }
 }
 
 async function cancelReminder(id: string): Promise<void> {
-  if (IS_EXPO_GO) return;
-  const Notifs = require('expo-notifications');
   try {
+    const Notifs = require('expo-notifications');
     await Notifs.cancelScheduledNotificationAsync(id);
     console.log(`[Notifs] Rappel annulé → ID: ${id}`);
   } catch (e) {
-    console.error('[Notifs] Erreur annulation:', e);
+    console.log('[Notifs] Cancel unavailable:', e);
   }
 }
 
@@ -287,7 +275,7 @@ export default function ProfileScreen() {
     await AsyncStorage.setItem(REMINDER_TIMES_KEY, JSON.stringify(updated));
 
     // Reprogramme automatiquement si le rappel est actif
-    if (reminders[key] && !IS_EXPO_GO) {
+    if (reminders[key]) {
       const oldId = notifIds[key];
       if (oldId) await cancelReminder(oldId);
       const { hour, minute } = updated[key];
@@ -343,15 +331,13 @@ export default function ProfileScreen() {
     return () => { sub.remove(); clearInterval(interval); };
   }, [reminders, reminderTimes]);
 
-  // ── Production : notifications système planifiées ──────────────────────
+  // ── Notifications système (fonctionne Expo Go + production) ────────────
   const toggleReminder = async (key: ReminderKey) => {
     const isOn = reminders[key];
 
-    if (!IS_EXPO_GO) {
-      const Notifs = require('expo-notifications');
-
-      if (!isOn) {
-        // Demande de permission
+    if (!isOn) {
+      try {
+        const Notifs = require('expo-notifications');
         const { status } = await Notifs.requestPermissionsAsync();
         if (status !== 'granted') {
           Alert.alert(
@@ -361,30 +347,26 @@ export default function ProfileScreen() {
           return;
         }
 
-        // Annule l'ancien rappel s'il existe (évite les doublons)
         const oldId = notifIds[key];
         if (oldId) await cancelReminder(oldId);
 
-        // Programme le nouveau rappel quotidien à l'heure personnalisée
         const { hour, minute } = reminderTimes[key];
         const id = await scheduleReminder(key, hour, minute);
-        if (!id) {
-          Alert.alert('Erreur', 'Impossible de programmer le rappel. Réessayez.');
-          return;
+        if (id) {
+          const updatedIds = { ...notifIds, [key]: id };
+          setNotifIds(updatedIds);
+          await AsyncStorage.setItem(NOTIF_IDS_KEY, JSON.stringify(updatedIds));
         }
-
-        const updatedIds = { ...notifIds, [key]: id };
-        setNotifIds(updatedIds);
-        await AsyncStorage.setItem(NOTIF_IDS_KEY, JSON.stringify(updatedIds));
-
-      } else {
-        // Désactivation → annule la notification planifiée
-        const id = notifIds[key];
-        if (id) await cancelReminder(id);
-        const updatedIds = { ...notifIds, [key]: null };
-        setNotifIds(updatedIds);
-        await AsyncStorage.setItem(NOTIF_IDS_KEY, JSON.stringify(updatedIds));
+      } catch (e) {
+        // expo-notifications indisponible — les alertes in-app prendront le relais
+        console.log('[Notifs] Planification indisponible, alertes in-app actives');
       }
+    } else {
+      const id = notifIds[key];
+      if (id) await cancelReminder(id);
+      const updatedIds = { ...notifIds, [key]: null };
+      setNotifIds(updatedIds);
+      await AsyncStorage.setItem(NOTIF_IDS_KEY, JSON.stringify(updatedIds));
     }
 
     const updated = { ...reminders, [key]: !isOn };
