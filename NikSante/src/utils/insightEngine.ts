@@ -88,8 +88,8 @@ function computePersonalGoal(entries: SleepEntry[]): number {
 // Dette de sommeil
 // ---------------------------------------------------------------------------
 
-export function computeSleepDebt(entries: SleepEntry[]): SleepDebt {
-  const goal = computePersonalGoal(entries);
+export function computeSleepDebt(entries: SleepEntry[], userGoal?: number): SleepDebt {
+  const goal = userGoal ?? computePersonalGoal(entries);
   const now  = new Date();
 
   function debtForDays(days: number): number {
@@ -99,9 +99,12 @@ export function computeSleepDebt(entries: SleepEntry[]): SleepDebt {
       d.setDate(d.getDate() - i);
       const dateStr = d.toISOString().split('T')[0];
       const entry   = entries.find(e => e.date === dateStr);
-      if (entry) total += Math.max(0, goal - entry.duration);
+      if (entry && entry.duration != null) {
+        // Les nuits courtes accumulent de la dette, les nuits longues la réduisent
+        total += goal - entry.duration;
+      }
     }
-    return Math.round(total * 10) / 10;
+    return Math.max(0, Math.round(total * 10) / 10);
   }
 
   const debt7d  = debtForDays(7);
@@ -226,6 +229,7 @@ export function getDailyTip(entries: SleepEntry[], debt: SleepDebt | null): Dail
 export function generateInsights(
   sleepEntries: SleepEntry[],
   glucoseHistory: GlucoseEntry[],
+  userGoal?: number,
 ): Insight[] {
   const insights: Insight[] = [];
 
@@ -240,7 +244,7 @@ export function generateInsights(
     ? recentGlucose.reduce((a, b) => a + b.value, 0) / recentGlucose.length : null;
 
   const stdMin     = bedtimeStdMinutes(recentSleep);
-  const goal       = computePersonalGoal(sleepEntries);
+  const goal       = userGoal ?? computePersonalGoal(sleepEntries);
 
   // Énergie au réveil moyenne (si dispo)
   const wakeFeelings = recentSleep.filter(e => e.wakeFeeling).map(e => e.wakeFeeling as WakeFeeling);
@@ -323,6 +327,7 @@ export function generateInsights(
 export function computeHealthScore(
   sleepEntries: SleepEntry[],
   glucoseHistory: GlucoseEntry[],
+  userGoal?: number,
 ): HealthScore | null {
   const recentSleep   = sleepEntries.slice(0, 7);
   const recentGlucose = last7DaysGlucose(glucoseHistory);
@@ -335,7 +340,7 @@ export function computeHealthScore(
   // ── Score sommeil ─────────────────────────────────────────────────────────
   let sleepScore = 0;
   if (hasSleep) {
-    const goal    = computePersonalGoal(sleepEntries);
+    const goal    = userGoal ?? computePersonalGoal(sleepEntries);
     const avgDur  = recentSleep.reduce((a, b) => a + b.duration, 0) / recentSleep.length;
     const avgQual = recentSleep.reduce((a, b) => a + b.quality,  0) / recentSleep.length;
     const regScore = Math.max(0, 100 - (bedtimeStdMinutes(recentSleep) / 120) * 100);

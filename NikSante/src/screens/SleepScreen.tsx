@@ -9,6 +9,9 @@ import {
   computeSleepDuration,
   SLEEP_QUALITY_META,
   WAKE_FEELING_META,
+  SLEEP_GOAL_MIN,
+  SLEEP_GOAL_MAX,
+  SLEEP_GOAL_STEP,
   SleepEntry,
   SleepQuality,
   WakeFeeling,
@@ -16,7 +19,6 @@ import {
 import { useGlucoseStore } from '@/store/glucoseStore';
 import {
   generateInsights,
-  computeHealthScore,
   computeSleepDebt,
   detectChronotype,
   getDailyTip,
@@ -121,8 +123,12 @@ export default function SleepScreen() {
   const initSleep      = useSleepStore(s => s.initSleep);
   const addSleep       = useSleepStore(s => s.addSleep);
   const deleteSleep    = useSleepStore(s => s.deleteSleep);
+  const sleepGoal      = useSleepStore(s => s.sleepGoal);
+  const setSleepGoal   = useSleepStore(s => s.setSleepGoal);
   const avgDuration    = useSleepStore(s => s.getAverageDuration)();
   const glucoseHistory = useGlucoseStore(s => s.glucoseHistory);
+
+  const [showGoalInfo,  setShowGoalInfo]  = useState(false);
 
   // ── Date sélectionnée ──────────────────────────────────────────────────────
   const [selectedDate, setSelectedDate] = useState(todayStr());
@@ -171,9 +177,8 @@ export default function SleepScreen() {
 
   // ── Données calculées ──────────────────────────────────────────────────────
   const duration  = computeSleepDuration(bedTime, wakeTime);
-  const insights  = generateInsights(entries, glucoseHistory);
-  const score     = computeHealthScore(entries, glucoseHistory);
-  const debt      = entries.length > 0 ? computeSleepDebt(entries) : null;
+  const insights  = generateInsights(entries, glucoseHistory, sleepGoal);
+  const debt      = entries.length > 0 ? computeSleepDebt(entries, sleepGoal) : null;
   const chronotype = detectChronotype(entries);
   const dailyTip  = getDailyTip(entries, debt);
   const recent7   = entries.slice(0, 7);
@@ -223,10 +228,56 @@ export default function SleepScreen() {
               </View>
             )}
           </View>
-          {debt && debt.personalGoal > 0 && (
-            <ThemedText style={styles.goalLabel}>
-              Objectif personnel : <ThemedText style={styles.goalValue}>{debt.personalGoal}h</ThemedText>
-            </ThemedText>
+        </View>
+
+        {/* ── Objectif de sommeil ── */}
+        <View style={styles.goalCard}>
+          <View style={styles.goalHeader}>
+            <ThemedText style={styles.goalCardTitle}>OBJECTIF DE SOMMEIL</ThemedText>
+            <TouchableOpacity onPress={() => setShowGoalInfo(v => !v)} style={styles.infoBtn}>
+              <ThemedText style={styles.infoBtnText}>?</ThemedText>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.goalStepper}>
+            <TouchableOpacity
+              style={[styles.goalStepBtn, sleepGoal <= SLEEP_GOAL_MIN && styles.goalStepBtnDisabled]}
+              onPress={() => setSleepGoal(sleepGoal - SLEEP_GOAL_STEP)}
+              disabled={sleepGoal <= SLEEP_GOAL_MIN}
+            >
+              <ThemedText style={styles.goalStepArrow}>−</ThemedText>
+            </TouchableOpacity>
+
+            <View style={styles.goalValueBox}>
+              <ThemedText style={styles.goalValueText}>{sleepGoal}h</ThemedText>
+              <ThemedText style={styles.goalValueSub}>par nuit</ThemedText>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.goalStepBtn, sleepGoal >= SLEEP_GOAL_MAX && styles.goalStepBtnDisabled]}
+              onPress={() => setSleepGoal(sleepGoal + SLEEP_GOAL_STEP)}
+              disabled={sleepGoal >= SLEEP_GOAL_MAX}
+            >
+              <ThemedText style={styles.goalStepArrow}>+</ThemedText>
+            </TouchableOpacity>
+          </View>
+
+          {showGoalInfo && (
+            <View style={styles.goalInfoBox}>
+              <ThemedText style={styles.goalInfoTitle}>Recommandation pour les diabétiques</ThemedText>
+              <ThemedText style={styles.goalInfoText}>
+                Les experts recommandent <ThemedText style={styles.goalInfoBold}>7 à 9 heures</ThemedText> de sommeil par nuit pour les personnes diabétiques.
+              </ThemedText>
+              <ThemedText style={styles.goalInfoText}>
+                • En dessous de <ThemedText style={styles.goalInfoBold}>6h</ThemedText> : la résistance à l'insuline augmente significativement.
+              </ThemedText>
+              <ThemedText style={styles.goalInfoText}>
+                • Entre <ThemedText style={styles.goalInfoBold}>7h et 8h</ThemedText> : fenêtre optimale pour la régulation glycémique.
+              </ThemedText>
+              <ThemedText style={styles.goalInfoText}>
+                • Au-delà de <ThemedText style={styles.goalInfoBold}>9h</ThemedText> : un excès régulier peut aussi indiquer un déséquilibre métabolique.
+              </ThemedText>
+            </View>
           )}
         </View>
 
@@ -235,71 +286,6 @@ export default function SleepScreen() {
           <ThemedText style={styles.tipTitle}>CONSEIL DU JOUR</ThemedText>
           <ThemedText style={styles.tipText}>{dailyTip.icon}  {dailyTip.text}</ThemedText>
         </View>
-
-        {/* ── Score de santé ── */}
-        {score ? (
-          <View style={[styles.scoreCard, { borderLeftColor: score.color }]}>
-            <View style={styles.scoreRow}>
-              <View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(6) }}>
-                  <ThemedText style={styles.scoreLabel}>SCORE DE SANTÉ</ThemedText>
-                  <TouchableOpacity onPress={() => setShowScoreInfo(v => !v)} style={styles.infoBtn}>
-                    <ThemedText style={styles.infoBtnText}>?</ThemedText>
-                  </TouchableOpacity>
-                </View>
-                <ThemedText style={[styles.scoreValue, { color: score.color }]}>{score.total}<ThemedText style={[styles.scoreOver, { color: score.color }]}>/100</ThemedText></ThemedText>
-                <ThemedText style={[styles.scoreTag, { color: score.color }]}>{score.label}</ThemedText>
-              </View>
-              <View style={styles.scoreBreakdown}>
-                <ScoreBar label="Sommeil"  value={score.sleepScore}   color="#1565C0" />
-                <ScoreBar label="Glycémie" value={score.glucoseScore} color="#388E3C" />
-              </View>
-            </View>
-            {showScoreInfo && (
-              <View style={styles.scoreInfo}>
-                <ThemedText style={styles.scoreInfoTitle}>Comment ce score est calculé</ThemedText>
-
-                <ThemedText style={styles.scoreInfoSection}>Sommeil (40% du total)</ThemedText>
-                <ThemedText style={styles.scoreInfoLine}>• Durée vs objectif perso — 40%</ThemedText>
-                <ThemedText style={styles.scoreInfoLine}>• Qualité ressentie (1-5) — 40%</ThemedText>
-                <ThemedText style={styles.scoreInfoLine}>• Régularité des horaires — 20%</ThemedText>
-                <ThemedText style={styles.scoreInfoHint}>Si l'énergie au réveil est renseignée, elle remplace 30% du calcul pour plus de précision.</ThemedText>
-
-                <ThemedText style={styles.scoreInfoSection}>Glycémie (60% du total)</ThemedText>
-                <ThemedText style={styles.scoreInfoLine}>• Temps dans la cible 70-180 mg/dL — 60%</ThemedText>
-                <ThemedText style={styles.scoreInfoLine}>• Stabilité (faible variabilité) — 40%</ThemedText>
-
-                <ThemedText style={styles.scoreInfoHint}>Si une seule source est disponible, elle représente 100% du score.</ThemedText>
-              </View>
-            )}
-          </View>
-        ) : null}
-
-        {/* ── Dette de sommeil ── */}
-        {debt && debt.debt7d >= 0.5 && (
-          <View style={styles.debtCard}>
-            <View style={styles.debtHeader}>
-              <ThemedText style={styles.debtTitle}>💤 DETTE DE SOMMEIL</ThemedText>
-              <View style={styles.debtBadges}>
-                <View style={styles.debtBadge}>
-                  <ThemedText style={styles.debtBadgeVal}>{debt.debt7d}h</ThemedText>
-                  <ThemedText style={styles.debtBadgeLbl}>7 jours</ThemedText>
-                </View>
-                {debt.debt14d > 0 && (
-                  <View style={[styles.debtBadge, { backgroundColor: '#FFF0F0' }]}>
-                    <ThemedText style={[styles.debtBadgeVal, { color: '#B71C1C' }]}>{debt.debt14d}h</ThemedText>
-                    <ThemedText style={styles.debtBadgeLbl}>14 jours</ThemedText>
-                  </View>
-                )}
-              </View>
-            </View>
-            {debt.recoveryNights > 0 && (
-              <ThemedText style={styles.debtRecovery}>
-                Plan récupération : +{debt.recoveryExtra} min/soir pendant {debt.recoveryNights} nuit{debt.recoveryNights > 1 ? 's' : ''}
-              </ThemedText>
-            )}
-          </View>
-        )}
 
         {/* ── Formulaire ── */}
         <View style={styles.formCard}>
@@ -400,13 +386,61 @@ export default function SleepScreen() {
         <View style={styles.statsRow}>
           <StatBox label="MOY. DURÉE"   value={avgDuration > 0 ? formatDuration(avgDuration) : '—'} />
           <StatBox label="NUITS (7J)"   value={`${recent7.length}`} />
-          <StatBox label="OBJECTIF"     value={debt ? `${debt.personalGoal}h` : '7.5h'} highlight />
+          <StatBox label="OBJECTIF"     value={`${sleepGoal}h`} highlight />
         </View>
 
-        {/* ── Insights (max 2) ── */}
-        {insights.length > 0 && (
+        {/* ── Analyse : insights + dette de sommeil ── */}
+        {(insights.length > 0 || (debt && debt.debt7d >= 0.5)) && (
           <View style={styles.section}>
             <ThemedText style={styles.sectionTitle}>Analyse</ThemedText>
+
+            {debt && debt.debt7d >= 0.5 && (
+              <View style={styles.debtCard}>
+                {/* Titre */}
+                <ThemedText style={styles.debtTitle}>💤 DETTE DE SOMMEIL</ThemedText>
+
+                {/* Badges */}
+                <View style={styles.debtBadges}>
+                  <View style={styles.debtBadge7}>
+                    <ThemedText style={styles.debtBadgeVal7}>{debt.debt7d}h</ThemedText>
+                    <ThemedText style={styles.debtBadgeLbl}>sur 7 jours</ThemedText>
+                  </View>
+                  {debt.debt14d > 0 && (
+                    <View style={styles.debtBadge14}>
+                      <ThemedText style={styles.debtBadgeVal14}>{debt.debt14d}h</ThemedText>
+                      <ThemedText style={styles.debtBadgeLbl}>sur 14 jours</ThemedText>
+                    </View>
+                  )}
+                </View>
+
+                {/* Explication */}
+                <View style={styles.debtExplain}>
+                  <ThemedText style={styles.debtExplainText}>
+                    <ThemedText style={styles.debtExplainBold}>7 jours</ThemedText> : total des heures manquantes par rapport à votre objectif ({debt.personalGoal}h/nuit) sur les 7 derniers jours. Les nuits où vous avez dormi plus que l'objectif réduisent ce chiffre.
+                  </ThemedText>
+                  {debt.debt14d > 0 && (
+                    <ThemedText style={[styles.debtExplainText, { marginTop: vs(6) }]}>
+                      <ThemedText style={styles.debtExplainBold}>14 jours</ThemedText> : même calcul étendu aux 14 derniers jours.{' '}
+                      {debt.debt14d === debt.debt7d
+                        ? 'Identique aux 7 jours → la semaine précédente était équilibrée (pas de dette supplémentaire).'
+                        : debt.debt14d > debt.debt7d
+                          ? `Plus élevé que les 7 jours → la semaine précédente avait déjà ${Math.round((debt.debt14d - debt.debt7d) * 10) / 10}h de manque.`
+                          : 'Plus bas que les 7 jours → la semaine précédente vous avez bien récupéré.'}
+                    </ThemedText>
+                  )}
+                </View>
+
+                {/* Plan de récupération */}
+                {debt.recoveryNights > 0 && (
+                  <View style={styles.debtRecoveryBox}>
+                    <ThemedText style={styles.debtRecovery}>
+                      Plan récupération : +{debt.recoveryExtra} min/soir pendant {debt.recoveryNights} nuit{debt.recoveryNights > 1 ? 's' : ''}
+                    </ThemedText>
+                  </View>
+                )}
+              </View>
+            )}
+
             {insights.map(ins => (
               <View key={ins.id} style={[styles.insightCard, { borderLeftColor: ins.color }]}>
                 <ThemedText style={[styles.insightTitle, { color: ins.color }]}>
@@ -477,24 +511,6 @@ function StatBox({ label, value, highlight }: { label: string; value: string; hi
 }
 
 // ---------------------------------------------------------------------------
-// ScoreBar
-// ---------------------------------------------------------------------------
-
-function ScoreBar({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <View style={{ marginBottom: vs(6) }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: vs(2) }}>
-        <ThemedText style={{ fontSize: fs(10), color: '#999' }}>{label}</ThemedText>
-        <ThemedText style={{ fontSize: fs(10), color, fontWeight: '700' }}>{value}</ThemedText>
-      </View>
-      <View style={{ height: vs(6), backgroundColor: '#f0f0f0', borderRadius: 3, overflow: 'hidden' }}>
-        <View style={{ width: `${value}%`, height: vs(6), backgroundColor: color, borderRadius: 3 }} />
-      </View>
-    </View>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Styles
 // ---------------------------------------------------------------------------
 
@@ -512,8 +528,33 @@ const styles = StyleSheet.create({
   },
   chronoEmoji: { fontSize: fs(14) },
   chronoLabel: { fontSize: fs(11), color: '#512DA8', fontWeight: '700' },
-  goalLabel:   { fontSize: fs(11), color: '#999' },
-  goalValue:   { fontWeight: '700', color: '#388E3C' },
+
+  // Objectif de sommeil
+  goalCard: {
+    marginHorizontal: s(20), marginBottom: vs(10),
+    backgroundColor: '#fff', borderRadius: 16, padding: s(16),
+    borderLeftWidth: 4, borderLeftColor: '#1565C0',
+    elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3,
+  },
+  goalHeader:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: vs(12) },
+  goalCardTitle: { fontSize: fs(10), color: '#999', fontWeight: '700', letterSpacing: 0.6 },
+  goalStepper:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: s(20) },
+  goalStepBtn: {
+    width: s(44), height: s(44), borderRadius: s(22),
+    backgroundColor: '#E3F2FD', alignItems: 'center', justifyContent: 'center',
+  },
+  goalStepBtnDisabled: { backgroundColor: '#f0f0f0' },
+  goalStepArrow: { fontSize: fs(22), fontWeight: 'bold', color: '#1565C0' },
+  goalValueBox:  { alignItems: 'center', minWidth: s(80) },
+  goalValueText: { fontSize: fs(36), fontWeight: 'bold', color: '#1565C0', lineHeight: vs(40) },
+  goalValueSub:  { fontSize: fs(11), color: '#999', marginTop: vs(2) },
+  goalInfoBox: {
+    marginTop: vs(14), paddingTop: vs(12),
+    borderTopWidth: 1, borderTopColor: '#f0f0f0',
+  },
+  goalInfoTitle: { fontSize: fs(12), fontWeight: '800', color: '#1565C0', marginBottom: vs(8) },
+  goalInfoText:  { fontSize: fs(11), color: '#555', lineHeight: vs(18), marginBottom: vs(4) },
+  goalInfoBold:  { fontWeight: '700', color: '#1565C0' },
 
   // Conseil du jour
   tipCard: {
@@ -524,42 +565,36 @@ const styles = StyleSheet.create({
   tipTitle: { fontSize: fs(9), color: '#aaa', fontWeight: '700', letterSpacing: 0.8, marginBottom: vs(6) },
   tipText:  { fontSize: fs(13), color: '#333', lineHeight: vs(20) },
 
-  // Score
-  scoreCard: {
-    marginHorizontal: s(20), marginVertical: vs(6),
-    backgroundColor: '#fff', borderRadius: 16, padding: s(16), borderLeftWidth: 5,
-    elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 4,
-  },
-  scoreRow:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  scoreLabel:     { fontSize: fs(10), color: '#999', fontWeight: '700', letterSpacing: 0.6, marginBottom: vs(4) },
-  scoreValue:     { fontSize: fs(44), fontWeight: 'bold', lineHeight: vs(48) },
-  scoreOver:      { fontSize: fs(16), fontWeight: '600' },
-  scoreTag:       { fontSize: fs(13), fontWeight: '700' },
-  scoreBreakdown: { flex: 1, marginLeft: s(20) },
-
   infoBtn:      { width: s(22), height: s(22), borderRadius: s(11), backgroundColor: '#1565C0', alignItems: 'center', justifyContent: 'center' },
   infoBtnText:  { fontSize: fs(12), fontWeight: '900', color: '#fff' },
 
-  scoreInfo:        { marginTop: vs(12), paddingTop: vs(12), borderTopWidth: 1, borderTopColor: '#f0f0f0' },
-  scoreInfoTitle:   { fontSize: fs(12), fontWeight: '800', color: '#444', marginBottom: vs(10) },
-  scoreInfoSection: { fontSize: fs(11), fontWeight: '700', color: '#666', marginTop: vs(6), marginBottom: vs(2) },
-  scoreInfoLine:    { fontSize: fs(11), color: '#777', marginBottom: vs(2), paddingLeft: s(4) },
-  scoreInfoHint:    { fontSize: fs(10), color: '#aaa', fontStyle: 'italic', marginTop: vs(4) },
-
   // Dette de sommeil
   debtCard: {
-    marginHorizontal: s(20), marginBottom: vs(10),
+    marginBottom: vs(8),
     backgroundColor: '#FFF3E0', borderRadius: 14, padding: s(14),
     borderLeftWidth: 4, borderLeftColor: '#F57C00',
     elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 2,
   },
-  debtHeader:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: vs(6) },
-  debtTitle:    { fontSize: fs(11), fontWeight: '800', color: '#E65100' },
-  debtBadges:   { flexDirection: 'row', gap: s(8) },
-  debtBadge:    { backgroundColor: '#FFE0B2', borderRadius: 10, paddingVertical: vs(4), paddingHorizontal: s(10), alignItems: 'center' },
-  debtBadgeVal: { fontSize: fs(14), fontWeight: 'bold', color: '#F57C00' },
-  debtBadgeLbl: { fontSize: fs(9), color: '#888', fontWeight: '600' },
-  debtRecovery: { fontSize: fs(12), color: '#5D4037', fontStyle: 'italic' },
+  debtTitle:   { fontSize: fs(11), fontWeight: '800', color: '#E65100', marginBottom: vs(12) },
+  debtBadges:  { flexDirection: 'row', gap: s(10), marginBottom: vs(12) },
+  debtBadge7: {
+    flex: 1, alignItems: 'center', paddingVertical: vs(10),
+    backgroundColor: '#FFF8F0', borderRadius: 12,
+    borderWidth: 2, borderColor: '#F57C00',
+  },
+  debtBadge14: {
+    flex: 1, alignItems: 'center', paddingVertical: vs(10),
+    backgroundColor: '#FFF0F0', borderRadius: 12,
+    borderWidth: 2, borderColor: '#B71C1C',
+  },
+  debtBadgeVal7:  { fontSize: fs(28), fontWeight: 'bold', color: '#F57C00', lineHeight: vs(32) },
+  debtBadgeVal14: { fontSize: fs(28), fontWeight: 'bold', color: '#B71C1C', lineHeight: vs(32) },
+  debtBadgeLbl:   { fontSize: fs(10), color: '#888', fontWeight: '700', marginTop: vs(2) },
+  debtExplain:     { backgroundColor: '#FFF8EC', borderRadius: 8, padding: s(10), marginBottom: vs(10) },
+  debtExplainText: { fontSize: fs(11), color: '#5D4037', lineHeight: vs(17) },
+  debtExplainBold: { fontWeight: '800', color: '#E65100' },
+  debtRecoveryBox: { backgroundColor: '#FFE0B2', borderRadius: 8, padding: s(10) },
+  debtRecovery:    { fontSize: fs(12), color: '#4E342E', fontWeight: '600' },
 
   // Formulaire
   formCard: {

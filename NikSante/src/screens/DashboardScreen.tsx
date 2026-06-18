@@ -68,6 +68,33 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 // ---------------------------------------------------------------------------
+// Impact glycémique selon durée de sommeil
+// ---------------------------------------------------------------------------
+
+function getSleepGlycemicImpact(hours: number): { text: string; color: string; icon: string } {
+  if (hours < 5)   return { icon: '🔴', color: '#B71C1C', text: 'Risque très élevé : résistance à l\'insuline fortement accrue' };
+  if (hours < 6)   return { icon: '🟠', color: '#E65100', text: 'Risque élevé : manque de sommeil dérègle la glycémie' };
+  if (hours < 7)   return { icon: '🟡', color: '#F57C00', text: 'Impact modéré : glycémie légèrement perturbée' };
+  if (hours <= 9)  return { icon: '🟢', color: '#2E7D32', text: 'Optimal : fenêtre idéale pour la régulation glycémique' };
+  return           { icon: '🟡', color: '#F57C00', text: 'Excès de sommeil : peut indiquer un déséquilibre métabolique' };
+}
+
+// Score de sommeil → label
+function sleepScoreLabel(score: number): string {
+  if (score >= 80) return 'Excellent';
+  if (score >= 60) return 'Bon';
+  if (score >= 40) return 'Moyen';
+  return 'À améliorer';
+}
+
+function sleepScoreColor(score: number): string {
+  if (score >= 80) return '#388E3C';
+  if (score >= 60) return '#FBC02D';
+  if (score >= 40) return '#F57C00';
+  return '#B71C1C';
+}
+
+// ---------------------------------------------------------------------------
 // Composant
 // ---------------------------------------------------------------------------
 
@@ -89,16 +116,13 @@ export default function DashboardScreen() {
   const glucoseUnit = useSettingsStore((s) => s.glucoseUnit);
 
   const sleepEntries = useSleepStore(s => s.entries);
+  const sleepGoal    = useSleepStore(s => s.sleepGoal);
   const todaySleep   = sleepEntries.find(e => e.date === new Date().toISOString().split('T')[0]) ?? null;
-  const healthScore  = computeHealthScore(sleepEntries, glucoseHistory);
+  const healthScore  = computeHealthScore(sleepEntries, glucoseHistory, sleepGoal);
 
-  const hasSleepData   = sleepEntries.length > 0;
-  const hasGlucoseData = glucoseHistory.length > 0;
-  const scoreHint = hasSleepData && hasGlucoseData
-    ? 'Score = sommeil + glycémie'
-    : hasSleepData
-    ? 'Score = sommeil uniquement'
-    : 'Score = glycémie uniquement';
+  const [showScoreInfo, setShowScoreInfo] = useState(false);
+
+  const hasSleepData = sleepEntries.length > 0;
 
   useEffect(() => { initGlucose(); }, []);
 
@@ -322,7 +346,18 @@ export default function DashboardScreen() {
         {/* ── Carte sommeil ── */}
         <TouchableOpacity style={styles.sleepCard} onPress={handleSleep} activeOpacity={0.8}>
           <View style={styles.sleepCardLeft}>
-            <ThemedText style={styles.sleepCardLabel}>TEMPS DE SOMMEIL</ThemedText>
+            <View style={styles.sleepCardLabelRow}>
+              <ThemedText style={styles.sleepCardLabel}>TEMPS DE SOMMEIL</ThemedText>
+              {healthScore && hasSleepData && (
+                <TouchableOpacity
+                  style={styles.sleepInfoBtn}
+                  onPress={(e) => { e.stopPropagation(); setShowScoreInfo(v => !v); }}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <ThemedText style={styles.sleepInfoBtnText}>?</ThemedText>
+                </TouchableOpacity>
+              )}
+            </View>
             {todaySleep ? (
               <>
                 <ThemedText style={styles.sleepCardValue}>
@@ -331,6 +366,17 @@ export default function DashboardScreen() {
                     ? `${todaySleep.duration}h`
                     : `${Math.floor(todaySleep.duration)}h${Math.round((todaySleep.duration % 1) * 60)}min`}
                 </ThemedText>
+                {/* Impact glycémique */}
+                {(() => {
+                  const impact = getSleepGlycemicImpact(todaySleep.duration);
+                  return (
+                    <View style={[styles.sleepImpactBadge, { backgroundColor: impact.color + '18' }]}>
+                      <ThemedText style={[styles.sleepImpactText, { color: impact.color }]}>
+                        {impact.icon}  {impact.text}
+                      </ThemedText>
+                    </View>
+                  );
+                })()}
                 <ThemedText style={styles.sleepCardSub}>
                   {'Nuit du '}
                   {new Date(todaySleep.date + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
@@ -343,16 +389,27 @@ export default function DashboardScreen() {
               <ThemedText style={styles.sleepCardEmpty}>Non enregistré · Appuyez pour ajouter</ThemedText>
             )}
             {healthScore && hasSleepData && (
-              <ThemedText style={styles.sleepScoreHint}>{scoreHint} · 7 derniers jours</ThemedText>
+              <ThemedText style={styles.sleepScoreHint}>Score sommeil · 7 derniers jours</ThemedText>
             )}
           </View>
           {healthScore && hasSleepData && (
-            <View style={[styles.sleepScoreBadge, { borderColor: healthScore.color, backgroundColor: healthScore.color + '18' }]}>
-              <ThemedText style={[styles.sleepScoreNum, { color: healthScore.color }]}>{healthScore.total}<ThemedText style={[styles.sleepScoreOver, { color: healthScore.color }]}>/100</ThemedText></ThemedText>
-              <ThemedText style={[styles.sleepScoreTag, { color: healthScore.color }]}>{healthScore.label}</ThemedText>
+            <View style={[styles.sleepScoreBadge, { borderColor: sleepScoreColor(healthScore.sleepScore), backgroundColor: sleepScoreColor(healthScore.sleepScore) + '18' }]}>
+              <ThemedText style={[styles.sleepScoreNum, { color: sleepScoreColor(healthScore.sleepScore) }]}>{healthScore.sleepScore}<ThemedText style={[styles.sleepScoreOver, { color: sleepScoreColor(healthScore.sleepScore) }]}>/100</ThemedText></ThemedText>
+              <ThemedText style={[styles.sleepScoreTag, { color: sleepScoreColor(healthScore.sleepScore) }]}>{sleepScoreLabel(healthScore.sleepScore)}</ThemedText>
             </View>
           )}
         </TouchableOpacity>
+
+        {/* Panneau d'explication du score — hors du TouchableOpacity pour éviter la navigation */}
+        {showScoreInfo && healthScore && (
+          <View style={styles.scoreInfoPanel}>
+            <ThemedText style={styles.scoreInfoTitle}>Score de sommeil — comment il est calculé</ThemedText>
+            <ThemedText style={styles.scoreInfoLine}>• Durée vs votre objectif personnel — 40%</ThemedText>
+            <ThemedText style={styles.scoreInfoLine}>• Qualité ressentie (1 à 5 étoiles) — 40%</ThemedText>
+            <ThemedText style={styles.scoreInfoLine}>• Régularité des horaires de coucher — 20%</ThemedText>
+            <ThemedText style={styles.scoreInfoHint}>Si l'énergie au réveil est renseignée, elle remplace 30% du calcul pour plus de précision.</ThemedText>
+          </View>
+        )}
 
         {/* ── Historique des mesures glycémiques ── */}
         {glucoseHistory.length > 0 && (
@@ -394,6 +451,25 @@ export default function DashboardScreen() {
                 </View>
               );
             })}
+
+            {/* ── Bannière rapport médical ── */}
+            <TouchableOpacity
+              style={styles.reportBanner}
+              onPress={() => router.push('/medical-report')}
+              activeOpacity={0.82}
+            >
+              <View style={styles.reportBannerLeft}>
+                <ThemedText style={styles.reportBannerIcon}>📋</ThemedText>
+                <View style={styles.reportBannerTextCol}>
+                  <ThemedText style={styles.reportBannerTitle}>Partagez vos données avec votre médecin</ThemedText>
+                  <ThemedText style={styles.reportBannerSub}>
+                    Exportez ou générez un rapport PDF à envoyer à votre professionnel de santé.
+                  </ThemedText>
+                </View>
+              </View>
+              <ThemedText style={styles.reportBannerArrow}>›</ThemedText>
+            </TouchableOpacity>
+
           </View>
         )}
 
@@ -509,6 +585,18 @@ const styles = StyleSheet.create({
   aiSuggestion: { fontSize: fs(12), color: '#555', marginTop: vs(8), lineHeight: vs(18) },
   aiAction:     { fontSize: fs(12), color: '#B71C1C', marginTop: vs(8), fontWeight: '700' },
 
+  // Score info panel
+  scoreInfoPanel: {
+    marginHorizontal: s(20), marginTop: vs(-6), marginBottom: vs(12),
+    backgroundColor: '#F3E5F5', borderRadius: 14, padding: s(14),
+    borderTopLeftRadius: 0, borderTopRightRadius: 0,
+    borderTopWidth: 0,
+  },
+  scoreInfoTitle:   { fontSize: fs(12), fontWeight: '800', color: '#4A148C', marginBottom: vs(8) },
+  scoreInfoSection: { fontSize: fs(11), fontWeight: '700', color: '#6A1B9A', marginTop: vs(6), marginBottom: vs(2) },
+  scoreInfoLine:    { fontSize: fs(11), color: '#555', marginBottom: vs(2), paddingLeft: s(4) },
+  scoreInfoHint:    { fontSize: fs(10), color: '#888', fontStyle: 'italic', marginTop: vs(4) },
+
   // Sommeil
   sleepCard: {
     marginHorizontal: s(20), marginBottom: vs(12),
@@ -516,10 +604,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3,
   },
-  sleepCardLeft:  { flex: 1 },
-  sleepCardLabel: { fontSize: fs(10), color: '#7B1FA2', fontWeight: '700', letterSpacing: 0.6, marginBottom: vs(4) },
+  sleepCardLeft:     { flex: 1 },
+  sleepCardLabelRow: { flexDirection: 'row', alignItems: 'center', gap: s(6), marginBottom: vs(4) },
+  sleepCardLabel:    { fontSize: fs(10), color: '#7B1FA2', fontWeight: '700', letterSpacing: 0.6 },
+  sleepInfoBtn:     { width: s(26), height: s(26), borderRadius: s(13), backgroundColor: '#7B1FA2', alignItems: 'center', justifyContent: 'center' },
+  sleepInfoBtnText: { fontSize: fs(14), fontWeight: '900', color: '#fff' },
   sleepCardValue: { fontSize: fs(22), fontWeight: 'bold', color: '#4A148C' },
-  sleepCardSub:   { fontSize: fs(11), color: '#888', marginTop: vs(2) },
+  sleepCardSub:      { fontSize: fs(11), color: '#888', marginTop: vs(2) },
+  sleepImpactBadge:  { borderRadius: 8, paddingVertical: vs(4), paddingHorizontal: s(8), marginTop: vs(6), marginBottom: vs(2), alignSelf: 'flex-start' },
+  sleepImpactText:   { fontSize: fs(11), fontWeight: '700', lineHeight: vs(16) },
   sleepCardEmpty: { fontSize: fs(13), color: '#aaa', fontStyle: 'italic' },
   sleepScoreHint: { fontSize: fs(10), color: '#9C6EBB', marginTop: vs(6), fontStyle: 'italic' },
   sleepScoreBadge: {
@@ -569,6 +662,21 @@ const styles = StyleSheet.create({
   historyTime:   { fontSize: fs(11), color: '#bbb', marginBottom: vs(2) },
   historyNote:   { fontSize: fs(11), color: '#999', fontStyle: 'italic' },
   historyStatus: { fontSize: fs(8), fontWeight: 'bold', letterSpacing: 0.3, textAlign: 'right', maxWidth: s(90) },
+
+  // Bannière rapport médical
+  reportBanner: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#F1F8E9',
+    borderRadius: 12, padding: s(12),
+    marginTop: vs(4),
+    borderWidth: 1, borderColor: '#C5E1A5',
+  },
+  reportBannerLeft:    { flex: 1, flexDirection: 'row', alignItems: 'center', gap: s(10) },
+  reportBannerIcon:    { fontSize: fs(22) },
+  reportBannerTextCol: { flex: 1 },
+  reportBannerTitle:   { fontSize: fs(12), fontWeight: '700', color: '#33691E', marginBottom: vs(2) },
+  reportBannerSub:     { fontSize: fs(11), color: '#558B2F', lineHeight: 16 },
+  reportBannerArrow:   { fontSize: fs(22), color: '#7CB342', fontWeight: '700', marginLeft: s(6) },
 
   // Action bar
   actionBar: {

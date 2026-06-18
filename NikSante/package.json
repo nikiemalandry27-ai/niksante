@@ -1,7 +1,7 @@
 {
   "name": "niksante",
   "main": "expo-router/entry",
-  "version": "1.0.0",
+  "version": "1.1.9",
   "dependencies": {
     "@expo/ui": "~56.0.14",
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -17,9 +17,12 @@
     "expo-glass-effect": "~56.0.4",
     "expo-image": "~56.0.9",
     "expo-linking": "~56.0.12",
+    "expo-mail-composer": "^56.0.4",
     "expo-notifications": "~56.0.16",
+    "expo-print": "^56.0.4",
     "expo-router": "~56.2.7",
     "expo-secure-store": "^56.0.4",
+    "expo-sharing": "^56.0.18",
     "expo-splash-screen": "~56.0.10",
     "expo-status-bar": "~56.0.4",
     "expo-symbols": "~56.0.5",

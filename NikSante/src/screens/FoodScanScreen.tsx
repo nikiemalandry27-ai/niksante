@@ -21,6 +21,19 @@ import { s, fs, vs } from '@/utils/responsive';
 
 type Phase = 'camera' | 'analyzing' | 'result';
 
+const LIQUID_KEYWORDS = [
+  'beverage', 'drink', 'juice', 'milk', 'water', 'soda', 'coffee',
+  'tea', 'smoothie', 'liquid', 'nectar', 'syrup', 'broth', 'soup',
+  'boisson', 'jus', 'lait', 'eau', 'café', 'thé', 'liquide',
+  'nectar', 'sirop', 'soupe', 'bouillon', 'yaourt', 'yogurt', 'shake',
+];
+
+function isLiquid(result: GlycemicResult): boolean {
+  const cat  = result.category_resolved.toLowerCase();
+  const food = result.food.toLowerCase();
+  return LIQUID_KEYWORDS.some((kw) => cat.includes(kw) || food.includes(kw));
+}
+
 function impactColor(level: GlycemicResult['impact_level']): string {
   switch (level) {
     case 'None':     return '#9E9E9E';
@@ -140,8 +153,8 @@ export default function FoodScanScreen() {
 
   if (phase === 'result' && result) {
     const color        = impactColor(result.impact_level);
-    // Aliment considéré non identifié si confiance < 50%
     const isIdentified = result.confidence_score >= 0.5;
+    const portionUnit  = isLiquid(result) ? 'ml' : 'g';
 
     return (
       <SafeAreaView style={styles.container}>
@@ -189,7 +202,7 @@ export default function FoodScanScreen() {
 
               {/* Données glycémiques */}
               <View style={styles.nutriCard}>
-                <ThemedText style={styles.nutriTitle}>Données glycémiques (portion 150g)</ThemedText>
+                <ThemedText style={styles.nutriTitle}>Données glycémiques (portion 150{portionUnit})</ThemedText>
                 <View style={styles.nutriGrid}>
                   <NutriBox label="Glucides"  value={`${result.carbs_used}g`}           color="#F57C00" />
                   <NutriBox label="Index GI"  value={`${result.glycemic_index}`}         color={result.glycemic_index < 40 ? '#388E3C' : result.glycemic_index < 70 ? '#F57C00' : '#B71C1C'} />

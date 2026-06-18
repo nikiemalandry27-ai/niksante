@@ -5,7 +5,7 @@
  * les statistiques détaillées et les actions de gestion du compte.
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   ScrollView,
@@ -17,13 +17,11 @@ import {
   Share,
   Linking,
   Platform,
-  AppState,
-  AppStateStatus,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants, { ExecutionEnvironment } from 'expo-constants';
+import Constants from 'expo-constants';
 
 import { useAuthStore }    from '@/store/authStore';
 import { useGlucoseStore } from '@/store/glucoseStore';
@@ -52,15 +50,11 @@ const NOTIF_IDS_KEY        = '@niksante_notif_ids';
 const REMINDER_TIMES_KEY   = '@niksante_reminder_times';
 const NOTIF_CHANNEL_ID     = 'niksante-rappels';
 
-// SDK 56+ : appOwnership est supprimé, utiliser executionEnvironment
-const IS_EXPO_GO = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
-
 // ---------------------------------------------------------------------------
-// Setup notifications (production uniquement)
+// Setup notifications
 // ---------------------------------------------------------------------------
 
 async function setupNotifications(): Promise<void> {
-  if (IS_EXPO_GO) return;
   try {
     const Notifs = require('expo-notifications');
     Notifs.setNotificationHandler({
@@ -85,7 +79,6 @@ async function setupNotifications(): Promise<void> {
 }
 
 async function scheduleReminder(key: ReminderKey, hour: number, minute: number): Promise<string | null> {
-  if (IS_EXPO_GO) return null;
   const def = REMINDER_DEFS[key];
   try {
     const Notifs = require('expo-notifications');
@@ -124,7 +117,6 @@ async function scheduleReminder(key: ReminderKey, hour: number, minute: number):
 }
 
 async function cancelReminder(id: string): Promise<void> {
-  if (IS_EXPO_GO) return;
   try {
     const Notifs = require('expo-notifications');
     await Notifs.cancelScheduledNotificationAsync(id);
@@ -260,17 +252,10 @@ export default function ProfileScreen() {
     afternoon: { hour: 13, minute: 0 },
     evening:   { hour: 19, minute: 0 },
   });
-  const shownTodayRef = useRef<Record<ReminderKey, string>>({
-    morning: '', afternoon: '', evening: '',
-  });
-
   useEffect(() => {
     setupNotifications();
     AsyncStorage.getItem(REMINDER_STORAGE_KEY).then((raw) => {
       if (raw) setReminders(JSON.parse(raw));
-    });
-    AsyncStorage.getItem(REMINDER_SHOWN_KEY).then((raw) => {
-      if (raw) shownTodayRef.current = JSON.parse(raw);
     });
     AsyncStorage.getItem(NOTIF_IDS_KEY).then((raw) => {
       if (raw) setNotifIds(JSON.parse(raw));
@@ -291,7 +276,7 @@ export default function ProfileScreen() {
     await AsyncStorage.setItem(REMINDER_TIMES_KEY, JSON.stringify(updated));
 
     // Reprogramme automatiquement si le rappel est actif
-    if (reminders[key] && !IS_EXPO_GO) {
+    if (reminders[key]) {
       const oldId = notifIds[key];
       if (oldId) await cancelReminder(oldId);
       const { hour, minute } = updated[key];
@@ -304,96 +289,51 @@ export default function ProfileScreen() {
     }
   };
 
-  // ── Expo Go : alerte in-app (AppState + intervalle toutes les 60s) ──────
-  const checkReminders = (
-    enabled: Record<ReminderKey, boolean>,
-    times: Record<ReminderKey, { hour: number; minute: number }>,
-  ) => {
-    if (!IS_EXPO_GO) return;
-    const now    = new Date();
-    const nowMin = now.getHours() * 60 + now.getMinutes();
-    const today  = now.toDateString();
-    for (const key of Object.keys(REMINDER_DEFS) as ReminderKey[]) {
-      if (!enabled[key]) continue;
-      if (shownTodayRef.current[key] === today) continue;
-      const { hour, minute } = times[key];
-      const diff = nowMin - (hour * 60 + minute);
-      if (diff >= 0 && diff <= 30) {
-        shownTodayRef.current[key] = today;
-        AsyncStorage.setItem(REMINDER_SHOWN_KEY, JSON.stringify(shownTodayRef.current));
-        const def = REMINDER_DEFS[key];
-        const hh  = String(hour).padStart(2, '0');
-        const mm  = String(minute).padStart(2, '0');
+  // ── Notifications planifiées ─────────────────────────────────────────────
+  const toggleReminder = async (key: ReminderKey) => {
+    const isOn = reminders[key];
+    const Notifs = require('expo-notifications');
+
+    if (!isOn) {
+      const { status } = await Notifs.requestPermissionsAsync();
+      if (status !== 'granted') {
         Alert.alert(
-          'Rappel glycémique',
-          `${def.label} (${hh}:${mm}) — Pensez à mesurer votre glycémie !`,
-          [{ text: 'OK' }],
+          'Permission requise',
+          'Activez les notifications dans Paramètres > Applications > NikSanté > Notifications.',
         );
         return;
       }
-    }
-  };
 
-  useEffect(() => {
-    if (!IS_EXPO_GO) return;
-    // Vérification immédiate au montage ou changement de rappels/heures
-    checkReminders(reminders, reminderTimes);
-    // Vérification au retour au premier plan
-    const sub = AppState.addEventListener('change', (state: AppStateStatus) => {
-      if (state === 'active') checkReminders(reminders, reminderTimes);
-    });
-    // Vérification toutes les 60s même si l'app est au premier plan
-    const interval = setInterval(() => checkReminders(reminders, reminderTimes), 60_000);
-    return () => { sub.remove(); clearInterval(interval); };
-  }, [reminders, reminderTimes]);
-
-  // ── Notifications système planifiées (production uniquement) ───────────
-  const toggleReminder = async (key: ReminderKey) => {
-    const isOn = reminders[key];
-
-    if (!IS_EXPO_GO) {
-      const Notifs = require('expo-notifications');
-      if (!isOn) {
-        const { status } = await Notifs.requestPermissionsAsync();
-        if (status !== 'granted') {
+      // Android 12+ : vérifie que les alarmes exactes sont autorisées
+      if (Platform.OS === 'android' && Notifs.canScheduleExactNotificationsAsync) {
+        const canExact = await Notifs.canScheduleExactNotificationsAsync();
+        if (!canExact) {
           Alert.alert(
-            'Permission requise',
-            'Activez les notifications dans Paramètres > Applications > NikSanté > Notifications.',
+            'Alarmes exactes requises',
+            'Pour recevoir les rappels à l\'heure exacte même quand l\'app est fermée, autorisez NikSanté à programmer des alarmes exactes.\n\nParamètres → Applications → NikSanté → Alarmes et rappels → Autoriser',
+            [
+              { text: 'Plus tard', style: 'cancel' },
+              { text: 'Ouvrir les paramètres', onPress: () => Linking.openSettings() },
+            ],
           );
-          return;
         }
+      }
 
-        // Android 12+ : vérifie que les alarmes exactes sont autorisées
-        if (Platform.OS === 'android' && Notifs.canScheduleExactNotificationsAsync) {
-          const canExact = await Notifs.canScheduleExactNotificationsAsync();
-          if (!canExact) {
-            Alert.alert(
-              'Alarmes exactes requises',
-              'Pour recevoir les rappels à l\'heure exacte même quand l\'app est fermée, autorisez NikSanté à programmer des alarmes exactes.\n\nParamètres → Applications → NikSanté → Alarmes et rappels → Autoriser',
-              [
-                { text: 'Plus tard', style: 'cancel' },
-                { text: 'Ouvrir les paramètres', onPress: () => Linking.openSettings() },
-              ],
-            );
-          }
-        }
-
-        const oldId = notifIds[key];
-        if (oldId) await cancelReminder(oldId);
-        const { hour, minute } = reminderTimes[key];
-        const id = await scheduleReminder(key, hour, minute);
-        if (id) {
-          const updatedIds = { ...notifIds, [key]: id };
-          setNotifIds(updatedIds);
-          await AsyncStorage.setItem(NOTIF_IDS_KEY, JSON.stringify(updatedIds));
-        }
-      } else {
-        const id = notifIds[key];
-        if (id) await cancelReminder(id);
-        const updatedIds = { ...notifIds, [key]: null };
+      const oldId = notifIds[key];
+      if (oldId) await cancelReminder(oldId);
+      const { hour, minute } = reminderTimes[key];
+      const id = await scheduleReminder(key, hour, minute);
+      if (id) {
+        const updatedIds = { ...notifIds, [key]: id };
         setNotifIds(updatedIds);
         await AsyncStorage.setItem(NOTIF_IDS_KEY, JSON.stringify(updatedIds));
       }
+    } else {
+      const id = notifIds[key];
+      if (id) await cancelReminder(id);
+      const updatedIds = { ...notifIds, [key]: null };
+      setNotifIds(updatedIds);
+      await AsyncStorage.setItem(NOTIF_IDS_KEY, JSON.stringify(updatedIds));
     }
 
     const updated = { ...reminders, [key]: !isOn };
@@ -616,9 +556,10 @@ export default function ProfileScreen() {
           <ThemedText style={styles.sectionTitle}>Fonctionnalités</ThemedText>
 
           {[
-            { icon: '🏅', label: 'Récompenses',      desc: 'Badges, points et niveaux',      route: '/gamification'    },
-            { icon: '🧠', label: 'Bien-être mental', desc: 'Humeur, respiration & conseils', route: '/mental-health'   },
-            { icon: '📚', label: 'Guide Diabète',    desc: 'Tout savoir sur le diabète',     route: '/diabetes-guide'  },
+            { icon: '📋', label: 'Rapport médical',  desc: 'PDF glycémie + sommeil pour votre médecin', route: '/medical-report'  },
+            { icon: '🏅', label: 'Récompenses',      desc: 'Badges, points et niveaux',                 route: '/gamification'    },
+            { icon: '🧠', label: 'Bien-être mental', desc: 'Humeur, respiration & conseils',            route: '/mental-health'   },
+            { icon: '📚', label: 'Guide Diabète',    desc: 'Tout savoir sur le diabète',                route: '/diabetes-guide'  },
           ].map((item) => (
             <TouchableOpacity
               key={item.route}

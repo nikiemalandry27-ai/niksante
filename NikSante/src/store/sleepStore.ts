@@ -5,6 +5,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Types
 // ---------------------------------------------------------------------------
 
+export const SLEEP_GOAL_MIN  = 5;
+export const SLEEP_GOAL_MAX  = 12;
+export const SLEEP_GOAL_STEP = 0.5;
+export const SLEEP_GOAL_DEFAULT = 7.5;
+
 export type SleepQuality = 1 | 2 | 3 | 4 | 5;
 
 export const SLEEP_QUALITY_META: Record<SleepQuality, { label: string; emoji: string; color: string }> = {
@@ -37,11 +42,13 @@ export interface SleepEntry {
 }
 
 interface SleepState {
-  entries: SleepEntry[];
+  entries:   SleepEntry[];
+  sleepGoal: number; // heures, objectif personnel
 
   initSleep:          () => Promise<void>;
   addSleep:           (entry: Omit<SleepEntry, 'id'>) => Promise<void>;
   deleteSleep:        (id: string) => Promise<void>;
+  setSleepGoal:       (hours: number) => Promise<void>;
   getTodaySleep:      () => SleepEntry | null;
   getRecentEntries:   (days: number) => SleepEntry[];
   getAverageDuration: () => number;
@@ -54,6 +61,7 @@ interface SleepState {
 // ---------------------------------------------------------------------------
 
 const STORAGE_KEY = 'niksante_sleep_history';
+const GOAL_KEY    = 'niksante_sleep_goal';
 
 function persistAsync(entries: SleepEntry[]) {
   AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(entries)).catch(() => {});
@@ -77,12 +85,19 @@ function todayStr(): string {
 // ---------------------------------------------------------------------------
 
 export const useSleepStore = create<SleepState>((set, get) => ({
-  entries: [],
+  entries:   [],
+  sleepGoal: SLEEP_GOAL_DEFAULT,
 
   initSleep: async () => {
     try {
-      const raw = await AsyncStorage.getItem(STORAGE_KEY);
-      if (raw) set({ entries: JSON.parse(raw) as SleepEntry[] });
+      const [raw, goal] = await Promise.all([
+        AsyncStorage.getItem(STORAGE_KEY),
+        AsyncStorage.getItem(GOAL_KEY),
+      ]);
+      const updates: Partial<SleepState> = {};
+      if (raw)  updates.entries   = JSON.parse(raw) as SleepEntry[];
+      if (goal) updates.sleepGoal = parseFloat(goal);
+      set(updates);
     } catch (e) {
       console.warn('[SleepStore] Erreur chargement :', e);
     }
@@ -97,6 +112,12 @@ export const useSleepStore = create<SleepState>((set, get) => ({
       persistAsync(newEntries);
       return { entries: newEntries };
     });
+  },
+
+  setSleepGoal: async (hours) => {
+    const clamped = Math.min(SLEEP_GOAL_MAX, Math.max(SLEEP_GOAL_MIN, hours));
+    set({ sleepGoal: clamped });
+    AsyncStorage.setItem(GOAL_KEY, String(clamped)).catch(() => {});
   },
 
   deleteSleep: async (id) => {

@@ -132,9 +132,14 @@ export default function HistoryScreen() {
           <ThemedText style={styles.backText}>← Retour</ThemedText>
         </TouchableOpacity>
         <ThemedText style={styles.title}>Historique</ThemedText>
-        <TouchableOpacity style={styles.exportBtn} onPress={handleExport}>
-          <ThemedText style={styles.exportBtnText}>⬆ Exporter</ThemedText>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.reportBtn} onPress={() => router.navigate('/medical-report')}>
+            <ThemedText style={styles.reportBtnText}>📋 PDF</ThemedText>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.exportBtn} onPress={handleExport}>
+            <ThemedText style={styles.exportBtnText}>⬆ Texte</ThemedText>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* ── Filtres ── */}
@@ -309,6 +314,13 @@ const styles = StyleSheet.create({
   backBtn:  { padding: 4 },
   backText: { color: '#388E3C', fontWeight: '600', fontSize: fs(15) },
   title:    { fontSize: fs(18), fontWeight: 'bold', color: '#1a1a1a' },
+  headerActions: { flexDirection: 'row', gap: s(6) },
+  reportBtn: {
+    paddingVertical: vs(6), paddingHorizontal: s(10),
+    borderRadius: 8, backgroundColor: '#EDE7F6',
+    borderWidth: 1, borderColor: '#7B1FA2',
+  },
+  reportBtnText: { fontSize: fs(11), color: '#7B1FA2', fontWeight: '700' },
   exportBtn: {
     paddingVertical: vs(6), paddingHorizontal: s(10),
     borderRadius: 8, backgroundColor: '#E8F5E9',

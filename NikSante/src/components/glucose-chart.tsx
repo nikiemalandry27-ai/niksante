@@ -35,7 +35,7 @@ interface Props {
 
 const TOP_PAD  = 20; // espace pour les labels de valeur au-dessus des points
 const CHART_H  = 150; // hauteur de la zone de courbe
-const BOT_PAD  = 22; // espace pour les dates en dessous
+const BOT_PAD  = 36; // espace pour les dates + heures en dessous
 const TOTAL_H  = TOP_PAD + CHART_H + BOT_PAD;
 const H_PAD    = 10; // marge gauche/droite dans la zone du graphique
 const DOT_R    = 5;  // rayon des points sur la courbe
@@ -216,21 +216,36 @@ export default function GlucoseChart({ data, maxBars = 12, unit = 'mg_dl' }: Pro
                     }}
                   />
 
-                  {/* Label date en dessous */}
+                  {/* Label date + heure en dessous */}
                   {showDate && (
-                    <ThemedText
-                      style={{
-                        position:  'absolute',
-                        width:     s(34),
-                        left:      pt.x - s(17),
-                        top:       TOP_PAD + CHART_H + vs(4),
-                        fontSize:  fs(8.5),
-                        color:     '#bbb',
-                        textAlign: 'center',
-                      }}
-                    >
-                      {date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
-                    </ThemedText>
+                    <>
+                      <ThemedText
+                        style={{
+                          position:  'absolute',
+                          width:     s(34),
+                          left:      pt.x - s(17),
+                          top:       TOP_PAD + CHART_H + vs(4),
+                          fontSize:  fs(8.5),
+                          color:     '#bbb',
+                          textAlign: 'center',
+                        }}
+                      >
+                        {date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
+                      </ThemedText>
+                      <ThemedText
+                        style={{
+                          position:  'absolute',
+                          width:     s(34),
+                          left:      pt.x - s(17),
+                          top:       TOP_PAD + CHART_H + vs(16),
+                          fontSize:  fs(8),
+                          color:     '#ccc',
+                          textAlign: 'center',
+                        }}
+                      >
+                        {date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                      </ThemedText>
+                    </>
                   )}
                 </React.Fragment>
               );
