@@ -362,6 +362,22 @@ export default function ProfileScreen() {
           );
           return;
         }
+
+        // Android 12+ : vérifie que les alarmes exactes sont autorisées
+        if (Platform.OS === 'android' && Notifs.canScheduleExactNotificationsAsync) {
+          const canExact = await Notifs.canScheduleExactNotificationsAsync();
+          if (!canExact) {
+            Alert.alert(
+              'Alarmes exactes requises',
+              'Pour recevoir les rappels à l\'heure exacte même quand l\'app est fermée, autorisez NikSanté à programmer des alarmes exactes.\n\nParamètres → Applications → NikSanté → Alarmes et rappels → Autoriser',
+              [
+                { text: 'Plus tard', style: 'cancel' },
+                { text: 'Ouvrir les paramètres', onPress: () => Linking.openSettings() },
+              ],
+            );
+          }
+        }
+
         const oldId = notifIds[key];
         if (oldId) await cancelReminder(oldId);
         const { hour, minute } = reminderTimes[key];
@@ -370,17 +386,6 @@ export default function ProfileScreen() {
           const updatedIds = { ...notifIds, [key]: id };
           setNotifIds(updatedIds);
           await AsyncStorage.setItem(NOTIF_IDS_KEY, JSON.stringify(updatedIds));
-        }
-        // Guide l'utilisateur à désactiver l'optimisation batterie
-        if (Platform.OS === 'android') {
-          Alert.alert(
-            'Rappel activé',
-            'Pour recevoir les rappels même quand l\'application est fermée, désactivez l\'optimisation batterie pour NikSanté :\n\nParamètres → Applications → NikSanté → Batterie → Aucune restriction',
-            [
-              { text: 'Plus tard', style: 'cancel' },
-              { text: 'Ouvrir les paramètres', onPress: () => Linking.openSettings() },
-            ],
-          );
         }
       } else {
         const id = notifIds[key];
