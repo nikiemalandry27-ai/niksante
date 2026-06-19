@@ -54,8 +54,8 @@ class AlarmSchedulerModule : Module() {
         }
 
         AsyncFunction("openExactAlarmSettings") {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val ctx = this@AlarmSchedulerModule.appContext.reactContext ?: return@AsyncFunction
+            val ctx = this@AlarmSchedulerModule.appContext.reactContext
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && ctx != null) {
                 val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
                     data = Uri.parse("package:${ctx.packageName}")
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -71,13 +71,15 @@ class AlarmSchedulerModule : Module() {
         }
 
         AsyncFunction("openBatteryOptimizationSettings") {
-            val ctx = this@AlarmSchedulerModule.appContext.reactContext ?: return@AsyncFunction
-            // ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS ouvre un dialog système ciblant l'app
-            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                data = Uri.parse("package:${ctx.packageName}")
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            val ctx = this@AlarmSchedulerModule.appContext.reactContext
+            if (ctx != null) {
+                // ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS ouvre un dialog système ciblant l'app
+                val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                    data = Uri.parse("package:${ctx.packageName}")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                ctx.startActivity(intent)
             }
-            ctx.startActivity(intent)
         }
     }
 
