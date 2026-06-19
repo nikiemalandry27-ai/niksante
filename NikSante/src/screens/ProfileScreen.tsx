@@ -87,17 +87,31 @@ async function scheduleReminder(key: ReminderKey, hour: number, minute: number):
   try {
     const Notifs = require('expo-notifications');
 
-    // Vérifie les permissions + alarmes exactes
+    // 1. Permission POST_NOTIFICATIONS (Android 13+)
     const perms = await Notifs.getPermissionsAsync();
     if (perms.status !== 'granted') {
       const { status } = await Notifs.requestPermissionsAsync();
       if (status !== 'granted') {
-        console.warn('[Notifs] Permission refusée');
+        Alert.alert(
+          'Permission requise',
+          'Activez les notifications pour NikSanté dans les paramètres de votre téléphone.',
+          [{ text: 'OK' }],
+        );
         return null;
       }
     }
+
+    // 2. SCHEDULE_EXACT_ALARM (Android 12+) — sans elle les rappels peuvent être retardés
     if (Platform.OS === 'android' && perms.canScheduleExactNotifications === false) {
-      console.warn('[Notifs] canScheduleExactNotifications=false → rappels inexacts en background');
+      Alert.alert(
+        'Alarmes exactes requises',
+        'Pour que vos rappels sonnent à l\'heure exacte, autorisez les alarmes exactes pour NikSanté.\n\nParamètres → Applications → NikSanté → Alarmes et rappels → Autoriser',
+        [
+          { text: 'Plus tard', style: 'cancel' },
+          { text: 'Ouvrir les paramètres', onPress: () => Linking.openSettings() },
+        ],
+      );
+      // On continue quand même : expo-notifications planifie en mode inexact
     }
 
     // Canal avec importance MAX pour garantir heads-up depuis le background
