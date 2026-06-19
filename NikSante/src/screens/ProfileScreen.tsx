@@ -44,11 +44,12 @@ const REMINDER_DEFS: Record<ReminderKey, { label: string; hour: number; minute: 
   evening:   { label: 'Soir',       hour: 19, minute: 0, icon: '🌙', desc: '19h00 — Avant le dîner' },
 };
 
-const REMINDER_STORAGE_KEY = '@niksante_reminders';
-const REMINDER_SHOWN_KEY   = '@niksante_reminders_shown';
-const NOTIF_IDS_KEY        = '@niksante_notif_ids';
-const REMINDER_TIMES_KEY   = '@niksante_reminder_times';
-const NOTIF_CHANNEL_ID     = 'niksante-rappels';
+const REMINDER_STORAGE_KEY  = '@niksante_reminders';
+const REMINDER_SHOWN_KEY    = '@niksante_reminders_shown';
+const NOTIF_IDS_KEY         = '@niksante_notif_ids';
+const REMINDER_TIMES_KEY    = '@niksante_reminder_times';
+const NOTIF_CHANNEL_ID      = 'niksante-rappels';
+const BATTERY_OPT_KEY       = '@niksante_battery_opt_requested';
 
 // ---------------------------------------------------------------------------
 // Setup notifications
@@ -105,7 +106,7 @@ async function scheduleReminder(key: ReminderKey, hour: number, minute: number):
     if (Platform.OS === 'android' && perms.canScheduleExactNotifications === false) {
       Alert.alert(
         'Autorisation requise',
-        'Pour activer ce rappel, vous devez autoriser les alarmes exactes pour NikSanté.\n\nAppuyez sur "Autoriser" pour ouvrir la page de permission.',
+        'Pour activer ce rappel, autorisez les alarmes exactes pour NikSanté.',
         [
           { text: 'Annuler', style: 'cancel' },
           {
@@ -120,7 +121,7 @@ async function scheduleReminder(key: ReminderKey, hour: number, minute: number):
       return null;
     }
 
-    // Canal avec importance MAX pour garantir heads-up depuis le background
+    // 3. Canal importance MAX
     if (Platform.OS === 'android') {
       await Notifs.setNotificationChannelAsync(NOTIF_CHANNEL_ID, {
         name:                 'Rappels glycémie',
@@ -155,6 +156,7 @@ async function scheduleReminder(key: ReminderKey, hour: number, minute: number):
     return id;
   } catch (e) {
     console.error(`[Notifs] Schedule error pour "${key}":`, e);
+    Alert.alert('Erreur', 'Impossible de planifier le rappel. Vérifiez les permissions.');
     return null;
   }
 }
@@ -335,53 +337,42 @@ export default function ProfileScreen() {
   // ── Notifications planifiées ─────────────────────────────────────────────
   const toggleReminder = async (key: ReminderKey) => {
     const isOn = reminders[key];
-    const Notifs = require('expo-notifications');
 
     if (!isOn) {
-      const { status } = await Notifs.requestPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(
-          'Permission requise',
-          'Activez les notifications dans Paramètres > Applications > NikSanté > Notifications.',
-        );
-        return;
+      // Demande exemption batterie une seule fois (garantit les rappels en background)
+      const batteryAsked = await AsyncStorage.getItem(BATTERY_OPT_KEY);
+      if (!batteryAsked && Platform.OS === 'android') {
+        await AsyncStorage.setItem(BATTERY_OPT_KEY, 'true');
+        Linking.sendIntent('android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS', [
+          { key: 'package', value: 'com.niksante.app' },
+        ]).catch(() => {});
       }
 
-      // Android 12+ : vérifie que les alarmes exactes sont autorisées
-      if (Platform.OS === 'android' && Notifs.canScheduleExactNotificationsAsync) {
-        const canExact = await Notifs.canScheduleExactNotificationsAsync();
-        if (!canExact) {
-          Alert.alert(
-            'Alarmes exactes requises',
-            'Pour recevoir les rappels à l\'heure exacte même quand l\'app est fermée, autorisez NikSanté à programmer des alarmes exactes.\n\nParamètres → Applications → NikSanté → Alarmes et rappels → Autoriser',
-            [
-              { text: 'Plus tard', style: 'cancel' },
-              { text: 'Ouvrir les paramètres', onPress: () => Linking.openSettings() },
-            ],
-          );
-        }
-      }
-
+      // scheduleReminder gère toutes les permissions (POST_NOTIFICATIONS + SCHEDULE_EXACT_ALARM)
       const oldId = notifIds[key];
       if (oldId) await cancelReminder(oldId);
       const { hour, minute } = reminderTimes[key];
       const id = await scheduleReminder(key, hour, minute);
-      if (id) {
-        const updatedIds = { ...notifIds, [key]: id };
-        setNotifIds(updatedIds);
-        await AsyncStorage.setItem(NOTIF_IDS_KEY, JSON.stringify(updatedIds));
-      }
+
+      // Ne marquer actif QUE si la planification a réussi
+      if (!id) return;
+
+      const updatedIds = { ...notifIds, [key]: id };
+      setNotifIds(updatedIds);
+      await AsyncStorage.setItem(NOTIF_IDS_KEY, JSON.stringify(updatedIds));
+      const updated = { ...reminders, [key]: true };
+      setReminders(updated);
+      await AsyncStorage.setItem(REMINDER_STORAGE_KEY, JSON.stringify(updated));
     } else {
       const id = notifIds[key];
       if (id) await cancelReminder(id);
       const updatedIds = { ...notifIds, [key]: null };
       setNotifIds(updatedIds);
       await AsyncStorage.setItem(NOTIF_IDS_KEY, JSON.stringify(updatedIds));
+      const updated = { ...reminders, [key]: false };
+      setReminders(updated);
+      await AsyncStorage.setItem(REMINDER_STORAGE_KEY, JSON.stringify(updated));
     }
-
-    const updated = { ...reminders, [key]: !isOn };
-    setReminders(updated);
-    await AsyncStorage.setItem(REMINDER_STORAGE_KEY, JSON.stringify(updated));
   };
 
   const user           = useAuthStore((state) => state.user);
