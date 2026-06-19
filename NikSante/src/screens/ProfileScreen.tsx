@@ -101,17 +101,23 @@ async function scheduleReminder(key: ReminderKey, hour: number, minute: number):
       }
     }
 
-    // 2. SCHEDULE_EXACT_ALARM (Android 12+) — recommandé pour la précision
+    // 2. SCHEDULE_EXACT_ALARM (Android 12+) — obligatoire, pas de fallback
     if (Platform.OS === 'android' && perms.canScheduleExactNotifications === false) {
       Alert.alert(
-        'Alarmes exactes recommandées',
-        'Pour que vos rappels sonnent à l\'heure exacte, autorisez les alarmes exactes pour NikSanté.\n\nParamètres → Applications → NikSanté → Alarmes et rappels → Autoriser',
+        'Autorisation requise',
+        'Pour activer ce rappel, vous devez autoriser les alarmes exactes pour NikSanté.\n\nAppuyez sur "Autoriser" pour ouvrir la page de permission.',
         [
-          { text: 'Plus tard', style: 'cancel' },
-          { text: 'Ouvrir les paramètres', onPress: () => Linking.openSettings() },
+          { text: 'Annuler', style: 'cancel' },
+          {
+            text: 'Autoriser',
+            onPress: () =>
+              Linking.sendIntent('android.settings.REQUEST_SCHEDULE_EXACT_ALARM', [
+                { key: 'android.provider.extra.APP_PACKAGE', value: 'com.niksante.app' },
+              ]).catch(() => Linking.openSettings()),
+          },
         ],
       );
-      // Planification quand même (alarme inexacte si permission absente)
+      return null;
     }
 
     // Canal avec importance MAX pour garantir heads-up depuis le background
