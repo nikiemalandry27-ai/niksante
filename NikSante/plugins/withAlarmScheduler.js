@@ -1,4 +1,4 @@
-const { withAndroidManifest, withDangerousMod } = require('@expo/config-plugins');
+const { withAndroidManifest, withDangerousMod, withMainApplication } = require('@expo/config-plugins');
 const fs   = require('fs');
 const path = require('path');
 
@@ -27,6 +27,9 @@ module.exports = function withAlarmScheduler(config) {
         const src = path.join(srcDir, file);
         if (fs.existsSync(src)) {
           fs.copyFileSync(src, path.join(destDir, file));
+          console.log(`[withAlarmScheduler] Copied ${file} → ${destDir}`);
+        } else {
+          console.warn(`[withAlarmScheduler] Source not found: ${src}`);
         }
       }
 
@@ -65,29 +68,46 @@ module.exports = function withAlarmScheduler(config) {
   });
 
   // ── 3. Register AlarmSchedulerPackage in MainApplication.kt ─────────────
-  config = withDangerousMod(config, [
-    'android',
-    (config) => {
-      const mainAppPath = path.join(
-        config.modRequest.platformProjectRoot,
-        'app', 'src', 'main', 'java', 'com', 'niksante', 'app', 'MainApplication.kt'
-      );
+  //    Utilise withMainApplication (API officielle) + patterns multiples
+  config = withMainApplication(config, (config) => {
+    let contents = config.modResults.contents;
 
-      if (!fs.existsSync(mainAppPath)) return config;
+    if (contents.includes('AlarmSchedulerPackage')) {
+      console.log('[withAlarmScheduler] AlarmSchedulerPackage already registered.');
+      return config;
+    }
 
-      let content = fs.readFileSync(mainAppPath, 'utf8');
-
-      if (content.includes('AlarmSchedulerPackage')) return config;
-
-      content = content.replace(
+    // Pattern A : template Expo standard avec variable locale
+    //   val packages = PackageList(this).packages
+    //   return packages
+    if (contents.includes('val packages = PackageList(this).packages')) {
+      contents = contents.replace(
         'val packages = PackageList(this).packages',
         'val packages = PackageList(this).packages\n          packages.add(AlarmSchedulerPackage())'
       );
+      console.log('[withAlarmScheduler] Registered via Pattern A.');
 
-      fs.writeFileSync(mainAppPath, content);
-      return config;
-    },
-  ]);
+    // Pattern B : return direct compact
+    //   return PackageList(this).packages
+    } else if (contents.includes('return PackageList(this).packages')) {
+      contents = contents.replace(
+        'return PackageList(this).packages',
+        [
+          'val packages = PackageList(this).packages',
+          '          packages.add(AlarmSchedulerPackage())',
+          '          return packages',
+        ].join('\n')
+      );
+      console.log('[withAlarmScheduler] Registered via Pattern B.');
+
+    } else {
+      console.warn('[withAlarmScheduler] WARNING: Could not find a pattern to inject AlarmSchedulerPackage.');
+      console.warn('[withAlarmScheduler] File path:', config.modResults.path);
+    }
+
+    config.modResults.contents = contents;
+    return config;
+  });
 
   return config;
 };
