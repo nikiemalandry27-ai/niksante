@@ -45,7 +45,6 @@ const REMINDER_DEFS: Record<ReminderKey, { label: string; hour: number; minute: 
 };
 
 const REMINDER_STORAGE_KEY  = '@niksante_reminders';
-const REMINDER_SHOWN_KEY    = '@niksante_reminders_shown';
 const NOTIF_IDS_KEY         = '@niksante_notif_ids';
 const REMINDER_TIMES_KEY    = '@niksante_reminder_times';
 const NOTIF_CHANNEL_ID      = 'niksante-rappels';
@@ -330,6 +329,14 @@ export default function ProfileScreen() {
         const updatedIds = { ...notifIds, [key]: id };
         setNotifIds(updatedIds);
         await AsyncStorage.setItem(NOTIF_IDS_KEY, JSON.stringify(updatedIds));
+      } else {
+        // Replanification échouée — désactiver le rappel pour éviter un état incohérent
+        const updatedIds = { ...notifIds, [key]: null };
+        setNotifIds(updatedIds);
+        await AsyncStorage.setItem(NOTIF_IDS_KEY, JSON.stringify(updatedIds));
+        const updatedReminders = { ...reminders, [key]: false };
+        setReminders(updatedReminders);
+        await AsyncStorage.setItem(REMINDER_STORAGE_KEY, JSON.stringify(updatedReminders));
       }
     }
   };
@@ -339,15 +346,6 @@ export default function ProfileScreen() {
     const isOn = reminders[key];
 
     if (!isOn) {
-      // Demande exemption batterie une seule fois (garantit les rappels en background)
-      const batteryAsked = await AsyncStorage.getItem(BATTERY_OPT_KEY);
-      if (!batteryAsked && Platform.OS === 'android') {
-        await AsyncStorage.setItem(BATTERY_OPT_KEY, 'true');
-        Linking.sendIntent('android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS', [
-          { key: 'package', value: 'com.niksante.app' },
-        ]).catch(() => {});
-      }
-
       // scheduleReminder gère toutes les permissions (POST_NOTIFICATIONS + SCHEDULE_EXACT_ALARM)
       const oldId = notifIds[key];
       if (oldId) await cancelReminder(oldId);
@@ -363,6 +361,15 @@ export default function ProfileScreen() {
       const updated = { ...reminders, [key]: true };
       setReminders(updated);
       await AsyncStorage.setItem(REMINDER_STORAGE_KEY, JSON.stringify(updated));
+
+      // Demande exemption batterie APRÈS succès — un seul dialog à la fois
+      const batteryAsked = await AsyncStorage.getItem(BATTERY_OPT_KEY);
+      if (!batteryAsked && Platform.OS === 'android') {
+        await AsyncStorage.setItem(BATTERY_OPT_KEY, 'true');
+        Linking.sendIntent('android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS', [
+          { key: 'package', value: 'com.niksante.app' },
+        ]).catch(() => {});
+      }
     } else {
       const id = notifIds[key];
       if (id) await cancelReminder(id);
