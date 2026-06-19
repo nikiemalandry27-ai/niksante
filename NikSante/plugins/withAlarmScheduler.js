@@ -90,10 +90,18 @@ module.exports = function withAlarmScheduler(config) {
         return config;
       }
 
-      // Le pattern est généré par expo-modules-core — très stable
-      const anchor = 'internal fun appContext() = modulesProvider {';
-      if (!content.includes(anchor)) {
-        console.warn('[withAlarmScheduler] Pattern not found in ExpoModulesProvider.kt');
+      // Expo SDK peut générer l'ancre avec ou sans "internal" selon la version
+      const anchors = [
+        'internal fun appContext() = modulesProvider {',
+        'fun appContext() = modulesProvider {',
+      ];
+      const anchor = anchors.find(a => content.includes(a));
+      if (!anchor) {
+        console.error(
+          '[withAlarmScheduler] ERREUR : Aucun pattern connu trouvé dans ExpoModulesProvider.kt.\n' +
+          'Le module AlarmScheduler ne sera PAS enregistré → requireOptionalNativeModule retournera null.\n' +
+          'Contenu du fichier :\n' + content.slice(0, 500)
+        );
         return config;
       }
 

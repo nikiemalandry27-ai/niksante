@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
@@ -46,9 +47,16 @@ class AlarmReceiver : BroadcastReceiver() {
     private fun showNotification(context: Context, notifId: Int, title: String, body: String) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
+        // Android 13+ : POST_NOTIFICATIONS doit être accordée pour afficher la notification
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val granted = context.checkSelfPermission("android.permission.POST_NOTIFICATIONS") ==
+                PackageManager.PERMISSION_GRANTED
+            if (!granted) return
+        }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val ch = NotificationChannel(
-                CHANNEL_ID, "Rappels glycémie", NotificationManager.IMPORTANCE_HIGH
+                CHANNEL_ID, "Rappels glycémie", NotificationManager.IMPORTANCE_MAX
             ).apply {
                 description      = "Rappels de mesure de glycémie"
                 enableVibration(true)
