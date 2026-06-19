@@ -8,6 +8,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 
 class AlarmReceiver : BroadcastReceiver() {
@@ -22,15 +23,24 @@ class AlarmReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
-        val notifId = intent.getIntExtra(EXTRA_ID, 0)
-        val title   = intent.getStringExtra(EXTRA_TITLE)  ?: "Rappel NikSanté"
-        val body    = intent.getStringExtra(EXTRA_BODY)   ?: "Pensez à mesurer votre glycémie !"
-        val hour    = intent.getIntExtra(EXTRA_HOUR, 8)
-        val minute  = intent.getIntExtra(EXTRA_MINUTE, 0)
+        // WakeLock défensif : le système en tient déjà un pour onReceive(),
+        // mais certains OEM agressifs (TECNO, Infinix) le relâchent trop tôt.
+        val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        val wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "niksante:alarm_wakelock")
+        wl.acquire(30_000L) // 30 s max — largement suffisant pour notif + replanification
 
-        showNotification(context, notifId, title, body)
-        // Replanifie le jour suivant (AlarmManager est one-shot)
-        rescheduleNextDay(context, notifId, hour, minute, title, body)
+        try {
+            val notifId = intent.getIntExtra(EXTRA_ID, 0)
+            val title   = intent.getStringExtra(EXTRA_TITLE)  ?: "Rappel NikSanté"
+            val body    = intent.getStringExtra(EXTRA_BODY)   ?: "Pensez à mesurer votre glycémie !"
+            val hour    = intent.getIntExtra(EXTRA_HOUR, 8)
+            val minute  = intent.getIntExtra(EXTRA_MINUTE, 0)
+
+            showNotification(context, notifId, title, body)
+            rescheduleNextDay(context, notifId, hour, minute, title, body)
+        } finally {
+            if (wl.isHeld) wl.release()
+        }
     }
 
     private fun showNotification(context: Context, notifId: Int, title: String, body: String) {

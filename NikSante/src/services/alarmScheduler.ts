@@ -5,6 +5,9 @@ type AlarmSchedulerNative = {
   scheduleDaily(id: number, hour: number, minute: number, title: string, body: string): Promise<number>;
   cancelAlarm(id: number): Promise<void>;
   canScheduleExactAlarms(): Promise<boolean>;
+  openExactAlarmSettings(): Promise<void>;
+  isBatteryOptimizationIgnored(): Promise<boolean>;
+  openBatteryOptimizationSettings(): Promise<void>;
 };
 
 const Native = requireOptionalNativeModule<AlarmSchedulerNative>('AlarmScheduler');
@@ -33,5 +36,20 @@ export const alarmScheduler = {
     if (Platform.OS !== 'android') return true;
     if (!Native) throw new Error('Module AlarmScheduler introuvable — build EAS requis.');
     return Native.canScheduleExactAlarms();
+  },
+
+  openExactAlarmSettings: async (): Promise<void> => {
+    if (Platform.OS !== 'android' || !Native) return;
+    return Native.openExactAlarmSettings();
+  },
+
+  isBatteryOptimizationIgnored: async (): Promise<boolean> => {
+    if (Platform.OS !== 'android' || !Native) return true;
+    return Native.isBatteryOptimizationIgnored();
+  },
+
+  openBatteryOptimizationSettings: async (): Promise<void> => {
+    if (Platform.OS !== 'android' || !Native) return;
+    return Native.openBatteryOptimizationSettings();
   },
 };

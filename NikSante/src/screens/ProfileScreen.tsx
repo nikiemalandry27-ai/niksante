@@ -114,9 +114,7 @@ async function scheduleReminder(key: ReminderKey, hour: number, minute: number):
           {
             text: 'Autoriser',
             onPress: () =>
-              Linking.sendIntent('android.settings.REQUEST_SCHEDULE_EXACT_ALARM', [
-                { key: 'android.provider.extra.APP_PACKAGE', value: 'com.niksante.app' },
-              ]).catch(() => Linking.openSettings()),
+              alarmScheduler.openExactAlarmSettings().catch(() => Linking.openSettings()),
           },
         ],
       );
@@ -380,9 +378,20 @@ export default function ProfileScreen() {
       const batteryAsked = await AsyncStorage.getItem(BATTERY_OPT_KEY);
       if (!batteryAsked && Platform.OS === 'android') {
         await AsyncStorage.setItem(BATTERY_OPT_KEY, 'true');
-        Linking.sendIntent('android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS', [
-          { key: 'package', value: 'com.niksante.app' },
-        ]).catch(() => {});
+        const ignored = await alarmScheduler.isBatteryOptimizationIgnored().catch(() => true);
+        if (!ignored) {
+          Alert.alert(
+            'Rappels garantis 24h/24',
+            'Autorisez NikSanté à ignorer les optimisations batterie pour que les rappels fonctionnent même quand le téléphone est en veille profonde.',
+            [
+              { text: 'Plus tard', style: 'cancel' },
+              {
+                text: 'Autoriser',
+                onPress: () => alarmScheduler.openBatteryOptimizationSettings().catch(() => {}),
+              },
+            ],
+          );
+        }
       }
     } else {
       const id = notifIds[key];

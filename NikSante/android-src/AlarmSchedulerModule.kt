@@ -4,7 +4,10 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import org.json.JSONArray
@@ -49,6 +52,33 @@ class AlarmSchedulerModule : Module() {
                 true
             }
         }
+
+        AsyncFunction("openExactAlarmSettings") {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val ctx = this@AlarmSchedulerModule.appContext.reactContext ?: return@AsyncFunction
+                val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                    data = Uri.parse("package:${ctx.packageName}")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                ctx.startActivity(intent)
+            }
+        }
+
+        AsyncFunction("isBatteryOptimizationIgnored") {
+            val ctx = this@AlarmSchedulerModule.appContext.reactContext ?: return@AsyncFunction false
+            val pm = ctx.getSystemService(Context.POWER_SERVICE) as PowerManager
+            pm.isIgnoringBatteryOptimizations(ctx.packageName)
+        }
+
+        AsyncFunction("openBatteryOptimizationSettings") {
+            val ctx = this@AlarmSchedulerModule.appContext.reactContext ?: return@AsyncFunction
+            // ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS ouvre un dialog système ciblant l'app
+            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                data = Uri.parse("package:${ctx.packageName}")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            ctx.startActivity(intent)
+        }
     }
 
     companion object {
@@ -79,7 +109,11 @@ class AlarmSchedulerModule : Module() {
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 if (am.canScheduleExactAlarms()) {
+                    // Permission accordée → alarme exacte, garantie même en Doze
                     am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, cal.timeInMillis, pi)
+                } else {
+                    // Fallback : alarme inexacte (±15 min) plutôt que silence total
+                    am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, cal.timeInMillis, pi)
                 }
             } else {
                 am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, cal.timeInMillis, pi)
