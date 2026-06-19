@@ -1,7 +1,7 @@
 {
   "name": "niksante",
   "main": "expo-router/entry",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "dependencies": {
     "@expo/ui": "~56.0.14",
     "@react-native-async-storage/async-storage": "2.2.0",

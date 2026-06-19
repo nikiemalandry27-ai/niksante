@@ -22,6 +22,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
+import { alarmScheduler, ALARM_IDS } from '@/services/alarmScheduler';
 
 import { useAuthStore }    from '@/store/authStore';
 import { useGlucoseStore } from '@/store/glucoseStore';
@@ -82,7 +83,7 @@ async function setupNotifications(): Promise<void> {
   }
 }
 
-async function scheduleReminder(key: ReminderKey, hour: number, minute: number): Promise<string | null> {
+async function scheduleReminder(key: ReminderKey, hour: number, minute: number): Promise<number | null> {
   const def = REMINDER_DEFS[key];
   try {
     const Notifs = require('expo-notifications');
@@ -102,7 +103,8 @@ async function scheduleReminder(key: ReminderKey, hour: number, minute: number):
     }
 
     // 2. SCHEDULE_EXACT_ALARM (Android 12+) — obligatoire, pas de fallback
-    if (Platform.OS === 'android' && perms.canScheduleExactNotifications === false) {
+    const canSchedule = await alarmScheduler.canScheduleExactAlarms();
+    if (!canSchedule) {
       Alert.alert(
         'Autorisation requise',
         'Pour activer ce rappel, autorisez les alarmes exactes pour NikSanté.',
@@ -120,53 +122,28 @@ async function scheduleReminder(key: ReminderKey, hour: number, minute: number):
       return null;
     }
 
-    // 3. Canal importance MAX
-    if (Platform.OS === 'android') {
-      await Notifs.setNotificationChannelAsync(NOTIF_CHANNEL_ID, {
-        name:                 'Rappels glycémie',
-        importance:           Notifs.AndroidImportance.MAX,
-        vibrationPattern:     [0, 250, 250, 250],
-        lightColor:           '#388E3C',
-        sound:                true,
-        enableVibrate:        true,
-        enableLights:         true,
-        showBadge:            false,
-        lockscreenVisibility: Notifs.AndroidNotificationVisibility.PUBLIC,
-        bypassDnd:            false,
-      });
-    }
-
-    const id = await Notifs.scheduleNotificationAsync({
-      content: {
-        title:    'Rappel NikSanté',
-        body:     `${def.label} — Pensez à mesurer votre glycémie !`,
-        sound:    true,
-        priority: 'max',
-        data:     { key },
-      },
-      trigger: {
-        type:      Notifs.SchedulableTriggerInputTypes.DAILY,
-        hour,
-        minute,
-        channelId: NOTIF_CHANNEL_ID,
-      },
-    });
-    console.log(`[Notifs] "${key}" programmé à ${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')} → ID: ${id}`);
+    // 3. Planification via AlarmManager natif (indépendant du bridge JS)
+    const id = ALARM_IDS[key];
+    await alarmScheduler.scheduleDaily(
+      id, hour, minute,
+      'Rappel NikSanté',
+      `${def.label} — Pensez à mesurer votre glycémie !`,
+    );
+    console.log(`[Alarm] "${key}" programmé à ${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')} → ID: ${id}`);
     return id;
   } catch (e) {
-    console.error(`[Notifs] Schedule error pour "${key}":`, e);
+    console.error(`[Alarm] Schedule error pour "${key}":`, e);
     Alert.alert('Erreur', 'Impossible de planifier le rappel. Vérifiez les permissions.');
     return null;
   }
 }
 
-async function cancelReminder(id: string): Promise<void> {
+async function cancelReminder(id: number): Promise<void> {
   try {
-    const Notifs = require('expo-notifications');
-    await Notifs.cancelScheduledNotificationAsync(id);
-    console.log(`[Notifs] Rappel annulé → ID: ${id}`);
+    await alarmScheduler.cancelAlarm(id);
+    console.log(`[Alarm] Rappel annulé → ID: ${id}`);
   } catch (e) {
-    console.log('[Notifs] Cancel unavailable:', e);
+    console.error('[Alarm] Cancel error:', e);
   }
 }
 
@@ -288,7 +265,7 @@ export default function ProfileScreen() {
   const [reminders, setReminders] = useState<Record<ReminderKey, boolean>>({
     morning: false, afternoon: false, evening: false,
   });
-  const [notifIds, setNotifIds] = useState<Record<ReminderKey, string | null>>({
+  const [notifIds, setNotifIds] = useState<Record<ReminderKey, number | null>>({
     morning: null, afternoon: null, evening: null,
   });
   const [reminderTimes, setReminderTimes] = useState<Record<ReminderKey, { hour: number; minute: number }>>({
@@ -302,7 +279,15 @@ export default function ProfileScreen() {
       if (raw) setReminders(JSON.parse(raw));
     });
     AsyncStorage.getItem(NOTIF_IDS_KEY).then((raw) => {
-      if (raw) setNotifIds(JSON.parse(raw));
+      if (raw) {
+        const stored = JSON.parse(raw);
+        // Migration : anciens IDs expo-notifications (string) → IDs natifs (number)
+        setNotifIds({
+          morning:   typeof stored.morning   === 'number' ? stored.morning   : null,
+          afternoon: typeof stored.afternoon === 'number' ? stored.afternoon : null,
+          evening:   typeof stored.evening   === 'number' ? stored.evening   : null,
+        });
+      }
     });
     AsyncStorage.getItem(REMINDER_TIMES_KEY).then((raw) => {
       if (raw) setReminderTimes(JSON.parse(raw));
