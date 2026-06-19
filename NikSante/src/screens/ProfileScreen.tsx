@@ -50,6 +50,7 @@ const NOTIF_IDS_KEY         = '@niksante_notif_ids';
 const REMINDER_TIMES_KEY    = '@niksante_reminder_times';
 const NOTIF_CHANNEL_ID      = 'niksante-rappels';
 const BATTERY_OPT_KEY       = '@niksante_battery_opt_requested';
+const ALARM_MIGRATED_KEY    = '@niksante_alarm_migrated_v2';
 
 // ---------------------------------------------------------------------------
 // Setup notifications
@@ -275,23 +276,51 @@ export default function ProfileScreen() {
   });
   useEffect(() => {
     setupNotifications();
-    AsyncStorage.getItem(REMINDER_STORAGE_KEY).then((raw) => {
-      if (raw) setReminders(JSON.parse(raw));
-    });
-    AsyncStorage.getItem(NOTIF_IDS_KEY).then((raw) => {
-      if (raw) {
-        const stored = JSON.parse(raw);
-        // Migration : anciens IDs expo-notifications (string) → IDs natifs (number)
+
+    (async () => {
+      // Migration one-time : anciens rappels expo-notifications → AlarmManager natif
+      // Sans cette migration, les switches pourraient apparaître ON alors qu'aucune
+      // alarme AlarmManager n'est planifiée (l'ancien état persiste en AsyncStorage).
+      const migrated = await AsyncStorage.getItem(ALARM_MIGRATED_KEY);
+      if (!migrated) {
+        try {
+          // Annule toutes les anciennes notifications expo-notifications
+          const Notifs = require('expo-notifications');
+          await Notifs.cancelAllScheduledNotificationsAsync();
+        } catch { /* silencieux si expo-notifications indisponible */ }
+
+        // Remet tous les rappels à zéro (les heures perso sont conservées)
+        const blank = { morning: false, afternoon: false, evening: false };
+        const blankIds = { morning: null, afternoon: null, evening: null };
+        setReminders(blank);
+        setNotifIds(blankIds);
+        await AsyncStorage.setItem(REMINDER_STORAGE_KEY, JSON.stringify(blank));
+        await AsyncStorage.setItem(NOTIF_IDS_KEY, JSON.stringify(blankIds));
+        await AsyncStorage.setItem(ALARM_MIGRATED_KEY, 'v2');
+
+        // Charge quand même les heures perso
+        const rawTimes = await AsyncStorage.getItem(REMINDER_TIMES_KEY);
+        if (rawTimes) setReminderTimes(JSON.parse(rawTimes));
+        return;
+      }
+
+      // Chargement normal après migration
+      const [rawReminders, rawIds, rawTimes] = await Promise.all([
+        AsyncStorage.getItem(REMINDER_STORAGE_KEY),
+        AsyncStorage.getItem(NOTIF_IDS_KEY),
+        AsyncStorage.getItem(REMINDER_TIMES_KEY),
+      ]);
+      if (rawReminders) setReminders(JSON.parse(rawReminders));
+      if (rawIds) {
+        const stored = JSON.parse(rawIds);
         setNotifIds({
           morning:   typeof stored.morning   === 'number' ? stored.morning   : null,
           afternoon: typeof stored.afternoon === 'number' ? stored.afternoon : null,
           evening:   typeof stored.evening   === 'number' ? stored.evening   : null,
         });
       }
-    });
-    AsyncStorage.getItem(REMINDER_TIMES_KEY).then((raw) => {
-      if (raw) setReminderTimes(JSON.parse(raw));
-    });
+      if (rawTimes) setReminderTimes(JSON.parse(rawTimes));
+    })();
   }, []);
 
   // Ajuste l'heure d'un rappel et reprogramme si actif
