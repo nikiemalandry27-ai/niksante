@@ -103,25 +103,10 @@ async function scheduleReminder(key: ReminderKey, hour: number, minute: number):
       }
     }
 
-    // 2. SCHEDULE_EXACT_ALARM (Android 12+) — obligatoire, pas de fallback
-    const canSchedule = await alarmScheduler.canScheduleExactAlarms();
-    if (!canSchedule) {
-      Alert.alert(
-        'Autorisation requise',
-        'Pour activer ce rappel, autorisez les alarmes exactes pour NikSanté.',
-        [
-          { text: 'Annuler', style: 'cancel' },
-          {
-            text: 'Autoriser',
-            onPress: () =>
-              alarmScheduler.openExactAlarmSettings().catch(() => Linking.openSettings()),
-          },
-        ],
-      );
-      return null;
-    }
-
-    // 3. Planification via AlarmManager natif (indépendant du bridge JS)
+    // 2. Planification via AlarmManager natif
+    // scheduleDaily gère le fallback en interne : setExactAndAllowWhileIdle si
+    // SCHEDULE_EXACT_ALARM est accordée, setAndAllowWhileIdle (±15 min) sinon.
+    // Ne jamais bloquer ici — le Kotlin ne rate jamais silencieusement.
     const id = ALARM_IDS[key];
     await alarmScheduler.scheduleDaily(
       id, hour, minute,
