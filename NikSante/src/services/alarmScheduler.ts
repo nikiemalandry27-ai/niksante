@@ -1,6 +1,13 @@
-import { NativeModules, Platform } from 'react-native';
+import { requireOptionalNativeModule } from 'expo-modules-core';
+import { Platform } from 'react-native';
 
-const { AlarmScheduler } = NativeModules;
+type AlarmSchedulerNative = {
+  scheduleDaily(id: number, hour: number, minute: number, title: string, body: string): Promise<number>;
+  cancelAlarm(id: number): Promise<void>;
+  canScheduleExactAlarms(): Promise<boolean>;
+};
+
+const Native = requireOptionalNativeModule<AlarmSchedulerNative>('AlarmScheduler');
 
 export const ALARM_IDS = {
   morning:   1001,
@@ -13,18 +20,18 @@ export type AlarmKey = keyof typeof ALARM_IDS;
 export const alarmScheduler = {
   scheduleDaily: async (id: number, hour: number, minute: number, title: string, body: string): Promise<number> => {
     if (Platform.OS !== 'android') return id;
-    if (!AlarmScheduler) throw new Error('Module AlarmScheduler introuvable — build EAS requis.');
-    return AlarmScheduler.scheduleDaily(id, hour, minute, title, body);
+    if (!Native) throw new Error('Module AlarmScheduler introuvable — build EAS requis.');
+    return Native.scheduleDaily(id, hour, minute, title, body);
   },
 
   cancelAlarm: async (id: number): Promise<void> => {
-    if (Platform.OS !== 'android' || !AlarmScheduler) return;
-    return AlarmScheduler.cancelAlarm(id);
+    if (Platform.OS !== 'android' || !Native) return;
+    return Native.cancelAlarm(id);
   },
 
   canScheduleExactAlarms: async (): Promise<boolean> => {
     if (Platform.OS !== 'android') return true;
-    if (!AlarmScheduler) throw new Error('Module AlarmScheduler introuvable — build EAS requis.');
-    return AlarmScheduler.canScheduleExactAlarms();
+    if (!Native) throw new Error('Module AlarmScheduler introuvable — build EAS requis.');
+    return Native.canScheduleExactAlarms();
   },
 };
