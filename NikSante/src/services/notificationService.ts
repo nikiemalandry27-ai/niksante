@@ -3,7 +3,8 @@ import { Platform, Linking, Alert } from 'react-native';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import api from './api';
 
-const EXPO_PROJECT_ID = 'f12328b2-8542-4782-b20c-1c83dbaa9557';
+const EXPO_PROJECT_ID =
+  Constants.expoConfig?.extra?.eas?.projectId ?? '5433c0d6-40a8-4b81-9dd1-8d74ed9df387';
 const PLAY_STORE_URL  = 'market://details?id=com.niksante.app';
 const PLAY_STORE_WEB  = 'https://play.google.com/store/apps/details?id=com.niksante.app';
 
