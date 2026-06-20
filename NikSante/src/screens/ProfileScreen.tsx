@@ -118,7 +118,7 @@ async function scheduleReminder(key: ReminderKey, hour: number, minute: number):
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[Alarm] Schedule error pour "${key}":`, e);
-    Alert.alert('Erreur planification', msg);
+    Alert.alert('Erreur de planification', `Impossible de planifier le rappel.\n\n${msg}`);
     return null;
   }
 }
