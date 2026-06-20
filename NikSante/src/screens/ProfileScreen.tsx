@@ -116,9 +116,8 @@ async function scheduleReminder(key: ReminderKey, hour: number, minute: number):
     console.log(`[Alarm] "${key}" programmé à ${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')} → ID: ${id}`);
     return id;
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
     console.error(`[Alarm] Schedule error pour "${key}":`, e);
-    Alert.alert('Erreur planification', msg);
+    Alert.alert('Erreur', 'Impossible de planifier le rappel. Vérifiez les permissions.');
     return null;
   }
 }
