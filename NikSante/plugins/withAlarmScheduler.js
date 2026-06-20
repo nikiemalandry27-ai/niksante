@@ -1,10 +1,12 @@
-const { withAndroidManifest, withDangerousMod } = require('@expo/config-plugins');
+const { withAndroidManifest, withDangerousMod, withGradleProperties } = require('@expo/config-plugins');
 const fs   = require('fs');
 const path = require('path');
 
 module.exports = function withAlarmScheduler(config) {
 
-  // ── 1. Copy Kotlin files into the Android project ───────────────────────
+  // ── 1. Copy BroadcastReceiver Kotlin files into the Android project ──────
+  //    AlarmSchedulerModule.kt is NOT copied here — it is registered via the
+  //    inline-modules mechanism (Step 3) which symlinks it at Gradle build time.
   config = withDangerousMod(config, [
     'android',
     (config) => {
@@ -16,10 +18,10 @@ module.exports = function withAlarmScheduler(config) {
 
       fs.mkdirSync(destDir, { recursive: true });
 
+      // Only copy the BroadcastReceivers — NOT AlarmSchedulerModule (handled by inline modules)
       const files = [
         'AlarmReceiver.kt',
         'BootReceiver.kt',
-        'AlarmSchedulerModule.kt',
       ];
 
       for (const file of files) {
@@ -66,9 +68,22 @@ module.exports = function withAlarmScheduler(config) {
     return config;
   });
 
-  // ── 3. L'enregistrement du module est géré par modules/alarm-scheduler/expo-module.config.json
-  //    expo-modules-core scanne node_modules au prebuild et génère ExpoModulesProvider.kt
-  //    automatiquement — aucun patch manuel nécessaire.
+  // ── 3. Inline-modules: tell expo-modules-autolinking to scan android-src/modules/
+  //    The Gradle plugin reads expo.inlineModules.watchedDirectories at build time,
+  //    symlinks AlarmSchedulerModule.kt into the app's source set, and generates
+  //    ExpoInlineModulesList.java which AppContext loads via reflection at runtime.
+  config = withGradleProperties(config, (config) => {
+    const key = 'expo.inlineModules.watchedDirectories';
+    const value = '["android-src/modules"]';
+
+    // Remove any existing entry for this key to avoid duplicates
+    config.modResults = config.modResults.filter(
+      (item) => !(item.type === 'property' && item.key === key)
+    );
+
+    config.modResults.push({ type: 'property', key, value });
+    return config;
+  });
 
   return config;
 };
