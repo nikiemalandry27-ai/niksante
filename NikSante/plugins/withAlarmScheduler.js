@@ -16,7 +16,6 @@ module.exports = function withAlarmScheduler(config) {
 
       fs.mkdirSync(destDir, { recursive: true });
 
-      // AlarmSchedulerPackage.kt n'est plus nécessaire (Expo Module API)
       const files = [
         'AlarmReceiver.kt',
         'BootReceiver.kt',
@@ -67,54 +66,9 @@ module.exports = function withAlarmScheduler(config) {
     return config;
   });
 
-  // ── 3. Register AlarmSchedulerModule via ExpoModulesProvider.kt ─────────
-  //    Expo génère ce fichier dans un emplacement fixe avec un format stable.
-  //    Beaucoup plus fiable que de patcher MainApplication.kt.
-  config = withDangerousMod(config, [
-    'android',
-    (config) => {
-      const providerPath = path.join(
-        config.modRequest.platformProjectRoot,
-        'app', 'src', 'main', 'java', 'expo', 'modules', 'ExpoModulesProvider.kt'
-      );
-
-      if (!fs.existsSync(providerPath)) {
-        console.warn('[withAlarmScheduler] ExpoModulesProvider.kt not found:', providerPath);
-        return config;
-      }
-
-      let content = fs.readFileSync(providerPath, 'utf8');
-
-      if (content.includes('AlarmSchedulerModule')) {
-        console.log('[withAlarmScheduler] AlarmSchedulerModule already registered.');
-        return config;
-      }
-
-      // Expo SDK peut générer l'ancre avec ou sans "internal" selon la version
-      const anchors = [
-        'internal fun appContext() = modulesProvider {',
-        'fun appContext() = modulesProvider {',
-      ];
-      const anchor = anchors.find(a => content.includes(a));
-      if (!anchor) {
-        console.error(
-          '[withAlarmScheduler] ERREUR : Aucun pattern connu trouvé dans ExpoModulesProvider.kt.\n' +
-          'Le module AlarmScheduler ne sera PAS enregistré → requireOptionalNativeModule retournera null.\n' +
-          'Contenu du fichier :\n' + content.slice(0, 500)
-        );
-        return config;
-      }
-
-      content = content.replace(
-        anchor,
-        `${anchor}\n  module { com.niksante.app.AlarmSchedulerModule() }`
-      );
-
-      fs.writeFileSync(providerPath, content);
-      console.log('[withAlarmScheduler] AlarmSchedulerModule registered in ExpoModulesProvider.kt');
-      return config;
-    },
-  ]);
+  // ── 3. L'enregistrement du module est géré par modules/alarm-scheduler/expo-module.config.json
+  //    expo-modules-core scanne node_modules au prebuild et génère ExpoModulesProvider.kt
+  //    automatiquement — aucun patch manuel nécessaire.
 
   return config;
 };
