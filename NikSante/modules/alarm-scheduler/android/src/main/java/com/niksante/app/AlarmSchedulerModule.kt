@@ -108,14 +108,19 @@ class AlarmSchedulerModule : Module() {
                 set(Calendar.MILLISECOND, 0)
                 if (timeInMillis <= System.currentTimeMillis()) add(Calendar.DAY_OF_YEAR, 1)
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                if (am.canScheduleExactAlarms()) {
-                    am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, cal.timeInMillis, pi)
-                } else {
-                    am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, cal.timeInMillis, pi)
-                }
+            val canExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || am.canScheduleExactAlarms()
+
+            if (canExact) {
+                // setAlarmClock est le seul type exempt de toutes les restrictions OEM
+                // (TECNO, Infinix, Samsung, Xiaomi…). Le système ne peut pas le déférer,
+                // même quand l'app est en arrière-plan. Équivalent à l'alarme de l'appli Horloge.
+                val showIntent = context.packageManager
+                    .getLaunchIntentForPackage(context.packageName)
+                    ?.let { PendingIntent.getActivity(context, id + 10000, it, PendingIntent.FLAG_IMMUTABLE) }
+                am.setAlarmClock(AlarmManager.AlarmClockInfo(cal.timeInMillis, showIntent), pi)
             } else {
-                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, cal.timeInMillis, pi)
+                // Fallback si SCHEDULE_EXACT_ALARM refusée — inexact (±15 min)
+                am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, cal.timeInMillis, pi)
             }
         }
 
