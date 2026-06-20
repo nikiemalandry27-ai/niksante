@@ -4,3 +4,7 @@ apply plugin: 'expo-module-gradle-plugin'
 android {
   namespace "com.niksante.alarm_scheduler"
 }
+
+expoModule {
+  canBePublished = false
+}
