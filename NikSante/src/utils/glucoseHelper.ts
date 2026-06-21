@@ -200,41 +200,41 @@ export function getAIMessage(status: GlucoseStatus, mealContext: MealContext = n
   // ── Zone acceptable post-repas (8–10 mmol/L / 140–180 mg/dL) ─────────────
   if (status === 'hyper_mild') {
     switch (mealContext) {
+      case 'before_meal':
+        return {
+          title: '🟡 Glycémie légèrement élevée avant repas',
+          message: 'Votre glycémie est un peu élevée avant de manger — un bon choix alimentaire maintenant peut aider à la stabiliser.',
+          suggestion: 'Privilégiez : légumes verts, protéines maigres (poulet, poisson, œufs, légumineuses) et glucides lents (riz complet, lentilles, flocons d\'avoine). Limitez le pain blanc, le riz blanc, les sodas et les sucreries.',
+        };
       case 'after_meal':
         return {
           title: '🟡 Glycémie légèrement élevée après repas',
-          message: 'Votre glycémie est restée légèrement élevée après ce repas — signe que le repas était riche en glucides rapides ou en sucres ajoutés.',
-          suggestion: 'Marchez 15–20 min : cela aide les muscles à consommer le glucose et accélère la régulation.',
-        };
-      case 'before_meal':
-        return {
-          title: '🟡 Glycémie élevée avant repas',
-          message: 'Votre glycémie est légèrement élevée avant de manger — probablement un résidu du repas précédent ou l\'effet du stress.',
-          suggestion: 'Choisissez un repas léger pauvre en glucides rapides. Évitez le pain blanc, les sodas et les sucreries.',
+          message: 'Votre glycémie est restée un peu élevée après ce repas — cela peut être lié à des glucides rapides ou à une portion plus importante qu\'habituellement.',
+          suggestion: 'Une marche douce de 15–20 min aide les muscles à consommer le glucose. Pour le prochain repas, misez sur les fibres (légumes, légumineuses) et les protéines pour ralentir l\'absorption du sucre.',
         };
       case 'fasting':
         return {
-          title: '🟡 Glycémie à jeun élevée',
-          message: 'À jeun, votre glycémie reste légèrement élevée — l\'organisme n\'a pas totalement régulé pendant la nuit.',
-          suggestion: 'Si c\'est répété, consultez votre médecin — possible phénomène de l\'aube ou ajustement de traitement nécessaire.',
+          title: '🟡 Glycémie légèrement élevée à jeun',
+          message: 'Votre glycémie est un peu élevée au réveil — l\'organisme n\'a pas totalement régulé pendant la nuit.',
+          suggestion: 'Pour le petit-déjeuner, évitez les céréales sucrées, le pain blanc et les jus de fruit. Préférez des œufs, un yaourt nature, des oléagineux (noix, amandes) ou du pain complet avec des protéines.',
         };
       case 'bedtime':
         return {
-          title: '🟡 Glycémie élevée au coucher',
-          message: 'Aller dormir avec une glycémie élevée prolonge cette élévation pendant la nuit sans que vous puissiez la corriger.',
-          suggestion: 'Buvez de l\'eau, évitez toute collation. Une courte marche de 10 min peut aider avant de dormir.',
+          title: '🟡 Glycémie légèrement élevée au coucher',
+          message: 'Aller dormir avec une glycémie un peu élevée peut prolonger cette élévation pendant la nuit.',
+          suggestion: 'Évitez toute collation sucrée ou féculents ce soir. Une courte marche de 10 min avant de dormir peut aider à abaisser doucement la glycémie. Buvez un verre d\'eau.',
         };
       case 'sport':
         return {
-          title: '🟡 Glycémie élevée pendant l\'activité',
-          message: 'Un effort anaérobie intense (sprint, musculation) peut temporairement élever la glycémie via les hormones de stress.',
-          suggestion: 'Après l\'effort, la glycémie devrait baisser avec la phase de récupération. Surveillez l\'évolution.',
+          title: '🟡 Glycémie légèrement élevée pendant l\'activité',
+          message: 'Certains efforts anaérobies (sprint, musculation) peuvent temporairement élever la glycémie via les hormones de stress — c\'est un phénomène connu.',
+          suggestion: 'Vous pouvez continuer si vous vous sentez bien. Un effort aérobie léger (marche rapide, vélo modéré) aide à baisser la glycémie naturellement. Elle devrait revenir à la normale en phase de récupération.',
         };
       default:
         return {
           title: '🟡 Glycémie légèrement élevée',
-          message: 'Votre glycémie est légèrement élevée — peut être lié à un repas récent riche en glucides ou à un état de stress.',
-          suggestion: 'Buvez de l\'eau, marchez un peu et observez l\'évolution à la prochaine mesure.',
+          message: 'Votre glycémie est légèrement élevée — cela peut être lié à un repas récent, au stress ou à un manque d\'activité.',
+          suggestion: 'Buvez un verre d\'eau, marchez 10–15 min et observez l\'évolution à la prochaine mesure.',
         };
     }
   }

@@ -63,10 +63,17 @@ const STATUS_LABELS: Record<string, string> = {
   hypo_critical:  'HYPOGLYCÉMIE CRITIQUE',
   hypo:           'GLYCÉMIE BASSE',
   normal:         'NORMAL',
-  hyper_mild:     'ÉLEVÉ POST-REPAS',
+  hyper_mild:     'LÉGÈREMENT ÉLEVÉ',
   hyper:          'GLYCÉMIE ÉLEVÉE',
   hyper_critical: 'HYPERGLYCÉMIE CRITIQUE',
 };
+
+function getStatusLabel(status: string, mealContext?: string | null): string {
+  if (status === 'hyper_mild') {
+    return mealContext === 'after_meal' ? 'ÉLEVÉ POST-REPAS' : 'LÉGÈREMENT ÉLEVÉ';
+  }
+  return STATUS_LABELS[status] ?? '';
+}
 
 // ---------------------------------------------------------------------------
 // Impact glycémique selon durée de sommeil
@@ -206,7 +213,7 @@ export default function DashboardScreen() {
                     borderColor:     statusColor,
                   }]}>
                     <ThemedText style={[styles.statusBadgeText, { color: statusColor }]}>
-                      {STATUS_LABELS[status]}
+                      {getStatusLabel(status, latestGlucose?.mealContext)}
                     </ThemedText>
                   </View>
                 </View>
@@ -440,7 +447,7 @@ export default function DashboardScreen() {
                     ) : null}
                   </View>
                   <ThemedText style={[styles.historyStatus, { color }]}>
-                    {STATUS_LABELS[s]}
+                    {getStatusLabel(s, entry.mealContext)}
                   </ThemedText>
                 </View>
               );
