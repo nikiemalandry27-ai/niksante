@@ -56,6 +56,7 @@ module.exports = function withAlarmScheduler(config) {
           'android:name': '.AlarmForegroundService',
           'android:foregroundServiceType': 'systemExempted',
           'android:exported': 'false',
+          'android:process': ':alarm',
         },
       });
     }
