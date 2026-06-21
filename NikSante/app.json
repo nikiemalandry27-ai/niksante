@@ -66,6 +66,14 @@
       "./plugins/withCameraProguard",
       "./plugins/withAlarmScheduler",
       [
+        "expo-camera",
+        {
+          "cameraPermission": "NikSanté utilise la caméra pour scanner et analyser l'impact glycémique de vos aliments.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      [
         "expo-notifications",
         {
           "icon": "./assets/images/icon.png",

@@ -85,7 +85,7 @@ const CHAPTERS: Chapter[] = [
       },
       {
         type: 'tip',
-        text: "En France, environ 4,5 millions de personnes sont diabétiques, dont 1 million s'ignorent. Le dépistage précoce est essentiel.",
+        text: "Selon la Fédération Internationale du Diabète (FID), 537 millions d'adultes vivent avec le diabète dans le monde — et près d'une personne sur deux ne le sait pas encore. Un dépistage précoce peut changer le cours de la maladie.",
       },
     ],
   },

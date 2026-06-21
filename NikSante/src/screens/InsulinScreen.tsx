@@ -14,9 +14,9 @@ import { s, fs, vs } from '@/utils/responsive';
 // ---------------------------------------------------------------------------
 
 const TYPE_META: Record<InsulinType, { label: string; color: string; desc: string; icon: string }> = {
-  rapide:   { label: 'Rapide',    color: '#1565C0', icon: '⚡', desc: 'Action 1–4h (NovoRapid, Humalog…)' },
-  lente:    { label: 'Lente',     color: '#388E3C', icon: '🐢', desc: 'Action 12–24h (Lantus, Levemir…)'  },
-  premixte: { label: 'Prémixée', color: '#7B1FA2', icon: '🔀', desc: 'Action mixte (NovoMix…)'            },
+  rapide:   { label: 'Rapide',   color: '#1565C0', icon: '⚡', desc: 'Agit rapidement en 1 à 4h — à prendre avant les repas (NovoRapid, Humalog, Apidra…)' },
+  lente:    { label: 'Lente',    color: '#388E3C', icon: '🐢', desc: 'Agit sur la durée, 12 à 24h — maintient la glycémie de fond (Lantus, Levemir, Toujeo…)' },
+  premixte: { label: 'Prémixée', color: '#7B1FA2', icon: '🔀', desc: 'Mélange insuline rapide + lente en une seule injection (NovoMix, Mixtard…)' },
 };
 
 const DAY_LABELS = ['Di', 'Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa'];
@@ -107,7 +107,7 @@ export default function InsulinScreen() {
 
         {/* ── Totaux du jour ── */}
         <View style={styles.totalsCard}>
-          <ThemedText style={styles.totalsLabel}>AUJOURD'HUI</ThemedText>
+          <ThemedText style={styles.totalsLabel}>AUJOURD'HUI — doses en unités (u)</ThemedText>
           <View style={styles.totalsRow}>
             {(Object.keys(TYPE_META) as InsulinType[]).map(t => (
               <View key={t} style={[styles.totalBox, { borderColor: TYPE_META[t].color + '40' }]}>
@@ -197,7 +197,7 @@ export default function InsulinScreen() {
             style={styles.noteInput}
             value={note}
             onChangeText={setNote}
-            placeholder="Ex : avant le repas, site abdomen…"
+            placeholder="Ex : avant le repas, injection à l'abdomen, à la cuisse…"
             placeholderTextColor="#ccc"
             maxLength={120}
           />
@@ -266,7 +266,7 @@ export default function InsulinScreen() {
               ))}
 
             <ThemedText style={styles.deleteHint}>
-              Appui long sur une entrée pour la supprimer
+              Appuyez longuement sur une injection pour la supprimer
             </ThemedText>
           </View>
         )}
