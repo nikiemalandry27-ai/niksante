@@ -6,21 +6,21 @@
  */
 
 export const GLUCOSE_THRESHOLDS = {
-  /** Hypoglycémie critique : < 54 mg/dL */
+  /** Hypoglycémie critique niveau 2 : < 54 mg/dL (ADA/FID) */
   HYPO_CRITICAL: 54,
-  /** Hypoglycémie : < 70 mg/dL */
+  /** Hypoglycémie niveau 1 : < 70 mg/dL (ADA/FID) */
   HYPO_ALERT: 70,
-  /** Zone basse (vigilance) : 70-80 mg/dL */
+  /** Zone basse (vigilance) : 70–80 mg/dL */
   HYPO_WARNING: 80,
-  /** Plage normale minimale */
-  NORMAL_MIN: 80,
-  /** Plage normale maximale (à jeun / interprandiale) */
-  NORMAL_MAX: 140,
-  /** Zone élevée (vigilance) */
+  /** Borne inférieure TIR — 70 mg/dL (ADA 2019 / FID 2023) */
+  NORMAL_MIN: 70,
+  /** Borne supérieure TIR — 180 mg/dL (ADA 2019 / FID 2023) */
+  NORMAL_MAX: 180,
+  /** Hyperglycémie niveau 1 : > 180 mg/dL */
   HYPER_WARNING: 180,
-  /** Hyperglycémie franche */
-  HYPER_ALERT: 200,
-  /** Hyperglycémie critique */
+  /** Hyperglycémie niveau 2 : > 250 mg/dL (ADA) */
+  HYPER_ALERT: 250,
+  /** Hyperglycémie critique : > 300 mg/dL */
   HYPER_CRITICAL: 300,
 } as const;
 
