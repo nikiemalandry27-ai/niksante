@@ -226,11 +226,12 @@ export default function AddGlucoseScreen() {
             <View style={styles.thresholdsCard}>
               <ThemedText style={styles.thresholdsTitle}>Repères cliniques</ThemedText>
               {[
-                { label: 'Hypoglycémie critique', range: `< ${toDisplay(GLUCOSE_THRESHOLDS.HYPO_CRITICAL, glucoseUnit)}`, color: '#B71C1C' },
-                { label: 'Hypoglycémie',          range: `${toDisplay(GLUCOSE_THRESHOLDS.HYPO_CRITICAL, glucoseUnit)}–${toDisplay(GLUCOSE_THRESHOLDS.HYPO_ALERT - 1, glucoseUnit)}`, color: '#F57C00' },
-                { label: 'Normal',                range: `${toDisplay(GLUCOSE_THRESHOLDS.NORMAL_MIN, glucoseUnit)}–${toDisplay(GLUCOSE_THRESHOLDS.NORMAL_MAX, glucoseUnit)}`, color: '#388E3C' },
-                { label: 'Hyperglycémie',         range: `${toDisplay(GLUCOSE_THRESHOLDS.NORMAL_MAX + 1, glucoseUnit)}–${toDisplay(GLUCOSE_THRESHOLDS.HYPER_CRITICAL, glucoseUnit)}`, color: '#F57C00' },
-                { label: 'Hyperglycémie critique', range: `> ${toDisplay(GLUCOSE_THRESHOLDS.HYPER_CRITICAL, glucoseUnit)}`, color: '#B71C1C' },
+                { label: 'Hypoglycémie critique', range: `< ${toDisplay(GLUCOSE_THRESHOLDS.HYPO_CRITICAL, glucoseUnit)}`,                                                                                               color: '#B71C1C' },
+                { label: 'Hypoglycémie',          range: `${toDisplay(GLUCOSE_THRESHOLDS.HYPO_CRITICAL, glucoseUnit)} – ${toDisplay(GLUCOSE_THRESHOLDS.HYPO_ALERT - 1, glucoseUnit)}`,                                  color: '#1565C0' },
+                { label: 'Normal (optimal)',       range: `${toDisplay(GLUCOSE_THRESHOLDS.NORMAL_MIN, glucoseUnit)} – ${toDisplay(GLUCOSE_THRESHOLDS.NORMAL_MAX, glucoseUnit)}`,                                          color: '#388E3C' },
+                { label: 'Élevé post-repas',       range: `${toDisplay(GLUCOSE_THRESHOLDS.NORMAL_MAX + 1, glucoseUnit)} – ${toDisplay(GLUCOSE_THRESHOLDS.HYPER_WARNING, glucoseUnit)}`,                                  color: '#F9A825' },
+                { label: 'Hyperglycémie',          range: `${toDisplay(GLUCOSE_THRESHOLDS.HYPER_WARNING + 1, glucoseUnit)} – ${toDisplay(GLUCOSE_THRESHOLDS.HYPER_CRITICAL, glucoseUnit)}`,                              color: '#E65100' },
+                { label: 'Hyperglycémie critique', range: `> ${toDisplay(GLUCOSE_THRESHOLDS.HYPER_CRITICAL, glucoseUnit)}`,                                                                                               color: '#B71C1C' },
               ].map((row) => (
                 <View key={row.label} style={styles.thresholdRow}>
                   <View style={[styles.dot, { backgroundColor: row.color }]} />

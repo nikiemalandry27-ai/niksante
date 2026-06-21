@@ -147,7 +147,7 @@ export function getAIMessage(status: GlucoseStatus, mealContext: MealContext = n
       default:
         return {
           title: '⚡ Glycémie basse',
-          message: 'Votre glycémie est légèrement en dessous de la normale. Cause possible : repas sauté ou effort récent.',
+          message: 'Votre glycémie est basse — un repas sauté ou un effort physique récent peuvent en être la cause.',
           suggestion: 'Prenez une collation sucrée légère (fruit, biscuit) et contrôlez dans 15 minutes.',
         };
     }
@@ -159,7 +159,7 @@ export function getAIMessage(status: GlucoseStatus, mealContext: MealContext = n
       case 'before_meal':
         return {
           title: '✅ Bonne glycémie avant repas',
-          message: 'Votre glycémie est dans la cible avant le repas. Bon point de départ.',
+          message: 'Votre glycémie est bien équilibrée avant le repas.',
           suggestion: 'Privilégiez un repas équilibré (glucides lents, légumes, protéines) pour garder cette stabilité.',
         };
       case 'after_meal':
@@ -184,14 +184,14 @@ export function getAIMessage(status: GlucoseStatus, mealContext: MealContext = n
         };
       case 'sport':
         return {
-          title: '✅ Glycémie normale — activité physique',
-          message: 'Votre glycémie est bien dans la cible pour pratiquer une activité physique.',
+          title: '✅ Glycémie stable — activité physique',
+          message: 'Votre glycémie est stable — conditions favorables pour pratiquer une activité physique.',
           suggestion: 'Gardez une collation sucrée à portée en cas d\'effort prolongé (> 45 min).',
         };
       default:
         return {
-          title: '✅ Glycémie normale',
-          message: 'Votre glycémie est dans la plage cible. Continuez sur cette lancée !',
+          title: '✅ Glycémie bien équilibrée',
+          message: 'Votre glycémie est bien équilibrée. Continuez sur cette lancée !',
           suggestion: 'Maintenez une alimentation équilibrée, restez hydraté et bougez régulièrement.',
         };
     }
@@ -202,33 +202,33 @@ export function getAIMessage(status: GlucoseStatus, mealContext: MealContext = n
     switch (mealContext) {
       case 'after_meal':
         return {
-          title: '🟡 Au-dessus de l\'objectif post-repas',
-          message: 'Votre glycémie est entre 8 et 10 mmol/L après le repas. C\'est acceptable mais l\'objectif est de rester sous 8 mmol/L.',
-          suggestion: 'Marchez 15–20 min après le repas pour aider les muscles à consommer le glucose.',
+          title: '🟡 Glycémie légèrement élevée après repas',
+          message: 'Votre glycémie est restée légèrement élevée après ce repas — signe que le repas était riche en glucides rapides ou en sucres ajoutés.',
+          suggestion: 'Marchez 15–20 min : cela aide les muscles à consommer le glucose et accélère la régulation.',
         };
       case 'before_meal':
         return {
           title: '🟡 Glycémie élevée avant repas',
-          message: 'Votre glycémie dépasse 8 mmol/L avant de manger — résidu du repas précédent ou stress.',
-          suggestion: 'Choisissez un repas léger en glucides rapides. Évitez le pain blanc, les sodas et les sucreries.',
+          message: 'Votre glycémie est légèrement élevée avant de manger — probablement un résidu du repas précédent ou l\'effet du stress.',
+          suggestion: 'Choisissez un repas léger pauvre en glucides rapides. Évitez le pain blanc, les sodas et les sucreries.',
         };
       case 'fasting':
         return {
-          title: '🟡 Glycémie à jeun trop élevée',
-          message: 'À jeun, l\'objectif est d\'être entre 4 et 7 mmol/L. Votre valeur dépasse 8 mmol/L.',
-          suggestion: 'Parlez à votre médecin si c\'est régulier — possible phénomène de l\'aube ou ajustement de traitement nécessaire.',
+          title: '🟡 Glycémie à jeun élevée',
+          message: 'À jeun, votre glycémie reste légèrement élevée — l\'organisme n\'a pas totalement régulé pendant la nuit.',
+          suggestion: 'Si c\'est répété, consultez votre médecin — possible phénomène de l\'aube ou ajustement de traitement nécessaire.',
         };
       case 'bedtime':
         return {
           title: '🟡 Glycémie élevée au coucher',
-          message: 'Aller dormir à plus de 8 mmol/L prolonge l\'hyperglycémie nocturne.',
+          message: 'Aller dormir avec une glycémie élevée prolonge cette élévation pendant la nuit sans que vous puissiez la corriger.',
           suggestion: 'Buvez de l\'eau, évitez toute collation. Une courte marche de 10 min peut aider avant de dormir.',
         };
       default:
         return {
-          title: '🟡 Légèrement au-dessus de l\'objectif',
-          message: 'Votre glycémie est entre 8 et 10 mmol/L. Acceptable, mais l\'objectif global est de rester sous 8 mmol/L.',
-          suggestion: 'Buvez de l\'eau et bougez un peu. Vérifiez votre dernier repas — trop de glucides rapides ?',
+          title: '🟡 Glycémie légèrement élevée',
+          message: 'Votre glycémie est légèrement élevée — signe possible d\'un repas récent riche en glucides ou d\'un état de stress.',
+          suggestion: 'Buvez de l\'eau et bougez un peu. Vérifiez la composition de votre dernier repas.',
         };
     }
   }
@@ -245,7 +245,7 @@ export function getAIMessage(status: GlucoseStatus, mealContext: MealContext = n
       case 'after_meal':
         return {
           title: '📈 Glycémie élevée après repas',
-          message: 'Le repas a fait monter votre glycémie au-dessus de la cible. Trop de glucides rapides ou de sucres ajoutés.',
+          message: 'Votre glycémie a significativement augmenté après ce repas — trop de glucides rapides ou de sucres ajoutés.',
           suggestion: 'Marchez 15–20 minutes : cela aide les muscles à consommer le glucose. Évitez de vous asseoir juste après.',
         };
       case 'fasting':
