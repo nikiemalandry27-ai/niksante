@@ -17,6 +17,7 @@ import {
 } from '@/utils/glucoseHelper';
 import {
   getDailyAverages,
+  getWeeklyAverages,
   getTrendFromAverages,
   DailyAverage,
 } from '@/utils/glucoseAnalysis';
@@ -69,7 +70,12 @@ export default function GlucoseChart({ data, unit = 'mg_dl' }: Props) {
 
   const isRecent   = period === 'recent';
   const days       = PERIOD_DAYS[period];
-  const aggregated = isRecent ? [] : getDailyAverages(data, days);
+  // 90j → moyennes hebdomadaires (13 semaines max) pour éviter 90 points superposés
+  const aggregated = isRecent
+    ? []
+    : period === '90d'
+      ? getWeeklyAverages(data, 13)
+      : getDailyAverages(data, days);
 
   // Assez de jours avec données pour un graphique agrégé significatif
   const hasEnoughForAggregated = aggregated.length >= 3;
@@ -152,7 +158,14 @@ export default function GlucoseChart({ data, unit = 'mg_dl' }: Props) {
 
       {/* ── Vue agrégée (7j / 30j / 90j) — uniquement si ≥ 3 jours avec données ── */}
       {!isRecent && hasEnoughForAggregated && (
-        <AggregatedChart averages={aggregated} unit={unit} days={days} chartWidth={chartWidth} setChartWidth={setChartWidth} />
+        <>
+          {period === '90d' && (
+            <ThemedText style={{ fontSize: fs(10), color: '#bbb', textAlign: 'center', marginBottom: vs(4), fontStyle: 'italic' }}>
+              Moyenne par semaine
+            </ThemedText>
+          )}
+          <AggregatedChart averages={aggregated} unit={unit} days={days} chartWidth={chartWidth} setChartWidth={setChartWidth} />
+        </>
       )}
 
       {/* ── Légende ── */}

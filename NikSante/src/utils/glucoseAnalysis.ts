@@ -263,6 +263,36 @@ export interface DailyAverage {
   count: number;
 }
 
+/** Regroupe les entrées par semaine sur `weeks` semaines (pour vues 90j). */
+export function getWeeklyAverages(entries: GlucoseEntry[], weeks: number): DailyAverage[] {
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  const result: DailyAverage[] = [];
+
+  for (let w = weeks - 1; w >= 0; w--) {
+    const weekEnd = new Date(today);
+    weekEnd.setDate(today.getDate() - w * 7);
+
+    const weekStart = new Date(weekEnd);
+    weekStart.setDate(weekEnd.getDate() - 6);
+    weekStart.setHours(0, 0, 0, 0);
+
+    const weekEntries = entries.filter(e => {
+      const d = new Date(e.date);
+      return d >= weekStart && d <= weekEnd;
+    });
+
+    if (weekEntries.length > 0) {
+      result.push({
+        date:  weekStart.toISOString().split('T')[0],
+        avg:   Math.round(weekEntries.reduce((s, e) => s + e.value, 0) / weekEntries.length),
+        count: weekEntries.length,
+      });
+    }
+  }
+  return result;
+}
+
 export function getDailyAverages(entries: GlucoseEntry[], days: number): DailyAverage[] {
   const today = new Date();
   const result: DailyAverage[] = [];
