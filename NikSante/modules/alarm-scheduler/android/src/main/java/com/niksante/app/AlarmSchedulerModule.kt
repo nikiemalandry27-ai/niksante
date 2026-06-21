@@ -97,13 +97,13 @@ class AlarmSchedulerModule : Module() {
         }
 
         AsyncFunction("startKeepaliveService") {
-            val ctx = this@AlarmSchedulerModule.appContext.reactContext ?: return@AsyncFunction
-            AlarmForegroundService.start(ctx)
+            val ctx = this@AlarmSchedulerModule.appContext.reactContext
+            if (ctx != null) AlarmForegroundService.start(ctx)
         }
 
         AsyncFunction("stopKeepaliveService") {
-            val ctx = this@AlarmSchedulerModule.appContext.reactContext ?: return@AsyncFunction
-            AlarmForegroundService.stop(ctx)
+            val ctx = this@AlarmSchedulerModule.appContext.reactContext
+            if (ctx != null) AlarmForegroundService.stop(ctx)
         }
     }
 
