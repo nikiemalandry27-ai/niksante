@@ -295,7 +295,13 @@ export default function ProfileScreen() {
         AsyncStorage.getItem(NOTIF_IDS_KEY),
         AsyncStorage.getItem(REMINDER_TIMES_KEY),
       ]);
-      if (rawReminders) setReminders(JSON.parse(rawReminders));
+      if (rawReminders) {
+        const parsed = JSON.parse(rawReminders) as Record<ReminderKey, boolean>;
+        setReminders(parsed);
+        if (Object.values(parsed).some(Boolean)) {
+          alarmScheduler.startKeepaliveService().catch(() => {});
+        }
+      }
       if (rawIds) {
         const stored = JSON.parse(rawIds);
         setNotifIds({
