@@ -44,9 +44,10 @@ export function getTimeInRange(entries: GlucoseEntry[]): TIRResult {
   let above   = 0;
 
   for (const e of entries) {
-    if      (e.value < GLUCOSE_THRESHOLDS.NORMAL_MIN) below++;
-    else if (e.value > GLUCOSE_THRESHOLDS.NORMAL_MAX) above++;
-    else                                               inRange++;
+    // TIR ADA 2019 : 70–180 mg/dL (4–10 mmol/L) — utilisé pour les rapports médicaux
+    if      (e.value < GLUCOSE_THRESHOLDS.HYPO_ALERT)    below++;
+    else if (e.value > GLUCOSE_THRESHOLDS.HYPER_WARNING) above++;
+    else                                                   inRange++;
   }
 
   const total = entries.length;

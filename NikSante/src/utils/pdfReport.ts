@@ -53,6 +53,7 @@ export function filterSleepByDays(entries: SleepEntry[], days: number): SleepEnt
 function gStatusColor(status: string): string {
   if (status === 'normal')         return '#1B5E20';
   if (status.includes('hypo'))     return '#0D47A1';
+  if (status === 'hyper_mild')     return '#F57F17';
   if (status === 'hyper_critical') return '#B71C1C';
   return '#E65100';
 }
@@ -60,6 +61,7 @@ function gStatusColor(status: string): string {
 function gStatusBg(status: string): string {
   if (status === 'normal')         return '#F1F8F1';
   if (status.includes('hypo'))     return '#EDF3FC';
+  if (status === 'hyper_mild')     return '#FFFDE7';
   if (status === 'hyper_critical') return '#FEF0F0';
   return '#FFF8F0';
 }
@@ -263,9 +265,10 @@ export function generateMedicalReportHTML(params: ReportParams): string {
     const bg  = gStatusBg(status);
     const col = gStatusColor(status);
     const lblMap: Record<string, string> = {
-      normal:          'Normal',
+      normal:          'Normal (4–8 mmol/L)',
       hypo_critical:   'Hypoglycémie critique',
       hypo:            'Hypoglycémie',
+      hyper_mild:      'Élevé post-repas (8–10 mmol/L)',
       hyper:           'Hyperglycémie',
       hyper_critical:  'Hyperglycémie critique',
     };

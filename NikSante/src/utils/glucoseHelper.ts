@@ -47,16 +47,18 @@ export function unitLabel(unit: GlucoseUnit): string {
 /**
  * Retourne le statut clinique d'une valeur de glycémie (mg/dL).
  *
- *   < 54        → hypo_critical
- *   54 – 69     → hypo
- *   70 – 140    → normal
- *   141 – 300   → hyper
- *   > 300       → hyper_critical
+ *   < 54         → hypo_critical
+ *   54 – 69      → hypo
+ *   70 – 140     → normal      (4–8 mmol/L — zone optimale SFD/OMS)
+ *   141 – 180    → hyper_mild  (8–10 mmol/L — acceptable post-repas, à améliorer)
+ *   181 – 300    → hyper
+ *   > 300        → hyper_critical
  */
 export function getGlucoseStatus(value: number): GlucoseStatus {
-  if (value < GLUCOSE_THRESHOLDS.HYPO_CRITICAL) return 'hypo_critical';
-  if (value < GLUCOSE_THRESHOLDS.HYPO_ALERT)    return 'hypo';
-  if (value <= GLUCOSE_THRESHOLDS.NORMAL_MAX)   return 'normal';
+  if (value < GLUCOSE_THRESHOLDS.HYPO_CRITICAL)  return 'hypo_critical';
+  if (value < GLUCOSE_THRESHOLDS.HYPO_ALERT)     return 'hypo';
+  if (value <= GLUCOSE_THRESHOLDS.NORMAL_MAX)    return 'normal';
+  if (value <= GLUCOSE_THRESHOLDS.HYPER_WARNING) return 'hyper_mild';
   if (value <= GLUCOSE_THRESHOLDS.HYPER_CRITICAL) return 'hyper';
   return 'hyper_critical';
 }
@@ -69,9 +71,10 @@ export function getGlucoseStatus(value: number): GlucoseStatus {
 export function getStatusColor(status: GlucoseStatus): string {
   const colors: Record<GlucoseStatus, string> = {
     hypo_critical:  '#B71C1C', // rouge foncé
-    hypo:           '#F57C00', // orange
+    hypo:           '#1565C0', // bleu
     normal:         '#388E3C', // vert
-    hyper:          '#F57C00', // orange
+    hyper_mild:     '#F9A825', // jaune ambré (8–10 mmol/L)
+    hyper:          '#E65100', // orange foncé
     hyper_critical: '#B71C1C', // rouge foncé
   };
   return colors[status];
@@ -190,6 +193,42 @@ export function getAIMessage(status: GlucoseStatus, mealContext: MealContext = n
           title: '✅ Glycémie normale',
           message: 'Votre glycémie est dans la plage cible. Continuez sur cette lancée !',
           suggestion: 'Maintenez une alimentation équilibrée, restez hydraté et bougez régulièrement.',
+        };
+    }
+  }
+
+  // ── Zone acceptable post-repas (8–10 mmol/L / 140–180 mg/dL) ─────────────
+  if (status === 'hyper_mild') {
+    switch (mealContext) {
+      case 'after_meal':
+        return {
+          title: '🟡 Au-dessus de l\'objectif post-repas',
+          message: 'Votre glycémie est entre 8 et 10 mmol/L après le repas. C\'est acceptable mais l\'objectif est de rester sous 8 mmol/L.',
+          suggestion: 'Marchez 15–20 min après le repas pour aider les muscles à consommer le glucose.',
+        };
+      case 'before_meal':
+        return {
+          title: '🟡 Glycémie élevée avant repas',
+          message: 'Votre glycémie dépasse 8 mmol/L avant de manger — résidu du repas précédent ou stress.',
+          suggestion: 'Choisissez un repas léger en glucides rapides. Évitez le pain blanc, les sodas et les sucreries.',
+        };
+      case 'fasting':
+        return {
+          title: '🟡 Glycémie à jeun trop élevée',
+          message: 'À jeun, l\'objectif est d\'être entre 4 et 7 mmol/L. Votre valeur dépasse 8 mmol/L.',
+          suggestion: 'Parlez à votre médecin si c\'est régulier — possible phénomène de l\'aube ou ajustement de traitement nécessaire.',
+        };
+      case 'bedtime':
+        return {
+          title: '🟡 Glycémie élevée au coucher',
+          message: 'Aller dormir à plus de 8 mmol/L prolonge l\'hyperglycémie nocturne.',
+          suggestion: 'Buvez de l\'eau, évitez toute collation. Une courte marche de 10 min peut aider avant de dormir.',
+        };
+      default:
+        return {
+          title: '🟡 Légèrement au-dessus de l\'objectif',
+          message: 'Votre glycémie est entre 8 et 10 mmol/L. Acceptable, mais l\'objectif global est de rester sous 8 mmol/L.',
+          suggestion: 'Buvez de l\'eau et bougez un peu. Vérifiez votre dernier repas — trop de glucides rapides ?',
         };
     }
   }
