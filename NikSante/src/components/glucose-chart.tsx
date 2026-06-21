@@ -2,11 +2,11 @@
  * NikSanté — GlucoseChart
  *
  * Courbe de glycémie 100 % React Native (pas de lib externe).
- * Segments de ligne calculés via trigonométrie + transform: rotate.
+ * Supporte 4 modes : Récent (12 mesures brutes) | 7j | 30j | 90j (moyennes/jour).
  */
 
 import React, { useState } from 'react';
-import { View, LayoutChangeEvent } from 'react-native';
+import { View, TouchableOpacity, LayoutChangeEvent } from 'react-native';
 import { GlucoseEntry } from '@/store/glucoseStore';
 import {
   getGlucoseStatus,
@@ -15,6 +15,11 @@ import {
   toDisplay,
   GlucoseUnit,
 } from '@/utils/glucoseHelper';
+import {
+  getDailyAverages,
+  getTrendFromAverages,
+  DailyAverage,
+} from '@/utils/glucoseAnalysis';
 import { GLUCOSE_THRESHOLDS } from '@/utils/constants';
 import { ThemedText } from '@/components/themed-text';
 import { s, fs, vs } from '@/utils/responsive';
@@ -25,234 +30,99 @@ import { s, fs, vs } from '@/utils/responsive';
 
 interface Props {
   data: GlucoseEntry[];
-  maxBars?: number;
   unit?: GlucoseUnit;
 }
+
+type Period = 'recent' | '7d' | '30d' | '90d';
+
+const PERIODS: { key: Period; label: string }[] = [
+  { key: 'recent', label: 'Récent' },
+  { key: '7d',     label: '7 jours' },
+  { key: '30d',    label: '30 jours' },
+  { key: '90d',    label: '90 jours' },
+];
+
+const PERIOD_DAYS: Record<Period, number> = { recent: 0, '7d': 7, '30d': 30, '90d': 90 };
 
 // ---------------------------------------------------------------------------
 // Constantes
 // ---------------------------------------------------------------------------
 
-const TOP_PAD  = 20; // espace pour les labels de valeur au-dessus des points
-const CHART_H  = 150; // hauteur de la zone de courbe
-const BOT_PAD  = 36; // espace pour les dates + heures en dessous
-const TOTAL_H  = TOP_PAD + CHART_H + BOT_PAD;
-const H_PAD    = 10; // marge gauche/droite dans la zone du graphique
-const DOT_R    = 5;  // rayon des points sur la courbe
+const TOP_PAD = 20;
+const CHART_H = 150;
+const BOT_PAD = 36;
+const TOTAL_H = TOP_PAD + CHART_H + BOT_PAD;
+const H_PAD   = 10;
+const DOT_R   = 5;
 
 function calcYMax(values: number[]): number {
   return Math.max(Math.max(...values), 300) * 1.15;
 }
 
 // ---------------------------------------------------------------------------
-// Composant
+// Composant principal
 // ---------------------------------------------------------------------------
 
-export default function GlucoseChart({ data, maxBars = 12, unit = 'mg_dl' }: Props) {
+export default function GlucoseChart({ data, unit = 'mg_dl' }: Props) {
+  const [period, setPeriod]     = useState<Period>('recent');
   const [chartWidth, setChartWidth] = useState(0);
 
-  // Du plus récent au plus ancien dans data → on inverse pour avoir oldest→newest
-  const entries = [...data].slice(0, maxBars).reverse();
+  const isRecent   = period === 'recent';
+  const days       = PERIOD_DAYS[period];
+  const aggregated = isRecent ? [] : getDailyAverages(data, days);
+  const trend      = isRecent ? null : getTrendFromAverages(aggregated);
 
-  if (entries.length === 0) {
-    return (
-      <View style={emptyStyle}>
-        <ThemedText style={{ fontSize: fs(13), color: '#bbb', textAlign: 'center' }}>
-          Ajoutez des mesures pour voir l'évolution 📈
-        </ThemedText>
-      </View>
-    );
-  }
-
-  const n    = entries.length;
-  const yMax = calcYMax(entries.map((e) => e.value));
-
-  const getX = (i: number): number => {
-    if (chartWidth <= 0) return 0;
-    if (n === 1) return chartWidth / 2;
-    return H_PAD + (i / (n - 1)) * (chartWidth - H_PAD * 2);
+  const TREND_LABELS: Record<string, string> = {
+    up: '↑ Tendance haussière', down: '↓ Tendance baissière', stable: '→ Stable',
   };
-
-  const getY = (value: number): number =>
-    TOP_PAD + (1 - value / yMax) * CHART_H;
-
-  const points = entries.map((entry, i) => ({
-    x: getX(i),
-    y: getY(entry.value),
-    entry,
-  }));
-
-  // Y des lignes de référence
-  const yRefHigh = getY(GLUCOSE_THRESHOLDS.NORMAL_MAX); // 140
-  const yRefLow  = getY(GLUCOSE_THRESHOLDS.HYPO_ALERT);  // 70
-
-  // Décider si on affiche la date à chaque point (toutes / 1 sur 2 / 1 sur 3)
-  const dateStep = n <= 6 ? 1 : n <= 10 ? 2 : 3;
+  const TREND_COLORS: Record<string, string> = {
+    up: '#F57C00', down: '#1565C0', stable: '#388E3C',
+  };
 
   return (
     <View style={wrapperStyle}>
 
-      {/* ── Titre ── */}
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: vs(12) }}>
+      {/* ── Titre + sélecteur ── */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: vs(10) }}>
         <ThemedText style={{ fontSize: fs(11), fontWeight: '700', color: '#999', letterSpacing: 0.6 }}>
           ÉVOLUTION DE LA GLYCÉMIE
         </ThemedText>
-        <ThemedText style={{ fontSize: fs(10), color: '#bbb' }}>
-          {n} mesure{n > 1 ? 's' : ''}
-        </ThemedText>
-      </View>
-
-      {/* ── Zone de la courbe ── */}
-      <View
-        style={{ height: TOTAL_H, position: 'relative' }}
-        onLayout={(e: LayoutChangeEvent) => setChartWidth(e.nativeEvent.layout.width)}
-      >
-        {chartWidth > 0 && (
-          <>
-            {/* Zone normale (fond vert très léger) */}
-            <View style={{
-              position:        'absolute',
-              left:            0,
-              right:           0,
-              top:             yRefHigh,
-              height:          yRefLow - yRefHigh,
-              backgroundColor: '#388E3C',
-              opacity:         0.07,
-            }} />
-
-            {/* Ligne de référence 140 mg/dL (vert) */}
-            <View style={{ position: 'absolute', left: 0, right: 0, top: yRefHigh, height: 1, backgroundColor: '#388E3C', opacity: 0.3 }} />
-            <ThemedText style={{
-              position:  'absolute',
-              left:      4,
-              top:       yRefHigh - 11,
-              fontSize:  fs(8),
-              color:     '#388E3C',
-              opacity:   0.8,
-            }}>
-              {toDisplay(GLUCOSE_THRESHOLDS.NORMAL_MAX, unit)}
-            </ThemedText>
-
-            {/* Ligne de référence 70 mg/dL (orange) */}
-            <View style={{ position: 'absolute', left: 0, right: 0, top: yRefLow, height: 1, backgroundColor: '#F57C00', opacity: 0.4 }} />
-            <ThemedText style={{
-              position: 'absolute',
-              left:     4,
-              top:      yRefLow + 3,
-              fontSize: fs(8),
-              color:    '#F57C00',
-              opacity:  0.8,
-            }}>
-              {toDisplay(GLUCOSE_THRESHOLDS.HYPO_ALERT, unit)}
-            </ThemedText>
-
-            {/* ── Segments de ligne entre les points ── */}
-            {points.map((pt, i) => {
-              if (i === 0) return null;
-              const prev  = points[i - 1];
-              const dx    = pt.x - prev.x;
-              const dy    = pt.y - prev.y;
-              const len   = Math.sqrt(dx * dx + dy * dy);
-              const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-              const midX  = (pt.x + prev.x) / 2;
-              const midY  = (pt.y + prev.y) / 2;
-              const color = getStatusColor(getGlucoseStatus(prev.entry.value));
-              return (
-                <View
-                  key={`seg-${i}`}
-                  style={{
-                    position:        'absolute',
-                    width:           len,
-                    height:          2,
-                    backgroundColor: color,
-                    left:            midX - len / 2,
-                    top:             midY - 1,
-                    transform:       [{ rotate: `${angle}deg` }],
-                    opacity:         0.8,
-                  }}
-                />
-              );
-            })}
-
-            {/* ── Points + labels valeur + labels date ── */}
-            {points.map((pt, i) => {
-              const status = getGlucoseStatus(pt.entry.value);
-              const color  = getStatusColor(status);
-              const date   = new Date(pt.entry.date);
-              const showDate = i % dateStep === 0 || i === n - 1;
-
-              return (
-                <React.Fragment key={`pt-${i}`}>
-
-                  {/* Label valeur au-dessus du point */}
-                  <ThemedText
-                    style={{
-                      position:  'absolute',
-                      width:     s(34),
-                      left:      pt.x - s(17),
-                      top:       pt.y - DOT_R - vs(14),
-                      fontSize:  fs(9),
-                      fontWeight:'700',
-                      color,
-                      textAlign: 'center',
-                    }}
-                  >
-                    {formatGlucose(pt.entry.value, unit)}
-                  </ThemedText>
-
-                  {/* Point coloré */}
-                  <View
-                    style={{
-                      position:        'absolute',
-                      width:           DOT_R * 2,
-                      height:          DOT_R * 2,
-                      borderRadius:    DOT_R,
-                      backgroundColor: color,
-                      left:            pt.x - DOT_R,
-                      top:             pt.y - DOT_R,
-                      borderWidth:     2,
-                      borderColor:     '#fff',
-                      elevation:       3,
-                    }}
-                  />
-
-                  {/* Label date + heure en dessous */}
-                  {showDate && (
-                    <>
-                      <ThemedText
-                        style={{
-                          position:  'absolute',
-                          width:     s(34),
-                          left:      pt.x - s(17),
-                          top:       TOP_PAD + CHART_H + vs(4),
-                          fontSize:  fs(8.5),
-                          color:     '#bbb',
-                          textAlign: 'center',
-                        }}
-                      >
-                        {date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
-                      </ThemedText>
-                      <ThemedText
-                        style={{
-                          position:  'absolute',
-                          width:     s(34),
-                          left:      pt.x - s(17),
-                          top:       TOP_PAD + CHART_H + vs(16),
-                          fontSize:  fs(8),
-                          color:     '#ccc',
-                          textAlign: 'center',
-                        }}
-                      >
-                        {date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                      </ThemedText>
-                    </>
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </>
+        {trend && (
+          <ThemedText style={{ fontSize: fs(10), fontWeight: '700', color: TREND_COLORS[trend] }}>
+            {TREND_LABELS[trend]}
+          </ThemedText>
         )}
       </View>
+
+      {/* Sélecteur de période */}
+      <View style={{ flexDirection: 'row', gap: s(6), marginBottom: vs(12) }}>
+        {PERIODS.map(p => (
+          <TouchableOpacity
+            key={p.key}
+            onPress={() => setPeriod(p.key)}
+            style={{
+              flex: 1, alignItems: 'center',
+              paddingVertical: vs(5),
+              borderRadius: 8,
+              backgroundColor: period === p.key ? '#388E3C' : '#f0f0f0',
+            }}
+          >
+            <ThemedText style={{ fontSize: fs(10), fontWeight: '700', color: period === p.key ? '#fff' : '#888' }}>
+              {p.label}
+            </ThemedText>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* ── Vue Récent (brut) ── */}
+      {isRecent && (
+        <RawChart data={data} unit={unit} chartWidth={chartWidth} setChartWidth={setChartWidth} />
+      )}
+
+      {/* ── Vue agrégée (7j / 30j / 90j) ── */}
+      {!isRecent && (
+        <AggregatedChart averages={aggregated} unit={unit} days={days} chartWidth={chartWidth} setChartWidth={setChartWidth} />
+      )}
 
       {/* ── Légende ── */}
       <View style={{ flexDirection: 'row', justifyContent: 'center', gap: s(16), marginTop: vs(6) }}>
@@ -274,32 +144,231 @@ export default function GlucoseChart({ data, maxBars = 12, unit = 'mg_dl' }: Pro
 }
 
 // ---------------------------------------------------------------------------
-// Styles inline (simples objets pour éviter StyleSheet)
+// Vue brut (12 dernières mesures)
+// ---------------------------------------------------------------------------
+
+function RawChart({
+  data, unit, chartWidth, setChartWidth,
+}: {
+  data: GlucoseEntry[];
+  unit: GlucoseUnit;
+  chartWidth: number;
+  setChartWidth: (w: number) => void;
+}) {
+  const entries = [...data].slice(0, 12).reverse();
+
+  if (entries.length === 0) {
+    return (
+      <View style={emptyStyle}>
+        <ThemedText style={{ fontSize: fs(13), color: '#bbb', textAlign: 'center' }}>
+          Ajoutez des mesures pour voir l'évolution 📈
+        </ThemedText>
+      </View>
+    );
+  }
+
+  const n    = entries.length;
+  const yMax = calcYMax(entries.map(e => e.value));
+
+  const getX = (i: number) => {
+    if (chartWidth <= 0) return 0;
+    if (n === 1) return chartWidth / 2;
+    return H_PAD + (i / (n - 1)) * (chartWidth - H_PAD * 2);
+  };
+  const getY = (v: number) => TOP_PAD + (1 - v / yMax) * CHART_H;
+
+  const points = entries.map((e, i) => ({ x: getX(i), y: getY(e.value), entry: e }));
+  const yRefHigh = getY(GLUCOSE_THRESHOLDS.NORMAL_MAX);
+  const yRefLow  = getY(GLUCOSE_THRESHOLDS.HYPO_ALERT);
+  const dateStep = n <= 6 ? 1 : n <= 10 ? 2 : 3;
+
+  return (
+    <View
+      style={{ height: TOTAL_H, position: 'relative' }}
+      onLayout={(e: LayoutChangeEvent) => setChartWidth(e.nativeEvent.layout.width)}
+    >
+      {chartWidth > 0 && (
+        <>
+          <View style={{ position: 'absolute', left: 0, right: 0, top: yRefHigh, height: yRefLow - yRefHigh, backgroundColor: '#388E3C', opacity: 0.07 }} />
+          <View style={{ position: 'absolute', left: 0, right: 0, top: yRefHigh, height: 1, backgroundColor: '#388E3C', opacity: 0.3 }} />
+          <ThemedText style={{ position: 'absolute', left: 4, top: yRefHigh - 11, fontSize: fs(8), color: '#388E3C', opacity: 0.8 }}>
+            {toDisplay(GLUCOSE_THRESHOLDS.NORMAL_MAX, unit)}
+          </ThemedText>
+          <View style={{ position: 'absolute', left: 0, right: 0, top: yRefLow, height: 1, backgroundColor: '#F57C00', opacity: 0.4 }} />
+          <ThemedText style={{ position: 'absolute', left: 4, top: yRefLow + 3, fontSize: fs(8), color: '#F57C00', opacity: 0.8 }}>
+            {toDisplay(GLUCOSE_THRESHOLDS.HYPO_ALERT, unit)}
+          </ThemedText>
+
+          {points.map((pt, i) => {
+            if (i === 0) return null;
+            const prev  = points[i - 1];
+            const dx    = pt.x - prev.x;
+            const dy    = pt.y - prev.y;
+            const len   = Math.sqrt(dx * dx + dy * dy);
+            const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+            const color = getStatusColor(getGlucoseStatus(prev.entry.value));
+            return (
+              <View
+                key={`seg-${i}`}
+                style={{
+                  position: 'absolute', width: len, height: 2,
+                  backgroundColor: color,
+                  left: (pt.x + prev.x) / 2 - len / 2,
+                  top:  (pt.y + prev.y) / 2 - 1,
+                  transform: [{ rotate: `${angle}deg` }], opacity: 0.8,
+                }}
+              />
+            );
+          })}
+
+          {points.map((pt, i) => {
+            const color    = getStatusColor(getGlucoseStatus(pt.entry.value));
+            const date     = new Date(pt.entry.date);
+            const showDate = i % dateStep === 0 || i === n - 1;
+            return (
+              <React.Fragment key={`pt-${i}`}>
+                <ThemedText style={{ position: 'absolute', width: s(34), left: pt.x - s(17), top: pt.y - DOT_R - vs(14), fontSize: fs(9), fontWeight: '700', color, textAlign: 'center' }}>
+                  {formatGlucose(pt.entry.value, unit)}
+                </ThemedText>
+                <View style={{ position: 'absolute', width: DOT_R * 2, height: DOT_R * 2, borderRadius: DOT_R, backgroundColor: color, left: pt.x - DOT_R, top: pt.y - DOT_R, borderWidth: 2, borderColor: '#fff', elevation: 3 }} />
+                {showDate && (
+                  <>
+                    <ThemedText style={{ position: 'absolute', width: s(34), left: pt.x - s(17), top: TOP_PAD + CHART_H + vs(4), fontSize: fs(8.5), color: '#bbb', textAlign: 'center' }}>
+                      {date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
+                    </ThemedText>
+                    <ThemedText style={{ position: 'absolute', width: s(34), left: pt.x - s(17), top: TOP_PAD + CHART_H + vs(16), fontSize: fs(8), color: '#ccc', textAlign: 'center' }}>
+                      {date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                    </ThemedText>
+                  </>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </>
+      )}
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Vue agrégée (moyennes journalières)
+// ---------------------------------------------------------------------------
+
+function AggregatedChart({
+  averages, unit, days, chartWidth, setChartWidth,
+}: {
+  averages: DailyAverage[];
+  unit: GlucoseUnit;
+  days: number;
+  chartWidth: number;
+  setChartWidth: (w: number) => void;
+}) {
+  if (averages.length === 0) {
+    return (
+      <View style={emptyStyle}>
+        <ThemedText style={{ fontSize: fs(13), color: '#bbb', textAlign: 'center' }}>
+          Aucune mesure sur cette période 📈
+        </ThemedText>
+      </View>
+    );
+  }
+
+  const n    = averages.length;
+  const yMax = calcYMax(averages.map(a => a.avg));
+
+  const getX = (i: number) => {
+    if (chartWidth <= 0) return 0;
+    if (n === 1) return chartWidth / 2;
+    return H_PAD + (i / (n - 1)) * (chartWidth - H_PAD * 2);
+  };
+  const getY = (v: number) => TOP_PAD + (1 - v / yMax) * CHART_H;
+
+  const points = averages.map((a, i) => ({ x: getX(i), y: getY(a.avg), avg: a }));
+  const yRefHigh = getY(GLUCOSE_THRESHOLDS.NORMAL_MAX);
+  const yRefLow  = getY(GLUCOSE_THRESHOLDS.HYPO_ALERT);
+
+  // Afficher étiquettes de date : début, milieu, fin seulement si beaucoup de points
+  const showLabelAt = (i: number) => {
+    if (n <= 7) return true;
+    if (n <= 15) return i % 3 === 0 || i === n - 1;
+    return i === 0 || i === Math.floor(n / 2) || i === n - 1;
+  };
+
+  return (
+    <View
+      style={{ height: TOTAL_H, position: 'relative' }}
+      onLayout={(e: LayoutChangeEvent) => setChartWidth(e.nativeEvent.layout.width)}
+    >
+      {chartWidth > 0 && (
+        <>
+          <View style={{ position: 'absolute', left: 0, right: 0, top: yRefHigh, height: yRefLow - yRefHigh, backgroundColor: '#388E3C', opacity: 0.07 }} />
+          <View style={{ position: 'absolute', left: 0, right: 0, top: yRefHigh, height: 1, backgroundColor: '#388E3C', opacity: 0.3 }} />
+          <ThemedText style={{ position: 'absolute', left: 4, top: yRefHigh - 11, fontSize: fs(8), color: '#388E3C', opacity: 0.8 }}>
+            {toDisplay(GLUCOSE_THRESHOLDS.NORMAL_MAX, unit)}
+          </ThemedText>
+          <View style={{ position: 'absolute', left: 0, right: 0, top: yRefLow, height: 1, backgroundColor: '#F57C00', opacity: 0.4 }} />
+          <ThemedText style={{ position: 'absolute', left: 4, top: yRefLow + 3, fontSize: fs(8), color: '#F57C00', opacity: 0.8 }}>
+            {toDisplay(GLUCOSE_THRESHOLDS.HYPO_ALERT, unit)}
+          </ThemedText>
+
+          {points.map((pt, i) => {
+            if (i === 0) return null;
+            const prev  = points[i - 1];
+            const dx    = pt.x - prev.x;
+            const dy    = pt.y - prev.y;
+            const len   = Math.sqrt(dx * dx + dy * dy);
+            const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+            const color = getStatusColor(getGlucoseStatus(prev.avg.avg));
+            return (
+              <View
+                key={`seg-${i}`}
+                style={{
+                  position: 'absolute', width: len, height: 2,
+                  backgroundColor: color,
+                  left: (pt.x + prev.x) / 2 - len / 2,
+                  top:  (pt.y + prev.y) / 2 - 1,
+                  transform: [{ rotate: `${angle}deg` }], opacity: 0.8,
+                }}
+              />
+            );
+          })}
+
+          {points.map((pt, i) => {
+            const color = getStatusColor(getGlucoseStatus(pt.avg.avg));
+            const date  = new Date(pt.avg.date + 'T12:00:00');
+            return (
+              <React.Fragment key={`pt-${i}`}>
+                {n <= 20 && (
+                  <ThemedText style={{ position: 'absolute', width: s(34), left: pt.x - s(17), top: pt.y - DOT_R - vs(14), fontSize: fs(9), fontWeight: '700', color, textAlign: 'center' }}>
+                    {formatGlucose(pt.avg.avg, unit)}
+                  </ThemedText>
+                )}
+                <View style={{ position: 'absolute', width: DOT_R * 2, height: DOT_R * 2, borderRadius: DOT_R, backgroundColor: color, left: pt.x - DOT_R, top: pt.y - DOT_R, borderWidth: 2, borderColor: '#fff', elevation: 3 }} />
+                {showLabelAt(i) && (
+                  <ThemedText style={{ position: 'absolute', width: s(34), left: pt.x - s(17), top: TOP_PAD + CHART_H + vs(4), fontSize: fs(8.5), color: '#bbb', textAlign: 'center' }}>
+                    {date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
+                  </ThemedText>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </>
+      )}
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Styles
 // ---------------------------------------------------------------------------
 
 const wrapperStyle = {
-  backgroundColor: '#fff',
-  borderRadius:    16,
-  padding:         16,
-  marginHorizontal: 20,
-  marginBottom:    12,
-  elevation:       2,
-  shadowColor:     '#000',
-  shadowOffset:    { width: 0, height: 1 },
-  shadowOpacity:   0.06,
-  shadowRadius:    3,
+  backgroundColor: '#fff', borderRadius: 16, padding: 16,
+  marginHorizontal: 20, marginBottom: 12,
+  elevation: 2, shadowColor: '#000',
+  shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3,
 } as const;
 
 const emptyStyle = {
-  backgroundColor: '#fff',
-  borderRadius:    16,
-  padding:         24,
-  marginHorizontal: 20,
-  marginBottom:    12,
-  alignItems:      'center' as const,
-  elevation:       2,
-  shadowColor:     '#000',
-  shadowOffset:    { width: 0, height: 1 },
-  shadowOpacity:   0.06,
-  shadowRadius:    3,
+  height: TOTAL_H, alignItems: 'center' as const, justifyContent: 'center' as const,
 };

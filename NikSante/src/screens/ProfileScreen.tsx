@@ -45,6 +45,32 @@ const REMINDER_DEFS: Record<ReminderKey, { label: string; hour: number; minute: 
   evening:   { label: 'Soir',       hour: 19, minute: 0, icon: '🌙', desc: '19h00 — Avant le dîner' },
 };
 
+const HOUR_BOUNDS: Record<ReminderKey, { min: number; max: number }> = {
+  morning:   { min: 5,  max: 11 },
+  afternoon: { min: 12, max: 17 },
+  evening:   { min: 18, max: 23 },
+};
+
+function clampTimes(
+  raw: Record<string, { hour: number; minute: number }>,
+): Record<ReminderKey, { hour: number; minute: number }> {
+  const result: Record<ReminderKey, { hour: number; minute: number }> = {
+    morning:   { hour: REMINDER_DEFS.morning.hour,   minute: REMINDER_DEFS.morning.minute   },
+    afternoon: { hour: REMINDER_DEFS.afternoon.hour, minute: REMINDER_DEFS.afternoon.minute },
+    evening:   { hour: REMINDER_DEFS.evening.hour,   minute: REMINDER_DEFS.evening.minute   },
+  };
+  (Object.keys(HOUR_BOUNDS) as ReminderKey[]).forEach(key => {
+    if (raw[key]) {
+      const { min, max } = HOUR_BOUNDS[key];
+      result[key] = {
+        hour:   Math.min(max, Math.max(min, raw[key].hour)),
+        minute: raw[key].minute,
+      };
+    }
+  });
+  return result;
+}
+
 const REMINDER_STORAGE_KEY  = '@niksante_reminders';
 const NOTIF_IDS_KEY         = '@niksante_notif_ids';
 const REMINDER_TIMES_KEY    = '@niksante_reminder_times';
@@ -285,7 +311,7 @@ export default function ProfileScreen() {
 
         // Charge quand même les heures perso
         const rawTimes = await AsyncStorage.getItem(REMINDER_TIMES_KEY);
-        if (rawTimes) setReminderTimes(JSON.parse(rawTimes));
+        if (rawTimes) setReminderTimes(clampTimes(JSON.parse(rawTimes)));
         return;
       }
 
@@ -310,7 +336,7 @@ export default function ProfileScreen() {
           evening:   typeof stored.evening   === 'number' ? stored.evening   : null,
         });
       }
-      if (rawTimes) setReminderTimes(JSON.parse(rawTimes));
+      if (rawTimes) setReminderTimes(clampTimes(JSON.parse(rawTimes)));
     })();
   }, []);
 
@@ -318,7 +344,7 @@ export default function ProfileScreen() {
   const adjustReminderTime = async (key: ReminderKey, field: 'hour' | 'minute', delta: number) => {
     const current = reminderTimes[key];
     const newVal  = field === 'hour'
-      ? ((current.hour + delta + 24) % 24)
+      ? Math.min(HOUR_BOUNDS[key].max, Math.max(HOUR_BOUNDS[key].min, current.hour + delta))
       : ((current.minute + delta + 60) % 60);
     const updated = { ...reminderTimes, [key]: { ...current, [field]: newVal } };
     setReminderTimes(updated);

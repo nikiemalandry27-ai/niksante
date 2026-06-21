@@ -12,6 +12,7 @@ const foodRoutes       = require('./routes/food');
 const adminRoutes      = require('./routes/admin');
 const glycemicRoutes       = require('./glycemic/router');
 const notificationsRoutes  = require('./notifications/router');
+const insulinRoutes        = require('./routes/insulin');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -104,6 +105,7 @@ app.use('/api/glucose', cors(corsOptions), glucoseRoutes);
 app.use('/api/food',     cors(corsOptions), foodLimiter, foodRoutes);
 app.use('/api/glycemic',       cors(corsOptions), foodLimiter, glycemicRoutes);
 app.use('/api/notifications',  notificationsRoutes);
+app.use('/api/insulin',        cors(corsOptions), insulinRoutes);
 // /api/admin n'a pas besoin de CORS — appelé uniquement depuis la même page serveur
 app.use('/api/admin',    adminRoutes);
 

@@ -40,7 +40,6 @@ module.exports = function withAlarmScheduler(config) {
       app.activity.push({
         $: {
           'android:name': '.AlarmActivity',
-          'android:process': ':alarm',
           'android:exported': 'false',
           'android:noHistory': 'true',
           'android:excludeFromRecents': 'true',
@@ -56,7 +55,6 @@ module.exports = function withAlarmScheduler(config) {
           'android:name': '.AlarmForegroundService',
           'android:foregroundServiceType': 'systemExempted',
           'android:exported': 'false',
-          'android:process': ':alarm',
         },
       });
     }

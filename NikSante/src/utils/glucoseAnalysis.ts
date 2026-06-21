@@ -222,6 +222,82 @@ export function getWeeklyStats(entries: GlucoseEntry[]): DayStats[] {
 }
 
 // ---------------------------------------------------------------------------
+// Estimateur HbA1c (formule ADAG — référence clinique standard)
+// ---------------------------------------------------------------------------
+
+export interface HbA1cResult {
+  value: number;
+  label: string;
+  color: string;
+  advice: string;
+  basedOnCount: number;
+}
+
+export function estimateHbA1c(entries: GlucoseEntry[]): HbA1cResult | null {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 90);
+  const recent = entries.filter(e => new Date(e.date) >= cutoff);
+  if (recent.length < 14) return null;
+  const avg = recent.reduce((sum, e) => sum + e.value, 0) / recent.length;
+  const value = Math.round(((avg + 46.7) / 28.7) * 10) / 10;
+  const interp = interpretHbA1c(value);
+  return { value, basedOnCount: recent.length, ...interp };
+}
+
+function interpretHbA1c(value: number): { label: string; color: string; advice: string } {
+  if (value < 5.7) return { label: 'Normal',          color: '#388E3C', advice: 'Excellent contrôle glycémique.' };
+  if (value < 6.5) return { label: 'Prédiabète',      color: '#F57C00', advice: 'Surveillez alimentation et activité physique.' };
+  if (value < 7.0) return { label: 'Bien contrôlé',   color: '#66BB6A', advice: 'Objectif atteint pour la plupart des diabétiques.' };
+  if (value < 8.0) return { label: 'Acceptable',      color: '#FBC02D', advice: 'Peut être amélioré avec votre médecin.' };
+  return               { label: 'À améliorer',     color: '#B71C1C', advice: 'Consultez votre diabétologue pour ajuster le traitement.' };
+}
+
+// ---------------------------------------------------------------------------
+// Moyennes journalières (pour graphiques de tendance 7j / 30j / 90j)
+// ---------------------------------------------------------------------------
+
+export interface DailyAverage {
+  date: string;
+  avg: number;
+  count: number;
+}
+
+export function getDailyAverages(entries: GlucoseEntry[], days: number): DailyAverage[] {
+  const today = new Date();
+  const result: DailyAverage[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const target = new Date(today);
+    target.setDate(today.getDate() - i);
+    const dateStr = target.toISOString().split('T')[0];
+    const dayEntries = entries.filter(
+      e => new Date(e.date).toISOString().split('T')[0] === dateStr,
+    );
+    if (dayEntries.length > 0) {
+      result.push({
+        date:  dateStr,
+        avg:   Math.round(dayEntries.reduce((sum, e) => sum + e.value, 0) / dayEntries.length),
+        count: dayEntries.length,
+      });
+    }
+  }
+  return result;
+}
+
+export function getTrendFromAverages(averages: DailyAverage[]): 'up' | 'down' | 'stable' {
+  if (averages.length < 3) return 'stable';
+  const n    = averages.length;
+  const ys   = averages.map(a => a.avg);
+  const sumX = (n * (n - 1)) / 2;
+  const sumY = ys.reduce((a, b) => a + b, 0);
+  const sumXY = ys.reduce((sum, y, i) => sum + i * y, 0);
+  const sumX2 = (n * (n - 1) * (2 * n - 1)) / 6;
+  const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+  if (slope > 1.5) return 'up';
+  if (slope < -1.5) return 'down';
+  return 'stable';
+}
+
+// ---------------------------------------------------------------------------
 // Export texte (Share API)
 // ---------------------------------------------------------------------------
 

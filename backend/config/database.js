@@ -46,6 +46,19 @@ async function createTables() {
     );
 
     INSERT INTO stats (key, value) VALUES ('food_scans', 0) ON CONFLICT DO NOTHING;
+
+    CREATE TABLE IF NOT EXISTS insulin_entries (
+      id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id          UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      dose_units       NUMERIC(5,2) NOT NULL,
+      type             VARCHAR(30)  NOT NULL,
+      administered_at  TIMESTAMPTZ  NOT NULL,
+      note             TEXT,
+      created_at       TIMESTAMPTZ  DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_insulin_user_date
+      ON insulin_entries(user_id, administered_at DESC);
   `);
 
   // Migration : ajout colonne push_token (idempotent)

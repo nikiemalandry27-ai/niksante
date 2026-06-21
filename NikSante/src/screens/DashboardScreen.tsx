@@ -35,6 +35,7 @@ import {
   getTimeInRange,
   getPatternInsight,
   getConsistencyScore,
+  estimateHbA1c,
 } from '@/utils/glucoseAnalysis';
 import GlucoseChart from '@/components/glucose-chart';
 import { ThemedText } from '@/components/themed-text';
@@ -140,10 +141,11 @@ export default function DashboardScreen() {
     new Date(e.date).toDateString() === new Date().toDateString()
   ).length;
 
-  // ── Analyse avancée (Step 5) ──
+  // ── Analyse avancée ──
   const tir            = getTimeInRange(glucoseHistory);
   const patternInsight = getPatternInsight(glucoseHistory);
   const score          = getConsistencyScore(glucoseHistory);
+  const hba1c          = estimateHbA1c(glucoseHistory);
 
   // ---------------------------------------------------------------------------
   // Handlers
@@ -340,8 +342,35 @@ export default function DashboardScreen() {
           </View>
         )}
 
+        {/* ── HbA1c estimé ── */}
+        {hba1c ? (
+          <View style={styles.hba1cCard}>
+            <View style={styles.hba1cHeader}>
+              <ThemedText style={styles.hba1cTitle}>HbA1c ESTIMÉ</ThemedText>
+              <View style={[styles.hba1cBadge, { backgroundColor: hba1c.color + '20', borderColor: hba1c.color }]}>
+                <ThemedText style={[styles.hba1cBadgeText, { color: hba1c.color }]}>{hba1c.label}</ThemedText>
+              </View>
+            </View>
+            <View style={styles.hba1cValueRow}>
+              <ThemedText style={[styles.hba1cValue, { color: hba1c.color }]}>{hba1c.value.toFixed(1)}</ThemedText>
+              <ThemedText style={styles.hba1cUnit}> %</ThemedText>
+            </View>
+            <ThemedText style={styles.hba1cAdvice}>{hba1c.advice}</ThemedText>
+            <ThemedText style={styles.hba1cBase}>
+              Estimation basée sur {hba1c.basedOnCount} mesures sur 90 jours
+            </ThemedText>
+          </View>
+        ) : glucoseHistory.length > 0 && glucoseHistory.length < 14 && (
+          <View style={styles.hba1cCard}>
+            <ThemedText style={styles.hba1cTitle}>HbA1c ESTIMÉ</ThemedText>
+            <ThemedText style={styles.hba1cBase}>
+              Données insuffisantes — il faut au moins 14 mesures sur 90 jours ({glucoseHistory.length} enregistrée{glucoseHistory.length > 1 ? 's' : ''}).
+            </ThemedText>
+          </View>
+        )}
+
         {/* ── Courbe d'évolution ── */}
-        <GlucoseChart data={glucoseHistory} maxBars={12} unit={glucoseUnit} />
+        <GlucoseChart data={glucoseHistory} unit={glucoseUnit} />
 
         {/* ── Carte sommeil ── */}
         <TouchableOpacity style={styles.sleepCard} onPress={handleSleep} activeOpacity={0.8}>
@@ -718,6 +747,23 @@ const styles = StyleSheet.create({
   },
   tirSegment: { height: vs(14) },
   tirLegend: { flexDirection: 'row', justifyContent: 'space-around' },
+
+  // HbA1c
+  hba1cCard: {
+    marginHorizontal: s(20), marginBottom: vs(12),
+    backgroundColor: '#fff', borderRadius: 16, padding: s(16),
+    elevation: 2, shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3,
+  },
+  hba1cHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: vs(8) },
+  hba1cTitle:  { fontSize: fs(11), color: '#999', fontWeight: '700', letterSpacing: 0.8 },
+  hba1cBadge:  { borderRadius: 20, borderWidth: 1, paddingVertical: vs(4), paddingHorizontal: s(10) },
+  hba1cBadgeText: { fontSize: fs(12), fontWeight: '700' },
+  hba1cValueRow: { flexDirection: 'row', alignItems: 'baseline', marginBottom: vs(4) },
+  hba1cValue:  { fontSize: fs(42), fontWeight: 'bold' },
+  hba1cUnit:   { fontSize: fs(20), color: '#999', fontWeight: '600' },
+  hba1cAdvice: { fontSize: fs(12), color: '#555', marginBottom: vs(6), lineHeight: vs(18) },
+  hba1cBase:   { fontSize: fs(10), color: '#bbb', fontStyle: 'italic' },
 
   // Pattern Insight
   patternCard: {

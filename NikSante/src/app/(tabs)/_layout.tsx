@@ -94,6 +94,17 @@ export default function TabsLayout() {
         }}
       />
 
+      {/* ── Insuline ── */}
+      <Tabs.Screen
+        name="insulin"
+        options={{
+          title: 'Insuline',
+          tabBarIcon: ({ focused }) => (
+            <Text style={{ fontSize: focused ? 24 : 22 }}>💉</Text>
+          ),
+        }}
+      />
+
       {/* ── Profil ── */}
       <Tabs.Screen
         name="profile"

@@ -146,6 +146,45 @@ export const foodService = {
 };
 
 // ---------------------------------------------------------------------------
+// Insulin Service
+// ---------------------------------------------------------------------------
+
+export type InsulinType = 'rapide' | 'lente' | 'premixte';
+
+export interface InsulinEntry {
+  id:             string;
+  userId:         string;
+  doseUnits:      number;
+  type:           InsulinType;
+  administeredAt: Date;
+  note?:          string;
+  createdAt:      Date;
+}
+
+export const insulinService = {
+  getAll: async (days = 30): Promise<InsulinEntry[]> => {
+    const { data } = await api.get<InsulinEntry[]>(`/insulin?days=${days}`);
+    return data;
+  },
+
+  add: async (
+    doseUnits:      number,
+    type:           InsulinType,
+    administeredAt: Date,
+    note?:          string,
+  ): Promise<InsulinEntry> => {
+    const { data } = await api.post<InsulinEntry>('/insulin', {
+      dose_units: doseUnits, type, administered_at: administeredAt, note,
+    });
+    return data;
+  },
+
+  delete: async (id: string): Promise<void> => {
+    await api.delete(`/insulin/${id}`);
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Glycemic Analysis Service
 // ---------------------------------------------------------------------------
 
