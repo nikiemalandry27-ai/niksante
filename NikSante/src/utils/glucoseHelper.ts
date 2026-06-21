@@ -97,12 +97,12 @@ export function getAIMessage(status: GlucoseStatus, mealContext: MealContext = n
   // ── Hypoglycémie critique — urgence maximale dans tous les cas ───────────
   if (status === 'hypo_critical') {
     const contextNote =
-      mealContext === 'sport'       ? 'L\'effort physique intense a probablement déclenché cette hypoglycémie.' :
-      mealContext === 'before_meal' ? 'Votre glycémie était déjà critique avant le repas — ne mangez pas encore sans traiter d\'abord.' :
-      mealContext === 'after_meal'  ? 'La glycémie est tombée dangereusement bas après le repas — possible surdosage en insuline.' :
-      mealContext === 'fasting'     ? 'Hypoglycémie critique à jeun — vérifiez votre dose du soir avec votre médecin.' :
-      mealContext === 'bedtime'     ? 'Danger : ne dormez pas avec une glycémie aussi basse. Traitez d\'abord.' :
-      'Cause possible : dose d\'insuline trop forte, repas sauté ou effort physique intense.';
+      mealContext === 'sport'       ? 'L\'effort physique semble avoir fortement sollicité vos réserves de glucose. Interrompez l\'activité le temps de vous stabiliser.' :
+      mealContext === 'before_meal' ? 'Votre glycémie est trop basse avant le repas — commencez par la stabiliser avant de passer à table.' :
+      mealContext === 'after_meal'  ? 'Votre glycémie est très basse après ce repas — cela peut arriver en cas de repas trop léger ou d\'un léger décalage de traitement.' :
+      mealContext === 'fasting'     ? 'Cette valeur très basse à jeun mérite attention — parlez de votre dosage nocturne à votre médecin.' :
+      mealContext === 'bedtime'     ? 'Votre glycémie est très basse au moment du coucher — il est important de la remonter avant de dormir.' :
+      'Cela peut survenir en cas de repas sauté, d\'effort intense ou d\'un ajustement de traitement à revoir.';
     return {
       title: '⚠️ Hypoglycémie critique',
       message: `Votre glycémie est dangereusement basse. ${contextNote}`,
@@ -117,14 +117,14 @@ export function getAIMessage(status: GlucoseStatus, mealContext: MealContext = n
       case 'before_meal':
         return {
           title: '⚡ Glycémie basse avant repas',
-          message: 'Votre glycémie est basse avant de manger. Commencez par un glucide rapide avant le repas.',
-          suggestion: 'Prenez un jus de fruit ou un sucre, puis mangez un repas équilibré avec des glucides lents.',
+          message: 'Votre glycémie est un peu basse avant de manger. Il est conseillé de la stabiliser d\'abord avant de commencer le repas.',
+          suggestion: 'Prenez 15 g de glucides rapides (un verre de jus de fruit, 3 morceaux de sucre ou un gel de glucose), attendez 10–15 min, puis commencez votre repas normalement.',
         };
       case 'after_meal':
         return {
           title: '⚡ Glycémie basse après repas',
-          message: 'Inhabituel : la glycémie baisse après le repas — peut indiquer un surdosage en insuline ou un repas trop léger.',
-          suggestion: 'Prenez une collation sucrée et contrôlez à nouveau dans 15 minutes. Signalez à votre médecin.',
+          message: 'Votre glycémie a baissé après le repas. Cela peut arriver en cas de repas léger, d\'activité physique récente ou d\'un léger décalage de traitement.',
+          suggestion: 'Prenez une collation légèrement sucrée (fruit, biscuit, jus de fruit) et vérifiez à nouveau dans 15 minutes. Si cela se répète, mentionnez-le à votre médecin.',
         };
       case 'fasting':
         return {
@@ -140,9 +140,9 @@ export function getAIMessage(status: GlucoseStatus, mealContext: MealContext = n
         };
       case 'sport':
         return {
-          title: '⚡ Glycémie basse — activité physique',
-          message: 'L\'effort physique a consommé vos réserves de glucose. Risque d\'hypoglycémie prolongée.',
-          suggestion: 'Arrêtez l\'exercice. Prenez un sucre rapide immédiatement et surveillez dans 15 minutes.',
+          title: '⚡ Glycémie basse pendant l\'activité',
+          message: 'L\'effort physique a sollicité vos réserves de glucose — une pause s\'impose pour vous stabiliser.',
+          suggestion: 'Interrompez l\'activité et prenez 15 g de glucides rapides (jus de fruit, gel, sucre). Vérifiez à nouveau dans 10–15 min avant de reprendre éventuellement.',
         };
       default:
         return {
@@ -159,14 +159,14 @@ export function getAIMessage(status: GlucoseStatus, mealContext: MealContext = n
       case 'before_meal':
         return {
           title: '✅ Bonne glycémie avant repas',
-          message: 'Excellent ! Votre glycémie est bien équilibrée avant ce repas — c\'est une bonne base pour démarrer.',
-          suggestion: 'Privilégiez une alimentation adaptée : glucides lents, légumes, protéines, et limitez les sucres rapides pour maintenir cet équilibre.',
+          message: 'Votre glycémie est bien équilibrée avant ce repas — c\'est une excellente base pour bien démarrer.',
+          suggestion: 'Choisissez un repas adapté : glucides lents (riz complet, légumineuses, pain complet), légumes et protéines, en limitant les sucres rapides et les boissons sucrées.',
         };
       case 'after_meal':
         return {
           title: '✅ Bonne glycémie après repas',
-          message: 'La digestion se passe bien, votre glycémie est restée stable après le repas.',
-          suggestion: 'Excellent résultat ! Notez la composition de ce repas — elle vous convient bien.',
+          message: 'Votre glycémie est restée bien équilibrée après ce repas — votre organisme a bien assimilé cet apport.',
+          suggestion: 'Ce repas vous convient bien, notez sa composition. Une courte marche de 10–15 min peut encore renforcer cet équilibre.',
         };
       case 'fasting':
         return {
@@ -245,14 +245,14 @@ export function getAIMessage(status: GlucoseStatus, mealContext: MealContext = n
       case 'before_meal':
         return {
           title: '📈 Glycémie élevée avant repas',
-          message: 'Votre glycémie est déjà haute avant de manger — probablement un résidu du repas précédent ou du stress.',
-          suggestion: 'Choisissez un repas léger pauvre en glucides rapides. Évitez le pain blanc, les sodas, les desserts.',
+          message: 'Votre glycémie est un peu haute avant de manger — probablement un résidu du repas précédent ou l\'effet du stress.',
+          suggestion: 'Optez pour un repas léger : légumes, protéines et glucides lents (riz complet, légumineuses). Limitez les sucres rapides, sodas et sucreries.',
         };
       case 'after_meal':
         return {
           title: '📈 Glycémie élevée après repas',
-          message: 'Votre glycémie a significativement augmenté après ce repas — trop de glucides rapides ou de sucres ajoutés.',
-          suggestion: 'Marchez 15–20 minutes : cela aide les muscles à consommer le glucose. Évitez de vous asseoir juste après.',
+          message: 'Votre glycémie a augmenté de façon notable après ce repas — cela peut être lié à une portion importante de glucides rapides ou sucres ajoutés.',
+          suggestion: 'Une marche douce de 15–20 minutes aide les muscles à consommer le glucose. Pour le prochain repas, privilégiez les aliments à index glycémique bas.',
         };
       case 'fasting':
         return {
@@ -268,9 +268,9 @@ export function getAIMessage(status: GlucoseStatus, mealContext: MealContext = n
         };
       case 'sport':
         return {
-          title: '📈 Glycémie élevée — activité physique',
-          message: 'Inhabituel après le sport — l\'exercice anaérobie intense (sprint, musculation) peut parfois élever la glycémie.',
-          suggestion: 'Hydratez-vous bien. Si cela se répète après le sport, discutez-en avec votre médecin.',
+          title: '📈 Glycémie élevée pendant l\'activité',
+          message: 'Certains efforts anaérobies intenses (sprint, musculation) peuvent temporairement élever la glycémie via la libération d\'hormones de stress.',
+          suggestion: 'Hydratez-vous bien. La glycémie devrait progressivement revenir à un niveau normal après l\'effort. Si cela se répète souvent, évoquez-le avec votre médecin.',
         };
       default:
         return {
@@ -283,12 +283,12 @@ export function getAIMessage(status: GlucoseStatus, mealContext: MealContext = n
 
   // ── Hyperglycémie critique ───────────────────────────────────────────────
   const contextNote =
-    mealContext === 'before_meal' ? 'Évitez tout repas riche en glucides rapides ou en sucres ajoutés — votre glycémie est déjà très élevée et un repas inadapté risque de l\'aggraver.' :
-    mealContext === 'after_meal'  ? 'Ce niveau après repas indique un apport glucidique excessif ou un défaut d\'insuline.' :
-    mealContext === 'fasting'     ? 'Ce niveau à jeun est très préoccupant — l\'organisme n\'a pas du tout régulé pendant la nuit.' :
-    mealContext === 'sport'       ? 'Arrêtez immédiatement l\'activité physique — un effort avec cette glycémie aggrave le risque de cétose.' :
-    mealContext === 'bedtime'     ? 'Ne dormez pas avec cette glycémie. Le risque de complications nocturnes est élevé.' :
-    'Cause possible : dose d\'insuline manquée, alimentation inadaptée ou infection.';
+    mealContext === 'before_meal' ? 'Avant de passer à table, évitez les aliments riches en glucides rapides ou sucres ajoutés — ils risqueraient d\'aggraver davantage cette élévation.' :
+    mealContext === 'after_meal'  ? 'Ce niveau après repas peut s\'expliquer par un apport glucidique important ou un ajustement de traitement à discuter avec votre médecin.' :
+    mealContext === 'fasting'     ? 'Cette valeur à jeun mérite une attention médicale — l\'organisme n\'a pas pu réguler suffisamment pendant la nuit.' :
+    mealContext === 'sport'       ? 'Il est conseillé d\'interrompre l\'activité physique — faire un effort avec cette glycémie peut aggraver la situation.' :
+    mealContext === 'bedtime'     ? 'Il est préférable de ne pas dormir avec cette glycémie — une régulation nocturne sera difficile sans intervention.' :
+    'Cela peut survenir en cas de dose d\'insuline manquée, d\'alimentation inadaptée ou d\'un début d\'infection.';
   return {
     title: '🚨 Hyperglycémie critique',
     message: `Votre glycémie est dangereusement élevée. ${contextNote}`,
