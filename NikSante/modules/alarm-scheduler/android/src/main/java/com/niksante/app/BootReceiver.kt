@@ -29,6 +29,9 @@ class BootReceiver : BroadcastReceiver() {
                     a.getString("body")
                 )
             }
+            if (alarms.length() > 0) {
+                AlarmForegroundService.start(context)
+            }
         } catch (e: Exception) {
             e.printStackTrace()
         }

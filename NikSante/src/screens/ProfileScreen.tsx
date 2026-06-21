@@ -354,6 +354,8 @@ export default function ProfileScreen() {
       // Ne marquer actif QUE si la planification a réussi
       if (!id) return;
 
+      alarmScheduler.startKeepaliveService().catch(() => {});
+
       const updatedIds = { ...notifIds, [key]: id };
       setNotifIds(updatedIds);
       await AsyncStorage.setItem(NOTIF_IDS_KEY, JSON.stringify(updatedIds));
@@ -417,6 +419,10 @@ export default function ProfileScreen() {
       setNotifIds(updatedIds);
       await AsyncStorage.setItem(NOTIF_IDS_KEY, JSON.stringify(updatedIds));
       const updated = { ...reminders, [key]: false };
+      const anyActive = Object.values(updated).some(Boolean);
+      if (!anyActive) {
+        alarmScheduler.stopKeepaliveService().catch(() => {});
+      }
       setReminders(updated);
       await AsyncStorage.setItem(REMINDER_STORAGE_KEY, JSON.stringify(updated));
     }

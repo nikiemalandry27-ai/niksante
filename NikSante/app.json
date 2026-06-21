@@ -2,7 +2,7 @@
   "expo": {
     "name": "NikSanté",
     "slug": "niksante",
-    "version": "1.4.4",
+    "version": "1.4.5",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "niksante",
@@ -36,7 +36,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.niksante.app",
-      "versionCode": 30,
+      "versionCode": 31,
       "googleServicesFile": "./google-services.json",
       "newArchEnabled": false,
       "permissions": [
@@ -46,7 +46,9 @@
         "android.permission.SCHEDULE_EXACT_ALARM",
         "android.permission.USE_EXACT_ALARM",
         "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
-        "android.permission.WAKE_LOCK"
+        "android.permission.WAKE_LOCK",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED"
       ]
     },
     "web": {
