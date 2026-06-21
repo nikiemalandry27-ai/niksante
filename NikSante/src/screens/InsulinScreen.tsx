@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  View, ScrollView, TouchableOpacity, TextInput,
+  View, ScrollView, TouchableOpacity, TextInput, Text,
   StyleSheet, Alert, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -151,17 +151,17 @@ export default function InsulinScreen() {
               style={styles.doseBtn}
               onPress={() => setDose(d => Math.max(0.5, d - 0.5))}
             >
-              <ThemedText style={styles.doseBtnText}>−</ThemedText>
+              <Text style={styles.doseBtnText}>−</Text>
             </TouchableOpacity>
             <View style={styles.doseDisplay}>
-              <ThemedText style={styles.doseValue}>{dose}</ThemedText>
-              <ThemedText style={styles.doseUnit}>u</ThemedText>
+              <Text style={styles.doseValue}>{dose}</Text>
+              <Text style={styles.doseUnit}>u</Text>
             </View>
             <TouchableOpacity
               style={styles.doseBtn}
               onPress={() => setDose(d => Math.min(300, d + 0.5))}
             >
-              <ThemedText style={styles.doseBtnText}>+</ThemedText>
+              <Text style={styles.doseBtnText}>+</Text>
             </TouchableOpacity>
           </View>
 
@@ -331,15 +331,19 @@ const styles = StyleSheet.create({
   fieldLabel: { fontSize: fs(12), color: '#888', fontWeight: '600', marginBottom: vs(8), marginTop: vs(4) },
 
   // Dose stepper
-  doseRow:    { flexDirection: 'row', alignItems: 'center', gap: s(16), marginBottom: vs(14) },
-  doseBtn:    { width: s(44), height: s(44), borderRadius: 22, backgroundColor: '#f0f0f0', alignItems: 'center', justifyContent: 'center' },
-  doseBtnText:{ fontSize: fs(24), color: '#388E3C', fontWeight: 'bold', lineHeight: vs(28) },
-  doseDisplay:{ flex: 1, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: s(4) },
-  doseValue:  { fontSize: fs(40), fontWeight: 'bold', color: '#1a1a1a' },
-  doseUnit:   { fontSize: fs(18), color: '#aaa', fontWeight: '600', marginTop: vs(6) },
+  doseRow:    { flexDirection: 'row', alignItems: 'center', gap: s(12), marginBottom: vs(14) },
+  doseBtn:    { width: s(48), height: s(48), borderRadius: 24, backgroundColor: '#388E3C', alignItems: 'center', justifyContent: 'center' },
+  doseBtnText:{ fontSize: fs(28), color: '#fff', fontWeight: 'bold', lineHeight: vs(32) },
+  doseDisplay:{
+    flex: 1, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: s(4),
+    backgroundColor: '#fff', borderWidth: 2, borderColor: '#388E3C',
+    borderRadius: 12, paddingVertical: vs(12), marginHorizontal: s(4),
+  },
+  doseValue:  { fontSize: fs(32), fontWeight: 'bold', color: '#000' },
+  doseUnit:   { fontSize: fs(16), color: '#388E3C', fontWeight: '700', alignSelf: 'flex-end', marginBottom: vs(2) },
 
   // Time picker
-  timeRow:      { flexDirection: 'row', alignItems: 'center', gap: s(8), marginBottom: vs(14) },
+  timeRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: s(8), marginBottom: vs(14) },
   timeCol:      { alignItems: 'center' },
   timeArrowBtn: { padding: s(8) },
   timeArrow:    { fontSize: fs(16), color: '#388E3C', fontWeight: 'bold' },

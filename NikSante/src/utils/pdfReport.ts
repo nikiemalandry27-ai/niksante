@@ -1,8 +1,9 @@
 import Constants from 'expo-constants';
 import { GlucoseEntry, MEAL_CONTEXT_META, MealContext } from '@/store/glucoseStore';
 import { SleepEntry } from '@/store/sleepStore';
+import { InsulinEntry, InsulinType } from '@/services/api';
 import { getGlucoseStatus, formatDate, GlucoseUnit, formatGlucose, unitLabel } from './glucoseHelper';
-import { getTimeInRange, getConsistencyScore } from './glucoseAnalysis';
+import { getTimeInRange, getConsistencyScore, estimateHbA1c } from './glucoseAnalysis';
 import { computeSleepDebt } from './insightEngine';
 import { GLUCOSE_THRESHOLDS } from './constants';
 
@@ -17,6 +18,7 @@ export interface ReportParams {
   patientEmail:   string;
   glucoseEntries: GlucoseEntry[];
   sleepEntries:   SleepEntry[];
+  insulinEntries: InsulinEntry[];
   sleepGoal:      number;
   glucoseUnit:    GlucoseUnit;
   period:         ReportPeriod;
@@ -183,7 +185,7 @@ function generateGlucoseSVG(entries: GlucoseEntry[], glucoseUnit: GlucoseUnit): 
 // ---------------------------------------------------------------------------
 
 export function generateMedicalReportHTML(params: ReportParams): string {
-  const { patientName, patientEmail, glucoseEntries, sleepEntries, sleepGoal, glucoseUnit, period } = params;
+  const { patientName, patientEmail, glucoseEntries, sleepEntries, insulinEntries, sleepGoal, glucoseUnit, period } = params;
 
   const filteredGlucose = filterGlucoseByDays(glucoseEntries, period);
   const filteredSleep   = filterSleepByDays(sleepEntries, period);
@@ -203,6 +205,42 @@ export function generateMedicalReportHTML(params: ReportParams): string {
   const gAvg  = hasGlucose ? Math.round(gValues.reduce((a, b) => a + b, 0) / gValues.length) : 0;
   const gMin  = hasGlucose ? Math.min(...gValues) : 0;
   const gMax  = hasGlucose ? Math.max(...gValues) : 0;
+
+  // ── HbA1c estimé (sur tous les 90j, indépendant de la période choisie) ──
+  const hba1c = estimateHbA1c(glucoseEntries);
+
+  // ── Insuline ──────────────────────────────────────────────────────
+  const filteredInsulin = insulinEntries.filter(e => {
+    const d = new Date(e.administeredAt);
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - period);
+    return d >= cutoff;
+  }).sort((a, b) => new Date(b.administeredAt).getTime() - new Date(a.administeredAt).getTime());
+  const hasInsulin = filteredInsulin.length > 0;
+
+  const INSULIN_META: Record<InsulinType, { label: string; color: string; icon: string }> = {
+    rapide:   { label: 'Rapide',   color: '#1565C0', icon: '⚡' },
+    lente:    { label: 'Lente',    color: '#388E3C', icon: '🐢' },
+    premixte: { label: 'Prémixée',color: '#7B1FA2', icon: '🔀' },
+  };
+
+  const insulinTotals: Record<InsulinType, number> = { rapide: 0, lente: 0, premixte: 0 };
+  filteredInsulin.forEach(e => { insulinTotals[e.type] = (insulinTotals[e.type] ?? 0) + e.doseUnits; });
+
+  const insulinRows = filteredInsulin.map(e => {
+    const m   = INSULIN_META[e.type];
+    const dt  = new Date(e.administeredAt);
+    const dtStr = dt.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+                + ' ' + dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    return `
+      <tr>
+        <td>${dtStr}</td>
+        <td style="font-weight:bold;color:${m.color}">${e.doseUnits} u</td>
+        <td><span style="color:${m.color};font-size:10px;font-weight:bold;background:${m.color}15;
+            padding:2px 8px;border-radius:10px;border:1px solid ${m.color}35">${m.icon} ${m.label}</span></td>
+        <td style="font-size:11px;color:#888;font-style:italic">${(e.note ?? '').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</td>
+      </tr>`;
+  }).join('');
 
   // ── Statistiques sommeil ───────────────────────────────────────────
   const hasSleep = filteredSleep.length > 0;
@@ -271,42 +309,135 @@ export function generateMedicalReportHTML(params: ReportParams): string {
 <meta charset="UTF-8">
 <title>Rapport Médical — NikSanté</title>
 <style>
-  *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1a1a1a;background:#fff;padding:24px 20px}
-  .rh{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #388E3C;padding-bottom:12px;margin-bottom:16px}
-  .rh-app{font-size:22px;font-weight:bold;color:#388E3C}
-  .rh-sub{font-size:11px;color:#999;margin-top:2px}
-  .rh-pat{text-align:right;font-size:12px;color:#555;line-height:1.7}
-  .rh-name{font-size:15px;font-weight:bold;color:#1a1a1a}
-  .period{display:inline-block;background:#E8F5E9;border:1px solid #81C784;border-radius:6px;padding:4px 14px;font-size:12px;color:#2E7D32;font-weight:bold;margin-bottom:18px}
-  .sec{margin-bottom:26px}
-  .sh{color:#fff;font-size:14px;font-weight:bold;padding:9px 14px;border-radius:8px 8px 0 0}
+  /* ── Format papier A4 ── */
+  @page{size:A4 portrait;margin:15mm 12mm 18mm 12mm}
+
+  /* ── Couleurs et fonds préservés à l'impression ── */
+  *{
+    margin:0;padding:0;box-sizing:border-box;
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+  }
+
+  body{
+    font-family:Arial,Helvetica,sans-serif;
+    font-size:10pt;
+    color:#1a1a1a;
+    background:#fff;
+    padding:0;
+    line-height:1.45;
+  }
+
+  /* ── En-tête ── */
+  .rh{
+    display:flex;justify-content:space-between;align-items:flex-start;
+    border-bottom:3pt solid #388E3C;padding-bottom:10pt;margin-bottom:14pt;
+    page-break-inside:avoid;
+  }
+  .rh-app{font-size:18pt;font-weight:bold;color:#388E3C}
+  .rh-sub{font-size:8pt;color:#999;margin-top:2pt}
+  .rh-pat{text-align:right;font-size:9pt;color:#555;line-height:1.8}
+  .rh-name{font-size:12pt;font-weight:bold;color:#1a1a1a}
+  .period{
+    display:inline-block;background:#E8F5E9;border:1pt solid #81C784;
+    border-radius:4pt;padding:3pt 12pt;font-size:9pt;color:#2E7D32;
+    font-weight:bold;margin-bottom:14pt;
+  }
+
+  /* ── Sections : saut de page entre elles uniquement ── */
+  .sec{
+    margin-bottom:20pt;
+    page-break-inside:avoid;
+  }
+  /* Autoriser un saut avant une nouvelle section si nécessaire */
+  .sec+.sec{page-break-before:auto}
+
+  /* ── En-têtes de section ── */
+  .sh{
+    color:#fff;font-size:11pt;font-weight:bold;
+    padding:7pt 12pt;border-radius:5pt 5pt 0 0;
+    page-break-after:avoid;
+  }
   .sh.g{background:linear-gradient(90deg,#2E7D32,#43A047)}
   .sh.s{background:linear-gradient(90deg,#4527A0,#5E35B1)}
-  .sr{display:flex;gap:8px;flex-wrap:wrap;background:#FAFAFA;border:1px solid #E0E0E0;border-top:none;padding:12px}
-  .sc{flex:1;min-width:80px;background:#fff;border-radius:8px;padding:10px 12px;border:1px solid #EEEEEE;text-align:center}
-  .sl{font-size:9px;color:#AAA;font-weight:bold;text-transform:uppercase;letter-spacing:.5px}
-  .sv{font-size:20px;font-weight:bold;color:#1a1a1a;margin:4px 0 2px}
-  .su{font-size:10px;color:#BBB}
-  .tb{background:#FAFAFA;border:1px solid #E0E0E0;border-top:none;padding:10px 14px 14px}
-  .tbl{font-size:11px;color:#555;font-weight:bold;margin-bottom:6px}
-  .tbar{display:flex;height:20px;border-radius:5px;overflow:hidden}
+
+  /* ── Cartes de statistiques ── */
+  .sr{
+    display:flex;gap:6pt;flex-wrap:wrap;
+    background:#FAFAFA;border:1pt solid #E0E0E0;border-top:none;
+    padding:10pt;page-break-inside:avoid;
+  }
+  .sc{
+    flex:1;min-width:70pt;background:#fff;border-radius:5pt;
+    padding:8pt 10pt;border:1pt solid #EEEEEE;text-align:center;
+    page-break-inside:avoid;
+  }
+  .sl{font-size:7pt;color:#AAA;font-weight:bold;text-transform:uppercase;letter-spacing:.5pt}
+  .sv{font-size:16pt;font-weight:bold;color:#1a1a1a;margin:3pt 0 2pt}
+  .su{font-size:8pt;color:#BBB}
+
+  /* ── Barre TIR ── */
+  .tb{
+    background:#FAFAFA;border:1pt solid #E0E0E0;border-top:none;
+    padding:8pt 12pt 12pt;page-break-inside:avoid;
+  }
+  .tbl{font-size:9pt;color:#555;font-weight:bold;margin-bottom:5pt}
+  .tbar{display:flex;height:16pt;border-radius:4pt;overflow:hidden}
   .t-lo{background:#1565C0}
   .t-ok{background:#388E3C}
   .t-hi{background:#F57C00}
-  .tleg{display:flex;gap:16px;margin-top:7px;flex-wrap:wrap}
-  .tli{display:flex;align-items:center;gap:5px;font-size:11px;color:#555}
-  .tld{width:10px;height:10px;border-radius:3px;flex-shrink:0}
-  .sbdg{display:inline-block;margin-top:8px;padding:4px 16px;border-radius:20px;font-size:13px;font-weight:bold}
-  .chrt{background:#FAFAFA;border:1px solid #E0E0E0;border-top:none;padding:12px 14px}
-  .chrt-ttl{font-size:11px;color:#555;font-weight:bold;margin-bottom:8px}
-  .dt{width:100%;border-collapse:collapse;border:1px solid #E0E0E0;border-top:none;font-size:12px}
-  .dt th{background:#F5F5F5;color:#777;font-size:9px;font-weight:bold;text-transform:uppercase;letter-spacing:.5px;padding:7px 10px;border-bottom:1px solid #E8E8E8;text-align:left}
-  .dt td{padding:7px 10px;border-bottom:1px solid #F5F5F5;vertical-align:middle}
+  .tleg{display:flex;gap:14pt;margin-top:6pt;flex-wrap:wrap}
+  .tli{display:flex;align-items:center;gap:4pt;font-size:8.5pt;color:#555}
+  .tld{width:8pt;height:8pt;border-radius:2pt;flex-shrink:0}
+  .sbdg{
+    display:inline-block;margin-top:7pt;
+    padding:3pt 14pt;border-radius:16pt;
+    font-size:10pt;font-weight:bold;
+  }
+
+  /* ── Graphique SVG ── */
+  .chrt{
+    background:#FAFAFA;border:1pt solid #E0E0E0;border-top:none;
+    padding:10pt 12pt;page-break-inside:avoid;
+  }
+  .chrt-ttl{font-size:9pt;color:#555;font-weight:bold;margin-bottom:6pt}
+
+  /* ── Tableaux de données ── */
+  .dt{
+    width:100%;border-collapse:collapse;
+    border:1pt solid #E0E0E0;border-top:none;
+    font-size:9pt;
+  }
+  .dt thead{display:table-header-group} /* répète l'en-tête sur chaque page */
+  .dt th{
+    background:#F5F5F5;color:#777;
+    font-size:7.5pt;font-weight:bold;
+    text-transform:uppercase;letter-spacing:.4pt;
+    padding:6pt 8pt;border-bottom:1pt solid #E8E8E8;text-align:left;
+  }
+  .dt td{
+    padding:6pt 8pt;border-bottom:1pt solid #F5F5F5;
+    vertical-align:middle;page-break-inside:avoid;
+  }
   .dt tr:last-child td{border-bottom:none}
-  .em{text-align:center;color:#BBB;padding:24px;font-style:italic;background:#FAFAFA;border:1px solid #E0E0E0;border-top:none}
-  .ft{margin-top:24px;padding-top:10px;border-top:1px solid #EEEEEE;text-align:center;color:#CCC;font-size:10px;line-height:1.8}
-  .disc{font-style:italic;font-size:9px;color:#DDD;margin-top:4px}
+  .dt tbody tr{page-break-inside:avoid}
+
+  /* ── États vides ── */
+  .em{
+    text-align:center;color:#BBB;padding:20pt;
+    font-style:italic;font-size:9pt;
+    background:#FAFAFA;border:1pt solid #E0E0E0;border-top:none;
+  }
+
+  /* ── Pied de page ── */
+  .ft{
+    margin-top:20pt;padding-top:8pt;
+    border-top:1pt solid #EEEEEE;
+    text-align:center;color:#CCC;
+    font-size:7.5pt;line-height:1.8;
+    page-break-inside:avoid;
+  }
+  .disc{font-style:italic;font-size:7pt;color:#DDD;margin-top:3pt}
 </style>
 </head>
 <body>
@@ -337,7 +468,13 @@ ${hasGlucose ? `
     <div class="sc"><div class="sl">Minimum</div><div class="sv" style="color:#1565C0">${formatGlucose(gMin, glucoseUnit)}</div><div class="su">${ul}</div></div>
     <div class="sc"><div class="sl">Maximum</div><div class="sv" style="color:#F57C00">${formatGlucose(gMax, glucoseUnit)}</div><div class="su">${ul}</div></div>
     <div class="sc"><div class="sl">TIR</div><div class="sv" style="color:#388E3C">${tir.inRange}%</div><div class="su">dans la norme</div></div>
+    ${hba1c ? `<div class="sc"><div class="sl">HbA1c estimé</div><div class="sv" style="color:${hba1c.color}">${hba1c.value.toFixed(1)}%</div><div class="su" style="color:${hba1c.color};font-weight:bold">${hba1c.label}</div></div>` : ''}
   </div>
+  ${hba1c ? `<div style="background:#FAFAFA;border:1px solid #E0E0E0;border-top:none;padding:10px 14px;font-size:11px;color:#555">
+    <b>HbA1c estimé :</b> <span style="color:${hba1c.color};font-weight:bold">${hba1c.value.toFixed(1)} %</span>
+    — ${hba1c.advice}
+    <span style="color:#BBB"> · Basé sur ${hba1c.basedOnCount} mesures (90 jours) · Formule ADAG</span>
+  </div>` : ''}
 
   <div class="tb">
     <div class="tbl">Time In Range (TIR)</div>
@@ -385,6 +522,23 @@ ${hasSleep ? `
   <table class="dt">
     <thead><tr><th>Date</th><th>Coucher</th><th>Réveil</th><th>Durée</th><th>Vs objectif</th><th>Qualité</th><th>Note</th></tr></thead>
     <tbody>${sleepRows}</tbody>
+  </table>
+</div>
+` : ''}
+
+${hasInsulin ? `
+<!-- ═══ INSULINE ═══ -->
+<div class="sec">
+  <div class="sh" style="background:linear-gradient(90deg,#4527A0,#7B1FA2)">💉 Insuline — ${filteredInsulin.length} injection${filteredInsulin.length > 1 ? 's' : ''}</div>
+  <div class="sr">
+    <div class="sc"><div class="sl">Rapide ⚡</div><div class="sv" style="color:#1565C0">${insulinTotals.rapide > 0 ? insulinTotals.rapide + ' u' : '—'}</div><div class="su">total période</div></div>
+    <div class="sc"><div class="sl">Lente 🐢</div><div class="sv" style="color:#388E3C">${insulinTotals.lente > 0 ? insulinTotals.lente + ' u' : '—'}</div><div class="su">total période</div></div>
+    <div class="sc"><div class="sl">Prémixée 🔀</div><div class="sv" style="color:#7B1FA2">${insulinTotals.premixte > 0 ? insulinTotals.premixte + ' u' : '—'}</div><div class="su">total période</div></div>
+    <div class="sc"><div class="sl">Total</div><div class="sv">${(insulinTotals.rapide + insulinTotals.lente + insulinTotals.premixte).toFixed(1)} u</div><div class="su">toutes insulines</div></div>
+  </div>
+  <table class="dt">
+    <thead><tr><th>Date / Heure</th><th>Dose</th><th>Type</th><th>Note</th></tr></thead>
+    <tbody>${insulinRows}</tbody>
   </table>
 </div>
 ` : ''}

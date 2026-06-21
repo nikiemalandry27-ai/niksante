@@ -37,6 +37,7 @@ import { useAuthStore }     from '@/store/authStore';
 import { useGlucoseStore }  from '@/store/glucoseStore';
 import { useSleepStore }    from '@/store/sleepStore';
 import { useSettingsStore } from '@/store/settingsStore';
+import { useInsulinStore }  from '@/store/insulinStore';
 import { getTimeInRange, getConsistencyScore } from '@/utils/glucoseAnalysis';
 import { computeSleepDebt } from '@/utils/insightEngine';
 import {
@@ -79,6 +80,7 @@ export default function MedicalReportScreen() {
   const sleepEntries   = useSleepStore(s => s.entries);
   const sleepGoal      = useSleepStore(s => s.sleepGoal);
   const glucoseUnit    = useSettingsStore(s => s.glucoseUnit);
+  const insulinHistory = useInsulinStore(s => s.history);
 
   const [period,          setPeriod]          = useState<ReportPeriod>(14);
   const [doctorEmail,     setDoctorEmail]     = useState('');
@@ -124,6 +126,7 @@ export default function MedicalReportScreen() {
     patientEmail,
     glucoseEntries: glucoseHistory,
     sleepEntries,
+    insulinEntries: insulinHistory,
     sleepGoal,
     glucoseUnit,
     period,
