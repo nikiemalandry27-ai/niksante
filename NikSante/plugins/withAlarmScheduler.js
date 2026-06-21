@@ -40,6 +40,7 @@ module.exports = function withAlarmScheduler(config) {
       app.activity.push({
         $: {
           'android:name': '.AlarmActivity',
+          'android:process': ':alarm',
           'android:exported': 'false',
           'android:noHistory': 'true',
           'android:excludeFromRecents': 'true',
