@@ -1,5 +1,6 @@
 import type { SleepEntry, WakeFeeling } from '@/store/sleepStore';
 import type { GlucoseEntry } from '@/store/glucoseStore';
+import { GLUCOSE_THRESHOLDS } from './constants';
 
 // ---------------------------------------------------------------------------
 // Types publics
@@ -292,7 +293,7 @@ export function generateInsights(
   }
 
   // ── Insight 5 : glycémie élevée seule ────────────────────────────────────
-  if (avgGlucose !== null && avgGlucose > 180 && insights.length < 2) {
+  if (avgGlucose !== null && avgGlucose > GLUCOSE_THRESHOLDS.HYPER_WARNING && insights.length < 2) {
     insights.push({
       id: 'high_glucose', icon: '📈', priority: 2,
       title: 'Glycémie élevée',
@@ -366,7 +367,7 @@ export function computeHealthScore(
   // ── Score glycémie ────────────────────────────────────────────────────────
   let glucoseScore = 0;
   if (hasGlucose) {
-    const inRange   = recentGlucose.filter(e => e.value >= 70 && e.value <= 180).length;
+    const inRange   = recentGlucose.filter(e => e.value >= GLUCOSE_THRESHOLDS.HYPO_ALERT && e.value <= GLUCOSE_THRESHOLDS.HYPER_WARNING).length;
     const tir       = (inRange / recentGlucose.length) * 100;
     const avg       = recentGlucose.reduce((a, b) => a + b.value, 0) / recentGlucose.length;
     const std       = Math.sqrt(recentGlucose.reduce((s, e) => s + (e.value - avg) ** 2, 0) / recentGlucose.length);

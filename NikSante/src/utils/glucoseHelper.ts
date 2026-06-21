@@ -159,8 +159,8 @@ export function getAIMessage(status: GlucoseStatus, mealContext: MealContext = n
       case 'before_meal':
         return {
           title: '✅ Bonne glycémie avant repas',
-          message: 'Votre glycémie est bien équilibrée avant le repas.',
-          suggestion: 'Privilégiez un repas équilibré (glucides lents, légumes, protéines) pour garder cette stabilité.',
+          message: 'Excellent ! Votre glycémie est bien équilibrée avant ce repas — c\'est une bonne base pour démarrer.',
+          suggestion: 'Privilégiez une alimentation adaptée : glucides lents, légumes, protéines, et limitez les sucres rapides pour maintenir cet équilibre.',
         };
       case 'after_meal':
         return {
@@ -283,7 +283,7 @@ export function getAIMessage(status: GlucoseStatus, mealContext: MealContext = n
 
   // ── Hyperglycémie critique ───────────────────────────────────────────────
   const contextNote =
-    mealContext === 'before_meal' ? 'Ne mangez pas avant d\'avoir traité cette hyperglycémie — un repas aggraverait la situation.' :
+    mealContext === 'before_meal' ? 'Évitez tout repas riche en glucides rapides ou en sucres ajoutés — votre glycémie est déjà très élevée et un repas inadapté risque de l\'aggraver.' :
     mealContext === 'after_meal'  ? 'Ce niveau après repas indique un apport glucidique excessif ou un défaut d\'insuline.' :
     mealContext === 'fasting'     ? 'Ce niveau à jeun est très préoccupant — l\'organisme n\'a pas du tout régulé pendant la nuit.' :
     mealContext === 'sport'       ? 'Arrêtez immédiatement l\'activité physique — un effort avec cette glycémie aggrave le risque de cétose.' :
