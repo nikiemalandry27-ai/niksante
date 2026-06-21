@@ -64,13 +64,31 @@ function calcYMax(values: number[]): number {
 // ---------------------------------------------------------------------------
 
 export default function GlucoseChart({ data, unit = 'mg_dl' }: Props) {
-  const [period, setPeriod]     = useState<Period>('recent');
+  const [period, setPeriod]         = useState<Period>('recent');
   const [chartWidth, setChartWidth] = useState(0);
 
   const isRecent   = period === 'recent';
   const days       = PERIOD_DAYS[period];
   const aggregated = isRecent ? [] : getDailyAverages(data, days);
-  const trend      = isRecent ? null : getTrendFromAverages(aggregated);
+
+  // Assez de jours avec données pour un graphique agrégé significatif
+  const hasEnoughForAggregated = aggregated.length >= 3;
+
+  // Entrées individuelles filtrées à la période (fallback quand données insuffisantes)
+  const periodEntries = isRecent
+    ? data
+    : data
+        .filter(e => {
+          const cutoff = new Date();
+          cutoff.setDate(cutoff.getDate() - days);
+          return new Date(e.date) >= cutoff;
+        })
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  // Tendance uniquement si assez de points agrégés
+  const trend = (!isRecent && hasEnoughForAggregated)
+    ? getTrendFromAverages(aggregated)
+    : null;
 
   const TREND_LABELS: Record<string, string> = {
     up: '↑ Tendance haussière', down: '↓ Tendance baissière', stable: '→ Stable',
@@ -114,13 +132,26 @@ export default function GlucoseChart({ data, unit = 'mg_dl' }: Props) {
         ))}
       </View>
 
-      {/* ── Vue Récent (brut) ── */}
-      {isRecent && (
-        <RawChart data={data} unit={unit} chartWidth={chartWidth} setChartWidth={setChartWidth} />
+      {/* ── Vue individuelle : Récent OU fallback si données insuffisantes ── */}
+      {(isRecent || !hasEnoughForAggregated) && (
+        <>
+          {!isRecent && periodEntries.length > 0 && (
+            <ThemedText style={{ fontSize: fs(10), color: '#bbb', textAlign: 'center', marginBottom: vs(6), fontStyle: 'italic' }}>
+              Trop peu de jours avec données — mesures individuelles affichées
+            </ThemedText>
+          )}
+          <RawChart
+            data={periodEntries}
+            unit={unit}
+            chartWidth={chartWidth}
+            setChartWidth={setChartWidth}
+            limitTo12={isRecent}
+          />
+        </>
       )}
 
-      {/* ── Vue agrégée (7j / 30j / 90j) ── */}
-      {!isRecent && (
+      {/* ── Vue agrégée (7j / 30j / 90j) — uniquement si ≥ 3 jours avec données ── */}
+      {!isRecent && hasEnoughForAggregated && (
         <AggregatedChart averages={aggregated} unit={unit} days={days} chartWidth={chartWidth} setChartWidth={setChartWidth} />
       )}
 
@@ -148,14 +179,19 @@ export default function GlucoseChart({ data, unit = 'mg_dl' }: Props) {
 // ---------------------------------------------------------------------------
 
 function RawChart({
-  data, unit, chartWidth, setChartWidth,
+  data, unit, chartWidth, setChartWidth, limitTo12 = true,
 }: {
   data: GlucoseEntry[];
   unit: GlucoseUnit;
   chartWidth: number;
   setChartWidth: (w: number) => void;
+  limitTo12?: boolean;
 }) {
-  const entries = [...data].slice(0, 12).reverse();
+  // En mode "Récent" : 12 dernières mesures triées du plus ancien au plus récent
+  // En mode fallback période : toutes les mesures déjà filtrées et triées
+  const entries = limitTo12
+    ? [...data].slice(0, 12).reverse()
+    : [...data];
 
   if (entries.length === 0) {
     return (
