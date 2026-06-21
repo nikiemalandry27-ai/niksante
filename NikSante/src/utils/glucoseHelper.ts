@@ -224,11 +224,17 @@ export function getAIMessage(status: GlucoseStatus, mealContext: MealContext = n
           message: 'Aller dormir avec une glycémie élevée prolonge cette élévation pendant la nuit sans que vous puissiez la corriger.',
           suggestion: 'Buvez de l\'eau, évitez toute collation. Une courte marche de 10 min peut aider avant de dormir.',
         };
+      case 'sport':
+        return {
+          title: '🟡 Glycémie élevée pendant l\'activité',
+          message: 'Un effort anaérobie intense (sprint, musculation) peut temporairement élever la glycémie via les hormones de stress.',
+          suggestion: 'Après l\'effort, la glycémie devrait baisser avec la phase de récupération. Surveillez l\'évolution.',
+        };
       default:
         return {
           title: '🟡 Glycémie légèrement élevée',
-          message: 'Votre glycémie est légèrement élevée — signe possible d\'un repas récent riche en glucides ou d\'un état de stress.',
-          suggestion: 'Buvez de l\'eau et bougez un peu. Vérifiez la composition de votre dernier repas.',
+          message: 'Votre glycémie est légèrement élevée — peut être lié à un repas récent riche en glucides ou à un état de stress.',
+          suggestion: 'Buvez de l\'eau, marchez un peu et observez l\'évolution à la prochaine mesure.',
         };
     }
   }
@@ -277,9 +283,10 @@ export function getAIMessage(status: GlucoseStatus, mealContext: MealContext = n
 
   // ── Hyperglycémie critique ───────────────────────────────────────────────
   const contextNote =
+    mealContext === 'before_meal' ? 'Ne mangez pas avant d\'avoir traité cette hyperglycémie — un repas aggraverait la situation.' :
     mealContext === 'after_meal'  ? 'Ce niveau après repas indique un apport glucidique excessif ou un défaut d\'insuline.' :
     mealContext === 'fasting'     ? 'Ce niveau à jeun est très préoccupant — l\'organisme n\'a pas du tout régulé pendant la nuit.' :
-    mealContext === 'sport'       ? 'Ne pratiquez aucun exercice physique avec une glycémie aussi haute — risque de cétose.' :
+    mealContext === 'sport'       ? 'Arrêtez immédiatement l\'activité physique — un effort avec cette glycémie aggrave le risque de cétose.' :
     mealContext === 'bedtime'     ? 'Ne dormez pas avec cette glycémie. Le risque de complications nocturnes est élevé.' :
     'Cause possible : dose d\'insuline manquée, alimentation inadaptée ou infection.';
   return {
