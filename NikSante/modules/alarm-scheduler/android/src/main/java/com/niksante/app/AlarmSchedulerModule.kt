@@ -30,8 +30,8 @@ class AlarmSchedulerModule : Module() {
 
         AsyncFunction("cancelAlarm") { id: Int ->
             val ctx = this@AlarmSchedulerModule.appContext.reactContext ?: return@AsyncFunction
-            val pi = PendingIntent.getBroadcast(
-                ctx, id, Intent(ctx, AlarmReceiver::class.java),
+            val pi = PendingIntent.getActivity(
+                ctx, id, Intent(ctx, AlarmActivity::class.java),
                 PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
             )
             if (pi != null) {
@@ -90,14 +90,18 @@ class AlarmSchedulerModule : Module() {
             context: Context, am: AlarmManager,
             id: Int, hour: Int, minute: Int, title: String, body: String
         ) {
-            val intent = Intent(context, AlarmReceiver::class.java).apply {
+            // AlarmActivity (getActivity) au lieu de AlarmReceiver (getBroadcast) :
+            // les broadcasts sont bloqués/gelés par les OEM (TECNO, Infinix…) quand le processus
+            // est en arrière-plan. Les Activity lancées par setAlarmClock() bénéficient d'une
+            // exemption explicite Android et ne peuvent pas être bloquées.
+            val intent = Intent(context, AlarmActivity::class.java).apply {
                 putExtra(AlarmReceiver.EXTRA_ID,     id)
                 putExtra(AlarmReceiver.EXTRA_TITLE,  title)
                 putExtra(AlarmReceiver.EXTRA_BODY,   body)
                 putExtra(AlarmReceiver.EXTRA_HOUR,   hour)
                 putExtra(AlarmReceiver.EXTRA_MINUTE, minute)
             }
-            val pi = PendingIntent.getBroadcast(
+            val pi = PendingIntent.getActivity(
                 context, id, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
@@ -111,15 +115,11 @@ class AlarmSchedulerModule : Module() {
             val canExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || am.canScheduleExactAlarms()
 
             if (canExact) {
-                // setAlarmClock est le seul type exempt de toutes les restrictions OEM
-                // (TECNO, Infinix, Samsung, Xiaomi…). Le système ne peut pas le déférer,
-                // même quand l'app est en arrière-plan. Équivalent à l'alarme de l'appli Horloge.
                 val showIntent = context.packageManager
                     .getLaunchIntentForPackage(context.packageName)
                     ?.let { PendingIntent.getActivity(context, id + 10000, it, PendingIntent.FLAG_IMMUTABLE) }
                 am.setAlarmClock(AlarmManager.AlarmClockInfo(cal.timeInMillis, showIntent), pi)
             } else {
-                // Fallback si SCHEDULE_EXACT_ALARM refusée — inexact (±15 min)
                 am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, cal.timeInMillis, pi)
             }
         }
