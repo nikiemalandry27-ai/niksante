@@ -12,7 +12,6 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -64,6 +63,7 @@ const STATUS_LABELS: Record<string, string> = {
   hypo_critical:  'HYPOGLYCÉMIE CRITIQUE',
   hypo:           'GLYCÉMIE BASSE',
   normal:         'NORMAL',
+  hyper_mild:     'ÉLEVÉ POST-REPAS',
   hyper:          'GLYCÉMIE ÉLEVÉE',
   hyper_critical: 'HYPERGLYCÉMIE CRITIQUE',
 };
@@ -104,16 +104,12 @@ export default function DashboardScreen() {
 
   // ── Stores ──
   const user             = useAuthStore((state) => state.user);
-  const logout           = useAuthStore((state) => state.logout);
   const latestGlucose    = useGlucoseStore((state) => state.latestGlucose);
   const glucoseHistory   = useGlucoseStore((state) => state.glucoseHistory);
-  const clearHistory     = useGlucoseStore((state) => state.clearHistory);
-  const resetLocalState  = useGlucoseStore((state) => state.resetLocalState);
   const initGlucose      = useGlucoseStore((state) => state.initGlucose);
   const averageGlucose   = useGlucoseStore((state) => state.getAverageGlucose)();
   const isLoadingHistory = useGlucoseStore((state) => state.isLoadingHistory);
 
-  const [loggingOut, setLoggingOut] = useState(false);
   const glucoseUnit = useSettingsStore((s) => s.glucoseUnit);
 
   const sleepEntries = useSleepStore(s => s.entries);
@@ -156,29 +152,6 @@ export default function DashboardScreen() {
   const handleSeeAll     = () => router.push('/history');
   const handleSleep      = () => router.navigate('/(tabs)/sleep' as any);
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Déconnexion',
-      'Êtes-vous sûr de vouloir vous déconnecter ?',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Déconnecter', style: 'destructive',
-          onPress: async () => {
-            setLoggingOut(true);
-            try {
-              await resetLocalState();
-              await logout();
-              router.replace('/login');
-            } catch {
-              Alert.alert('Erreur', 'Impossible de se déconnecter.');
-              setLoggingOut(false);
-            }
-          },
-        },
-      ],
-    );
-  };
 
   // ---------------------------------------------------------------------------
   // Render
@@ -190,22 +163,14 @@ export default function DashboardScreen() {
 
         {/* ── Header ── */}
         <View style={styles.header}>
-          <View>
-            <ThemedText style={styles.greeting}>
-              Bonjour, {user?.name ?? 'Utilisateur'} 👋
-            </ThemedText>
-            <ThemedText style={styles.date}>
-              {new Date().toLocaleDateString('fr-FR', {
-                weekday: 'long', day: 'numeric', month: 'long',
-              })}
-            </ThemedText>
-          </View>
-          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} disabled={loggingOut}>
-            {loggingOut
-              ? <ActivityIndicator color="#388E3C" size="small" />
-              : <ThemedText style={styles.logoutText}>Déconnexion</ThemedText>
-            }
-          </TouchableOpacity>
+          <ThemedText style={styles.greeting}>
+            Bonjour, {user?.name ?? 'Utilisateur'} 👋
+          </ThemedText>
+          <ThemedText style={styles.date}>
+            {new Date().toLocaleDateString('fr-FR', {
+              weekday: 'long', day: 'numeric', month: 'long',
+            })}
+          </ThemedText>
         </View>
 
         {/* ── Carte glycémie ── */}
@@ -555,16 +520,11 @@ const styles = StyleSheet.create({
 
   // Header
   header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    alignItems: 'center',
     paddingHorizontal: s(20), paddingTop: vs(20), paddingBottom: vs(12),
   },
-  greeting: { fontSize: fs(20), fontWeight: 'bold', color: '#1a1a1a' },
-  date: { fontSize: fs(12), color: '#999', marginTop: vs(4), textTransform: 'capitalize' },
-  logoutBtn: {
-    paddingVertical: vs(8), paddingHorizontal: s(12),
-    borderRadius: 8, borderWidth: 1, borderColor: '#ddd', backgroundColor: '#fff',
-  },
-  logoutText: { fontSize: fs(12), color: '#388E3C', fontWeight: '600' },
+  greeting: { fontSize: fs(20), fontWeight: 'bold', color: '#1a1a1a', textAlign: 'center' },
+  date: { fontSize: fs(12), color: '#999', marginTop: vs(4), textTransform: 'capitalize', textAlign: 'center' },
 
   // Carte glycémie
   glucoseCard: {

@@ -68,19 +68,10 @@ export default function TabsLayout() {
         }}
       />
 
-      {/* ── Ajouter une mesure ── */}
+      {/* ── Ajouter une mesure — route accessible mais masquée de la tab bar ── */}
       <Tabs.Screen
         name="add-glucose"
-        options={{
-          title: 'Ajouter',
-          tabBarIcon: ({ color }) => (
-            <Image
-              source={require('@/assets/images/tabIcons/explore.png')}
-              style={{ width: 24, height: 24, tintColor: color }}
-              resizeMode="contain"
-            />
-          ),
-        }}
+        options={{ href: null }}
       />
 
       {/* ── Sommeil ── */}
