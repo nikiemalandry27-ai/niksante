@@ -80,6 +80,21 @@ class AlarmSchedulerModule : Module() {
                 ctx.startActivity(intent)
             }
         }
+
+        AsyncFunction("getManufacturer") {
+            Build.MANUFACTURER.lowercase()
+        }
+
+        AsyncFunction("openAppSettings") {
+            val ctx = this@AlarmSchedulerModule.appContext.reactContext
+            if (ctx != null) {
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.parse("package:${ctx.packageName}")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                ctx.startActivity(intent)
+            }
+        }
     }
 
     companion object {

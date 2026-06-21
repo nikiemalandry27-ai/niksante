@@ -50,6 +50,7 @@ const NOTIF_IDS_KEY         = '@niksante_notif_ids';
 const REMINDER_TIMES_KEY    = '@niksante_reminder_times';
 const NOTIF_CHANNEL_ID      = 'niksante-rappels';
 const BATTERY_OPT_KEY       = '@niksante_battery_opt_requested';
+const AUTO_START_KEY        = '@niksante_autostart_requested';
 const ALARM_MIGRATED_KEY    = '@niksante_alarm_migrated_v2';
 
 // ---------------------------------------------------------------------------
@@ -375,6 +376,36 @@ export default function ProfileScreen() {
                 text: 'Autoriser',
                 onPress: () => alarmScheduler.openBatteryOptimizationSettings().catch(() => {}),
               },
+            ],
+          );
+        }
+      }
+
+      // Dialog Auto-start OEM — enchaîné après la batterie, une seule fois
+      const autoStartAsked = await AsyncStorage.getItem(AUTO_START_KEY);
+      if (!autoStartAsked && Platform.OS === 'android') {
+        const mfr = await alarmScheduler.getManufacturer().catch(() => '');
+        const isRestrictiveOEM = /tecno|infinix|itel|samsung|xiaomi|redmi|poco|huawei|honor|oppo|vivo|realme|oneplus/.test(mfr);
+        if (isRestrictiveOEM) {
+          await AsyncStorage.setItem(AUTO_START_KEY, 'true');
+          let instructions: string;
+          if (/tecno|infinix|itel/.test(mfr)) {
+            instructions = "Paramètres → Confidentialité → Autorisations d'app → Démarrage automatique → activez NikSanté";
+          } else if (/samsung/.test(mfr)) {
+            instructions = "Paramètres → Applications → NikSanté → Batterie → sélectionnez « Non restreint »";
+          } else if (/xiaomi|redmi|poco/.test(mfr)) {
+            instructions = "Paramètres → Applications → Gérer les apps → NikSanté → Économie de batterie → Aucune restriction";
+          } else if (/huawei|honor/.test(mfr)) {
+            instructions = "Paramètres → Applications → NikSanté → Lancement d'apps → désactivez « Gestion auto » → activez « Démarrage auto »";
+          } else {
+            instructions = "Paramètres → Applications → NikSanté → Autorisations → Démarrage automatique";
+          }
+          Alert.alert(
+            'Activer le démarrage automatique',
+            `Pour recevoir vos rappels même quand l'app est en arrière-plan :\n\n${instructions}`,
+            [
+              { text: 'Plus tard', style: 'cancel' },
+              { text: 'Ouvrir les paramètres', onPress: () => alarmScheduler.openAppSettings().catch(() => {}) },
             ],
           );
         }
