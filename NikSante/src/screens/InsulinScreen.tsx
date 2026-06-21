@@ -105,6 +105,14 @@ export default function InsulinScreen() {
           <ThemedText style={styles.subtitle}>Enregistrez vos injections au quotidien</ThemedText>
         </View>
 
+        {/* ── Bannière info rapport médical ── */}
+        <View style={styles.infoBanner}>
+          <ThemedText style={styles.infoIcon}>📋</ThemedText>
+          <ThemedText style={styles.infoText}>
+            Vos injections enregistrées sont automatiquement incluses dans votre rapport médical, exportable depuis l'onglet <ThemedText style={styles.infoTextBold}>Profil</ThemedText>.
+          </ThemedText>
+        </View>
+
         {/* ── Totaux du jour ── */}
         <View style={styles.totalsCard}>
           <ThemedText style={styles.totalsLabel}>AUJOURD'HUI — doses en unités (u)</ThemedText>
@@ -296,6 +304,17 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: s(20), paddingTop: vs(20), paddingBottom: vs(8) },
   title:    { fontSize: fs(22), fontWeight: 'bold', color: '#1a1a1a' },
   subtitle: { fontSize: fs(13), color: '#999', marginTop: vs(4) },
+
+  // Bannière info
+  infoBanner: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: s(10),
+    marginHorizontal: s(20), marginBottom: vs(10),
+    backgroundColor: '#E8F5E9', borderRadius: 12,
+    padding: s(12), borderLeftWidth: 3, borderLeftColor: '#388E3C',
+  },
+  infoIcon:      { fontSize: fs(16), marginTop: vs(1) },
+  infoText:      { flex: 1, fontSize: fs(12), color: '#2E7D32', lineHeight: vs(18) },
+  infoTextBold:  { fontWeight: '700', color: '#1B5E20' },
 
   // Totaux
   totalsCard: {

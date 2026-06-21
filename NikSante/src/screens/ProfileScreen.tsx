@@ -675,7 +675,7 @@ export default function ProfileScreen() {
           <ThemedText style={styles.sectionTitle}>Fonctionnalités</ThemedText>
 
           {[
-            { icon: '📋', label: 'Rapport médical',  desc: 'PDF glycémie + sommeil pour votre médecin', route: '/medical-report'  },
+            { icon: '📋', label: 'Rapport médical',  desc: 'PDF complet : glycémie, insuline & sommeil', route: '/medical-report'  },
             { icon: '🏅', label: 'Récompenses',      desc: 'Badges, points et niveaux',                 route: '/gamification'    },
             { icon: '🧠', label: 'Bien-être mental', desc: 'Humeur, respiration & conseils',            route: '/mental-health'   },
             { icon: '📚', label: 'Guide Diabète',    desc: 'Tout savoir sur le diabète',                route: '/diabetes-guide'  },

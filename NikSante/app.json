@@ -2,7 +2,7 @@
   "expo": {
     "name": "NikSanté",
     "slug": "niksante",
-    "version": "1.4.7",
+    "version": "1.2.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "niksante",
@@ -36,7 +36,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.niksante.app",
-      "versionCode": 33,
+      "versionCode": 16,
       "googleServicesFile": "./google-services.json",
       "newArchEnabled": false,
       "permissions": [

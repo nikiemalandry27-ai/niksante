@@ -246,11 +246,31 @@ export function estimateHbA1c(entries: GlucoseEntry[]): HbA1cResult | null {
 }
 
 function interpretHbA1c(value: number): { label: string; color: string; advice: string } {
-  if (value < 5.7) return { label: 'Normal',          color: '#388E3C', advice: 'Excellent contrôle glycémique.' };
-  if (value < 6.5) return { label: 'Prédiabète',      color: '#F57C00', advice: 'Surveillez alimentation et activité physique.' };
-  if (value < 7.0) return { label: 'Bien contrôlé',   color: '#66BB6A', advice: 'Objectif atteint pour la plupart des diabétiques.' };
-  if (value < 8.0) return { label: 'Acceptable',      color: '#FBC02D', advice: 'Peut être amélioré avec votre médecin.' };
-  return               { label: 'À améliorer',     color: '#B71C1C', advice: 'Consultez votre diabétologue pour ajuster le traitement.' };
+  if (value < 5.7) return {
+    label:  'Normal',
+    color:  '#388E3C',
+    advice: 'Votre glycémie moyenne sur 90 jours est excellente. Maintenez vos habitudes alimentaires et votre activité physique.',
+  };
+  if (value < 6.5) return {
+    label:  'Prédiabète',
+    color:  '#F57C00',
+    advice: 'Zone prédiabétique : privilégiez les glucides lents, réduisez les sucres rapides et visez 30 min d\'activité physique par jour. Un suivi médical régulier est recommandé.',
+  };
+  if (value < 7.0) return {
+    label:  'Bien contrôlé',
+    color:  '#66BB6A',
+    advice: 'Contrôle satisfaisant pour un diabétique traité. Continuez votre traitement, vos mesures régulières et vos bonnes habitudes alimentaires.',
+  };
+  if (value < 8.0) return {
+    label:  'Acceptable',
+    color:  '#FBC02D',
+    advice: 'Un ajustement de l\'alimentation (moins de sucres rapides, plus de fibres) ou du traitement pourrait améliorer ce résultat. Évoquez-le lors de votre prochaine consultation.',
+  };
+  return {
+    label:  'À améliorer',
+    color:  '#B71C1C',
+    advice: 'Ce niveau augmente le risque de complications à long terme (rein, vision, nerfs). Un rendez-vous avec votre diabétologue est recommandé pour revoir votre traitement.',
+  };
 }
 
 // ---------------------------------------------------------------------------
