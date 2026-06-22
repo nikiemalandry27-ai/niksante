@@ -28,7 +28,7 @@ const SECTIONS: Section[] = [
     color: '#388E3C',
     bg: '#E8F5E9',
     title: 'Tableau de bord',
-    subtitle: 'Vue d'ensemble de votre santé au quotidien',
+    subtitle: "Vue d'ensemble de votre santé au quotidien",
     blocks: [
       {
         type: 'paragraph',
