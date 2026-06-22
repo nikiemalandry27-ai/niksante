@@ -121,12 +121,9 @@ export default function DashboardScreen() {
 
   const sleepEntries = useSleepStore(s => s.entries);
   const sleepGoal    = useSleepStore(s => s.sleepGoal);
-  // Affiche la nuit la plus récente (aujourd'hui ou hier) — pas seulement aujourd'hui
-  const _today     = new Date().toISOString().split('T')[0];
+  // Affiche uniquement la nuit d'hier
   const _yesterday = new Date(Date.now() - 86_400_000).toISOString().split('T')[0];
-  const todaySleep = sleepEntries
-    .filter(e => e.date === _today || e.date === _yesterday)
-    .sort((a, b) => b.date.localeCompare(a.date))[0] ?? null;
+  const todaySleep = sleepEntries.find(e => e.date === _yesterday) ?? null;
   const healthScore  = computeHealthScore(sleepEntries, glucoseHistory, sleepGoal);
 
   const [showScoreInfo, setShowScoreInfo] = useState(false);
