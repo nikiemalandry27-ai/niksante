@@ -30,15 +30,19 @@ class AlarmSchedulerModule : Module() {
 
         AsyncFunction("cancelAlarm") { id: Int ->
             val ctx = this@AlarmSchedulerModule.appContext.reactContext ?: return@AsyncFunction
-            val pi = PendingIntent.getActivity(
+            val am = ctx.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            // Annuler le PendingIntent Activity (chemin setAlarmClock)
+            val actPi = PendingIntent.getActivity(
                 ctx, id, Intent(ctx, AlarmActivity::class.java),
                 PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
             )
-            if (pi != null) {
-                val am = ctx.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-                am.cancel(pi)
-                pi.cancel()
-            }
+            if (actPi != null) { am.cancel(actPi); actPi.cancel() }
+            // Annuler le PendingIntent Broadcast (chemin fallback setAndAllowWhileIdle)
+            val bcastPi = PendingIntent.getBroadcast(
+                ctx, id, Intent(ctx, AlarmReceiver::class.java),
+                PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+            )
+            if (bcastPi != null) { am.cancel(bcastPi); bcastPi.cancel() }
             removeAlarm(ctx, id)
         }
 
@@ -115,21 +119,6 @@ class AlarmSchedulerModule : Module() {
             context: Context, am: AlarmManager,
             id: Int, hour: Int, minute: Int, title: String, body: String
         ) {
-            // AlarmActivity (getActivity) au lieu de AlarmReceiver (getBroadcast) :
-            // les broadcasts sont bloqués/gelés par les OEM (TECNO, Infinix…) quand le processus
-            // est en arrière-plan. Les Activity lancées par setAlarmClock() bénéficient d'une
-            // exemption explicite Android et ne peuvent pas être bloquées.
-            val intent = Intent(context, AlarmActivity::class.java).apply {
-                putExtra(AlarmReceiver.EXTRA_ID,     id)
-                putExtra(AlarmReceiver.EXTRA_TITLE,  title)
-                putExtra(AlarmReceiver.EXTRA_BODY,   body)
-                putExtra(AlarmReceiver.EXTRA_HOUR,   hour)
-                putExtra(AlarmReceiver.EXTRA_MINUTE, minute)
-            }
-            val pi = PendingIntent.getActivity(
-                context, id, intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
             val cal = Calendar.getInstance().apply {
                 set(Calendar.HOUR_OF_DAY, hour)
                 set(Calendar.MINUTE,      minute)
@@ -140,11 +129,39 @@ class AlarmSchedulerModule : Module() {
             val canExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || am.canScheduleExactAlarms()
 
             if (canExact) {
+                // setAlarmClock + Activity : bénéficie d'une exemption Android explicite,
+                // les OEM ne peuvent pas bloquer une Activity issue de setAlarmClock().
+                val actIntent = Intent(context, AlarmActivity::class.java).apply {
+                    putExtra(AlarmReceiver.EXTRA_ID,     id)
+                    putExtra(AlarmReceiver.EXTRA_TITLE,  title)
+                    putExtra(AlarmReceiver.EXTRA_BODY,   body)
+                    putExtra(AlarmReceiver.EXTRA_HOUR,   hour)
+                    putExtra(AlarmReceiver.EXTRA_MINUTE, minute)
+                }
+                val pi = PendingIntent.getActivity(
+                    context, id, actIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
                 val showIntent = context.packageManager
                     .getLaunchIntentForPackage(context.packageName)
                     ?.let { PendingIntent.getActivity(context, id + 10000, it, PendingIntent.FLAG_IMMUTABLE) }
                 am.setAlarmClock(AlarmManager.AlarmClockInfo(cal.timeInMillis, showIntent), pi)
             } else {
+                // Fallback sans permission SCHEDULE_EXACT_ALARM :
+                // getBroadcast() au lieu de getActivity() — Android 10+ bloque le lancement
+                // d'une Activity depuis le fond, mais les BroadcastReceiver pour les alarmes
+                // sont exemptés et s'exécutent même app fermée.
+                val bcastIntent = Intent(context, AlarmReceiver::class.java).apply {
+                    putExtra(AlarmReceiver.EXTRA_ID,     id)
+                    putExtra(AlarmReceiver.EXTRA_TITLE,  title)
+                    putExtra(AlarmReceiver.EXTRA_BODY,   body)
+                    putExtra(AlarmReceiver.EXTRA_HOUR,   hour)
+                    putExtra(AlarmReceiver.EXTRA_MINUTE, minute)
+                }
+                val pi = PendingIntent.getBroadcast(
+                    context, id, bcastIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
                 am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, cal.timeInMillis, pi)
             }
         }
