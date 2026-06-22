@@ -78,6 +78,7 @@ const NOTIF_CHANNEL_ID      = 'niksante-rappels';
 const BATTERY_OPT_KEY       = '@niksante_battery_opt_requested';
 const AUTO_START_KEY        = '@niksante_autostart_requested';
 const ALARM_MIGRATED_KEY    = '@niksante_alarm_migrated_v2';
+const EXACT_ALARM_KEY       = '@niksante_exact_alarm_requested';
 
 // ---------------------------------------------------------------------------
 // Setup notifications
@@ -410,6 +411,24 @@ export default function ProfileScreen() {
                 text: 'Autoriser',
                 onPress: () => alarmScheduler.openBatteryOptimizationSettings().catch(() => {}),
               },
+            ],
+          );
+        }
+      }
+
+      // Vérifier SCHEDULE_EXACT_ALARM — sans cette permission les rappels peuvent
+      // avoir ±15 min de décalage. Guider l'utilisateur une seule fois.
+      const exactAlarmAsked = await AsyncStorage.getItem(EXACT_ALARM_KEY);
+      if (!exactAlarmAsked && Platform.OS === 'android') {
+        await AsyncStorage.setItem(EXACT_ALARM_KEY, 'true');
+        const canExact = await alarmScheduler.canScheduleExactAlarms().catch(() => true);
+        if (!canExact) {
+          Alert.alert(
+            'Rappels à l\'heure exacte',
+            'Pour recevoir vos rappels précisément à l\'heure choisie, autorisez NikSanté à programmer des alarmes exactes.',
+            [
+              { text: 'Plus tard', style: 'cancel' },
+              { text: 'Autoriser', onPress: () => alarmScheduler.openExactAlarmSettings().catch(() => {}) },
             ],
           );
         }

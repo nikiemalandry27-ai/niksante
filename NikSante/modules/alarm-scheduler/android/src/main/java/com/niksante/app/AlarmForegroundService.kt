@@ -58,9 +58,16 @@ class AlarmForegroundService : Service() {
             .setShowWhen(false)
             .build()
 
+        // shortService (API 34+) : ne nécessite pas d'approbation Google Play
+        // contrairement à systemExempted. Limité à 3 min mais suffisant pour
+        // maintenir le processus actif le temps que l'alarme se déclenche.
         if (Build.VERSION.SDK_INT >= 34) {
-            startForeground(NOTIF_ID, notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_SYSTEM_EXEMPTED)
+            try {
+                startForeground(NOTIF_ID, notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SHORT_SERVICE)
+            } catch (e: Exception) {
+                startForeground(NOTIF_ID, notification)
+            }
         } else {
             startForeground(NOTIF_ID, notification)
         }

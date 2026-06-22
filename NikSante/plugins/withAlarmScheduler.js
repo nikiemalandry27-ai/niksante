@@ -53,7 +53,7 @@ module.exports = function withAlarmScheduler(config) {
       app.service.push({
         $: {
           'android:name': '.AlarmForegroundService',
-          'android:foregroundServiceType': 'systemExempted',
+          'android:foregroundServiceType': 'shortService',
           'android:exported': 'false',
         },
       });
