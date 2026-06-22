@@ -34,6 +34,10 @@ function todayStr(): string {
   return new Date().toISOString().split('T')[0];
 }
 
+function yesterdayStr(): string {
+  return new Date(Date.now() - 86_400_000).toISOString().split('T')[0];
+}
+
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00');
   return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -131,7 +135,8 @@ export default function SleepScreen() {
   const [showGoalInfo,  setShowGoalInfo]  = useState(false);
 
   // ── Date sélectionnée ──────────────────────────────────────────────────────
-  const [selectedDate, setSelectedDate] = useState(todayStr());
+  // La nuit en cours n'est pas encore terminée — on part d'hier
+  const [selectedDate, setSelectedDate] = useState(yesterdayStr());
 
   const goToPrevDay = () => {
     const d = new Date(selectedDate + 'T12:00:00');
@@ -139,7 +144,7 @@ export default function SleepScreen() {
     setSelectedDate(d.toISOString().split('T')[0]);
   };
   const goToNextDay = () => {
-    if (selectedDate >= todayStr()) return;
+    if (selectedDate >= yesterdayStr()) return; // jamais au-delà d'hier
     const d = new Date(selectedDate + 'T12:00:00');
     d.setDate(d.getDate() + 1);
     setSelectedDate(d.toISOString().split('T')[0]);
@@ -297,14 +302,14 @@ export default function SleepScreen() {
               <ThemedText style={styles.dateNavArrow}>‹</ThemedText>
             </TouchableOpacity>
             <ThemedText style={styles.dateNavLabel}>
-              {selectedDate === todayStr() ? "Aujourd'hui" : formatDate(selectedDate)}
+              {selectedDate === yesterdayStr() ? 'Hier' : formatDate(selectedDate)}
             </ThemedText>
             <TouchableOpacity
               onPress={goToNextDay}
               style={styles.dateNavBtn}
-              disabled={selectedDate >= todayStr()}
+              disabled={selectedDate >= yesterdayStr()}
             >
-              <ThemedText style={[styles.dateNavArrow, selectedDate >= todayStr() && { color: '#ccc' }]}>›</ThemedText>
+              <ThemedText style={[styles.dateNavArrow, selectedDate >= yesterdayStr() && { color: '#ccc' }]}>›</ThemedText>
             </TouchableOpacity>
           </View>
 
