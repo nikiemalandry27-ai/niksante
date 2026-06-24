@@ -6,7 +6,7 @@ interface InsulinState {
   isLoading:   boolean;
 
   fetchHistory: (days?: number) => Promise<void>;
-  addEntry:    (dose: number, type: InsulinType, date: Date, note?: string) => Promise<InsulinEntry>;
+  addEntry:    (dose: number, type: InsulinType, date: Date, note?: string, productName?: string) => Promise<InsulinEntry>;
   deleteEntry: (id: string) => Promise<void>;
 
   getTodayTotals: () => Record<InsulinType, number>;
@@ -28,8 +28,8 @@ export const useInsulinStore = create<InsulinState>((set, get) => ({
     }
   },
 
-  addEntry: async (dose, type, date, note) => {
-    const entry = await insulinService.add(dose, type, date, note);
+  addEntry: async (dose, type, date, note, productName) => {
+    const entry = await insulinService.add(dose, type, date, note, productName);
     set(s => ({ history: [entry, ...s.history] }));
     return entry;
   },

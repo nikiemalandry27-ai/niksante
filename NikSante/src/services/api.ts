@@ -158,6 +158,7 @@ export interface InsulinEntry {
   type:           InsulinType;
   administeredAt: Date;
   note?:          string;
+  productName?:   string;
   createdAt:      Date;
 }
 
@@ -172,9 +173,11 @@ export const insulinService = {
     type:           InsulinType,
     administeredAt: Date,
     note?:          string,
+    productName?:   string,
   ): Promise<InsulinEntry> => {
     const { data } = await api.post<InsulinEntry>('/insulin', {
       dose_units: doseUnits, type, administered_at: administeredAt, note,
+      product_name: productName,
     });
     return data;
   },

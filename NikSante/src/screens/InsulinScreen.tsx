@@ -13,10 +13,10 @@ import { s, fs, vs } from '@/utils/responsive';
 // Constantes
 // ---------------------------------------------------------------------------
 
-const TYPE_META: Record<InsulinType, { label: string; color: string; desc: string; icon: string }> = {
-  rapide:   { label: 'Rapide',   color: '#1565C0', icon: '⚡', desc: 'Agit rapidement en 1 à 4h — à prendre avant les repas (NovoRapid, Humalog, Apidra…)' },
-  lente:    { label: 'Lente',    color: '#388E3C', icon: '🐢', desc: 'Agit sur la durée, 12 à 24h — maintient la glycémie de fond (Lantus, Levemir, Toujeo…)' },
-  premixte: { label: 'Prémixée', color: '#7B1FA2', icon: '🔀', desc: 'Mélange insuline rapide + lente en une seule injection (NovoMix, Mixtard…)' },
+const TYPE_META: Record<InsulinType, { label: string; color: string; desc: string; icon: string; placeholder: string }> = {
+  rapide:   { label: 'Rapide',   color: '#1565C0', icon: '⚡', desc: 'Agit rapidement en 1 à 4h — à prendre avant les repas', placeholder: 'Ex : NovoRapid, Humalog, Apidra…' },
+  lente:    { label: 'Lente',    color: '#388E3C', icon: '🐢', desc: 'Agit sur la durée, 12 à 24h — maintient la glycémie de fond', placeholder: 'Ex : Lantus, Levemir, Toujeo…' },
+  premixte: { label: 'Prémixée', color: '#7B1FA2', icon: '🔀', desc: 'Mélange insuline rapide + lente en une seule injection', placeholder: 'Ex : NovoMix, Mixtard, Ryzodeg…' },
 };
 
 const DAY_LABELS = ['Di', 'Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa'];
@@ -47,12 +47,13 @@ export default function InsulinScreen() {
   const isLoading    = useInsulinStore(s => s.isLoading);
   const getTodayTotals = useInsulinStore(s => s.getTodayTotals);
 
-  const [type, setType]     = useState<InsulinType>('rapide');
-  const [dose, setDose]     = useState(10);
-  const [hour, setHour]     = useState(new Date().getHours());
-  const [minute, setMinute] = useState(Math.round(new Date().getMinutes() / 5) * 5 % 60);
-  const [note, setNote]     = useState('');
-  const [saving, setSaving] = useState(false);
+  const [type, setType]             = useState<InsulinType>('rapide');
+  const [dose, setDose]             = useState(10);
+  const [hour, setHour]             = useState(new Date().getHours());
+  const [minute, setMinute]         = useState(Math.round(new Date().getMinutes() / 5) * 5 % 60);
+  const [note, setNote]             = useState('');
+  const [productName, setProductName] = useState('');
+  const [saving, setSaving]         = useState(false);
 
   useEffect(() => { fetchHistory(30); }, []);
 
@@ -64,9 +65,10 @@ export default function InsulinScreen() {
     try {
       const now   = new Date();
       const dated = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0);
-      await addEntry(dose, type, dated, note.trim() || undefined);
+      await addEntry(dose, type, dated, note.trim() || undefined, productName.trim() || undefined);
       setNote('');
-      Alert.alert('Enregistré', `${dose} u de ${TYPE_META[type].label} — ${String(hour).padStart(2,'0')}h${String(minute).padStart(2,'0')}`);
+      setProductName('');
+      Alert.alert('Enregistré', `${dose} u de ${TYPE_META[type].label}${productName.trim() ? ` (${productName.trim()})` : ''} — ${String(hour).padStart(2,'0')}h${String(minute).padStart(2,'0')}`);
     } catch {
       Alert.alert('Erreur', 'Impossible d\'enregistrer. Vérifiez votre connexion.');
     } finally {
@@ -151,6 +153,17 @@ export default function InsulinScreen() {
           <ThemedText style={[styles.typeDesc, { color: TYPE_META[type].color }]}>
             {TYPE_META[type].desc}
           </ThemedText>
+
+          {/* Nom du produit */}
+          <ThemedText style={styles.fieldLabel}>Nom du produit (optionnel)</ThemedText>
+          <TextInput
+            style={styles.noteInput}
+            value={productName}
+            onChangeText={setProductName}
+            placeholder={TYPE_META[type].placeholder}
+            placeholderTextColor="#ccc"
+            maxLength={60}
+          />
 
           {/* Dose */}
           <ThemedText style={styles.fieldLabel}>Dose (unités)</ThemedText>
@@ -261,6 +274,11 @@ export default function InsulinScreen() {
                             </ThemedText>
                           </View>
                         </View>
+                        {e.productName ? (
+                          <ThemedText style={[styles.entryProduct, { color: TYPE_META[e.type].color }]}>
+                            💊 {e.productName}
+                          </ThemedText>
+                        ) : null}
                         <ThemedText style={styles.entryTime}>
                           {formatTime(new Date(e.administeredAt))}
                         </ThemedText>
@@ -398,6 +416,7 @@ const styles = StyleSheet.create({
   entryDose:   { fontSize: fs(16), fontWeight: 'bold' },
   typePill:    { borderRadius: 8, paddingVertical: vs(2), paddingHorizontal: s(8) },
   typePillText:{ fontSize: fs(11), fontWeight: '700' },
+  entryProduct:{ fontSize: fs(12), fontWeight: '600', marginBottom: vs(1) },
   entryTime:   { fontSize: fs(11), color: '#bbb' },
   entryNote:   { fontSize: fs(11), color: '#999', fontStyle: 'italic', marginTop: vs(2) },
 

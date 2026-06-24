@@ -15,6 +15,7 @@ function toEntry(row) {
     type:           row.type,
     administeredAt: row.administered_at,
     note:           row.note,
+    productName:    row.product_name,
     createdAt:      row.created_at,
   };
 }
@@ -40,7 +41,7 @@ router.get('/', async (req, res) => {
 // POST /api/insulin
 router.post('/', async (req, res) => {
   try {
-    const { dose_units, type, administered_at, note } = req.body;
+    const { dose_units, type, administered_at, note, product_name } = req.body;
     if (!dose_units || !type || !administered_at) {
       return res.status(400).json({ error: 'dose_units, type et administered_at sont requis' });
     }
@@ -52,9 +53,9 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'dose_units doit être entre 0.5 et 300 unités' });
     }
     const { rows } = await pool.query(
-      `INSERT INTO insulin_entries (user_id, dose_units, type, administered_at, note)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [req.user.id, dose, type, administered_at, note || null],
+      `INSERT INTO insulin_entries (user_id, dose_units, type, administered_at, note, product_name)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [req.user.id, dose, type, administered_at, note || null, product_name || null],
     );
     res.status(201).json(toEntry(rows[0]));
   } catch (err) {

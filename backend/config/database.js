@@ -66,6 +66,11 @@ async function createTables() {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS push_token VARCHAR(255);
   `);
 
+  // Migration : ajout colonne product_name sur insulin_entries (idempotent)
+  await pool.query(`
+    ALTER TABLE insulin_entries ADD COLUMN IF NOT EXISTS product_name VARCHAR(100);
+  `);
+
   // Seed glycemic categories (idempotent)
   const categories = [
     ['water',                    0,  0,  'Eau et boissons sans calories'],
