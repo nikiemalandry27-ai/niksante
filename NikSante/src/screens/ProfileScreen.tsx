@@ -272,6 +272,8 @@ export default function ProfileScreen() {
   // ── Paramètres unité ─────────────────────────────────────────────────────
   const glucoseUnit    = useSettingsStore((s) => s.glucoseUnit);
   const setGlucoseUnit = useSettingsStore((s) => s.setGlucoseUnit);
+  const colorTheme     = useSettingsStore((s) => s.colorTheme);
+  const setColorTheme  = useSettingsStore((s) => s.setColorTheme);
 
   // ── Rappels ──────────────────────────────────────────────────────────────
   const [reminderModal, setReminderModal] = useState(false);
@@ -735,6 +737,32 @@ export default function ProfileScreen() {
                 thumbColor="#388E3C"
               />
               <ThemedText style={[styles.unitToggleLabel, glucoseUnit === 'mmol_l' && styles.unitToggleActive]}>mmol/L</ThemedText>
+            </View>
+          </View>
+        </View>
+
+        {/* ── Apparence ── */}
+        <View style={styles.section}>
+          <ThemedText style={styles.sectionTitle}>Apparence</ThemedText>
+          <View style={[styles.actionRow, styles.actionRowLast]}>
+            <ThemedText style={styles.actionIcon}>
+              {colorTheme === 'dark' ? '🌙' : '☀️'}
+            </ThemedText>
+            <View style={styles.actionInfo}>
+              <ThemedText style={styles.actionLabel}>Thème</ThemedText>
+              <ThemedText style={styles.actionDesc}>
+                {colorTheme === 'dark' ? 'Mode sombre' : colorTheme === 'light' ? 'Mode clair' : 'Automatique (système)'}
+              </ThemedText>
+            </View>
+            <View style={styles.unitToggleRow}>
+              <ThemedText style={[styles.unitToggleLabel, colorTheme !== 'dark' && styles.unitToggleActive]}>☀️</ThemedText>
+              <Switch
+                value={colorTheme === 'dark'}
+                onValueChange={(v) => setColorTheme(v ? 'dark' : 'light')}
+                trackColor={{ false: '#FDD835', true: '#455A64' }}
+                thumbColor={colorTheme === 'dark' ? '#CFD8DC' : '#fff'}
+              />
+              <ThemedText style={[styles.unitToggleLabel, colorTheme === 'dark' && styles.unitToggleActive]}>🌙</ThemedText>
             </View>
           </View>
         </View>
