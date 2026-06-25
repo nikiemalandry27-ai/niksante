@@ -99,7 +99,8 @@
             "resizeMode": "cover"
           }
         }
-      ]
+      ],
+      "expo-image"
     ],
     "experiments": {
       "typedRoutes": true,
