@@ -57,7 +57,8 @@ export async function registerForPushNotifications(): Promise<string | null> {
   try {
     const { data } = await Notifications.getExpoPushTokenAsync({ projectId: EXPO_PROJECT_ID });
     return data;
-  } catch {
+  } catch (e) {
+    console.error('[Notifs] getExpoPushTokenAsync:', e);
     return null;
   }
 }
@@ -65,8 +66,8 @@ export async function registerForPushNotifications(): Promise<string | null> {
 export async function sendTokenToBackend(token: string): Promise<void> {
   try {
     await api.post('/notifications/register', { token });
-  } catch {
-    // silencieux
+  } catch (e) {
+    console.error('[Notifs] sendTokenToBackend:', e);
   }
 }
 
