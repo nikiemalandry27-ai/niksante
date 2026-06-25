@@ -322,24 +322,24 @@ export default function DashboardScreen() {
         {hba1c ? (
           <View style={[styles.hba1cCard, { backgroundColor: theme.card }]}>
             <View style={styles.hba1cHeader}>
-              <ThemedText style={styles.hba1cTitle}>HbA1c ESTIMÉ</ThemedText>
+              <ThemedText style={[styles.hba1cTitle, { color: theme.text }]}>HbA1c ESTIMÉ</ThemedText>
               <View style={[styles.hba1cBadge, { backgroundColor: hba1c.color + '20', borderColor: hba1c.color }]}>
                 <ThemedText style={[styles.hba1cBadgeText, { color: hba1c.color }]}>{hba1c.label}</ThemedText>
               </View>
             </View>
             <View style={styles.hba1cValueRow}>
               <ThemedText style={[styles.hba1cValue, { color: hba1c.color }]}>{hba1c.value.toFixed(1)}</ThemedText>
-              <ThemedText style={styles.hba1cUnit}> %</ThemedText>
+              <ThemedText style={[styles.hba1cUnit, { color: theme.muted }]}> %</ThemedText>
             </View>
-            <ThemedText style={styles.hba1cAdvice}>{hba1c.advice}</ThemedText>
-            <ThemedText style={styles.hba1cBase}>
+            <ThemedText style={[styles.hba1cAdvice, { color: theme.muted }]}>{hba1c.advice}</ThemedText>
+            <ThemedText style={[styles.hba1cBase, { color: theme.muted }]}>
               Estimation basée sur {hba1c.basedOnCount} mesures sur 90 jours
             </ThemedText>
           </View>
         ) : glucoseHistory.length > 0 && glucoseHistory.length < 14 && (
           <View style={[styles.hba1cCard, { backgroundColor: theme.card }]}>
-            <ThemedText style={styles.hba1cTitle}>HbA1c ESTIMÉ</ThemedText>
-            <ThemedText style={styles.hba1cBase}>
+            <ThemedText style={[styles.hba1cTitle, { color: theme.text }]}>HbA1c ESTIMÉ</ThemedText>
+            <ThemedText style={[styles.hba1cBase, { color: theme.muted }]}>
               Données insuffisantes — il faut au moins 14 mesures sur 90 jours ({glucoseHistory.length} enregistrée{glucoseHistory.length > 1 ? 's' : ''}).
             </ThemedText>
           </View>

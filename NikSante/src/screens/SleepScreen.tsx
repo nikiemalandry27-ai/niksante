@@ -62,7 +62,8 @@ interface TimePickerProps {
 }
 
 function TimePicker({ label, value, onChange }: TimePickerProps) {
-  const [h, m] = value.split(':').map(Number);
+  const theme    = useTheme();
+  const [h, m]   = value.split(':').map(Number);
 
   const setH = (next: number) => {
     const c = ((next % 24) + 24) % 24;
@@ -78,27 +79,27 @@ function TimePicker({ label, value, onChange }: TimePickerProps) {
       <ThemedText style={tp.label}>{label}</ThemedText>
       <View style={tp.row}>
         <View style={tp.col}>
-          <TouchableOpacity style={tp.btn} onPress={() => setH(h + 1)}>
+          <TouchableOpacity style={[tp.btn, { backgroundColor: theme.backgroundElement }]} onPress={() => setH(h + 1)}>
             <ThemedText style={tp.arrow}>▲</ThemedText>
           </TouchableOpacity>
-          <View style={tp.display}>
-            <ThemedText style={tp.digit}>{String(h).padStart(2, '0')}</ThemedText>
+          <View style={[tp.display, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <ThemedText style={[tp.digit, { color: theme.text }]}>{String(h).padStart(2, '0')}</ThemedText>
           </View>
-          <TouchableOpacity style={tp.btn} onPress={() => setH(h - 1)}>
+          <TouchableOpacity style={[tp.btn, { backgroundColor: theme.backgroundElement }]} onPress={() => setH(h - 1)}>
             <ThemedText style={tp.arrow}>▼</ThemedText>
           </TouchableOpacity>
         </View>
 
-        <ThemedText style={tp.colon}>:</ThemedText>
+        <ThemedText style={[tp.colon, { color: theme.text }]}>:</ThemedText>
 
         <View style={tp.col}>
-          <TouchableOpacity style={tp.btn} onPress={() => setM(m + 5)}>
+          <TouchableOpacity style={[tp.btn, { backgroundColor: theme.backgroundElement }]} onPress={() => setM(m + 5)}>
             <ThemedText style={tp.arrow}>▲</ThemedText>
           </TouchableOpacity>
-          <View style={tp.display}>
-            <ThemedText style={tp.digit}>{String(m).padStart(2, '0')}</ThemedText>
+          <View style={[tp.display, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <ThemedText style={[tp.digit, { color: theme.text }]}>{String(m).padStart(2, '0')}</ThemedText>
           </View>
-          <TouchableOpacity style={tp.btn} onPress={() => setM(m - 5)}>
+          <TouchableOpacity style={[tp.btn, { backgroundColor: theme.backgroundElement }]} onPress={() => setM(m - 5)}>
             <ThemedText style={tp.arrow}>▼</ThemedText>
           </TouchableOpacity>
         </View>
@@ -369,9 +370,9 @@ export default function SleepScreen() {
 
           {/* Notes */}
           <TextInput
-            style={styles.notesInput}
+            style={[styles.notesInput, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
             placeholder="Notes (optionnel)..."
-            placeholderTextColor="#bbb"
+            placeholderTextColor={theme.muted}
             value={notes}
             onChangeText={setNotes}
             multiline
@@ -528,7 +529,7 @@ const styles = StyleSheet.create({
   // Header
   header:    { paddingHorizontal: s(20), paddingTop: vs(20), paddingBottom: vs(8) },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: vs(4) },
-  title:     { fontSize: fs(20), fontWeight: 'bold', color: '#1a1a1a' },
+  title:     { fontSize: fs(20), fontWeight: 'bold' },
   chronoBadge: {
     flexDirection: 'row', alignItems: 'center', gap: s(4),
     backgroundColor: '#EDE7F6', borderRadius: 20,
@@ -561,7 +562,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1, borderTopColor: '#f0f0f0',
   },
   goalInfoTitle: { fontSize: fs(12), fontWeight: '800', color: '#1565C0', marginBottom: vs(8) },
-  goalInfoText:  { fontSize: fs(11), color: '#555', lineHeight: vs(18), marginBottom: vs(4) },
+  goalInfoText:  { fontSize: fs(11), lineHeight: vs(18), marginBottom: vs(4) },
   goalInfoBold:  { fontWeight: '700', color: '#1565C0' },
 
   // Conseil du jour
@@ -571,7 +572,7 @@ const styles = StyleSheet.create({
     elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3,
   },
   tipTitle: { fontSize: fs(9), color: '#aaa', fontWeight: '700', letterSpacing: 0.8, marginBottom: vs(6) },
-  tipText:  { fontSize: fs(13), color: '#333', lineHeight: vs(20) },
+  tipText:  { fontSize: fs(13), lineHeight: vs(20) },
 
   infoBtn:      { width: s(22), height: s(22), borderRadius: s(11), backgroundColor: '#1565C0', alignItems: 'center', justifyContent: 'center' },
   infoBtnText:  { fontSize: fs(12), fontWeight: '900', color: '#fff' },
@@ -610,12 +611,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff', borderRadius: 16, padding: s(18),
     elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3,
   },
-  sectionTitle: { fontSize: fs(13), fontWeight: '700', color: '#555', letterSpacing: 0.3, marginBottom: vs(14) },
+  sectionTitle: { fontSize: fs(13), fontWeight: '700', letterSpacing: 0.3, marginBottom: vs(14) },
 
   dateNav:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: vs(16), backgroundColor: '#f5f5f5', borderRadius: 12, paddingVertical: vs(8) },
   dateNavBtn:   { paddingHorizontal: s(16), paddingVertical: vs(4) },
   dateNavArrow: { fontSize: fs(22), color: '#388E3C', fontWeight: 'bold' },
-  dateNavLabel: { fontSize: fs(13), fontWeight: '700', color: '#333', textTransform: 'capitalize', flex: 1, textAlign: 'center' },
+  dateNavLabel: { fontSize: fs(13), fontWeight: '700', textTransform: 'capitalize', flex: 1, textAlign: 'center' },
 
   timeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: vs(18) },
   durationPill: { backgroundColor: '#E8F5E9', borderRadius: 20, paddingVertical: vs(8), paddingHorizontal: s(12), alignItems: 'center' },
@@ -660,7 +661,7 @@ const styles = StyleSheet.create({
     elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 2,
   },
   insightTitle: { fontSize: fs(13), fontWeight: 'bold', marginBottom: vs(4) },
-  insightMsg:   { fontSize: fs(12), color: '#555', lineHeight: vs(18) },
+  insightMsg:   { fontSize: fs(12), lineHeight: vs(18) },
 
   // Historique
   historyItem: {
@@ -670,8 +671,8 @@ const styles = StyleSheet.create({
     elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 2,
   },
   historyTop:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: vs(4) },
-  historyDate:     { fontSize: fs(12), fontWeight: '700', color: '#333', flex: 1 },
-  historyDuration: { fontSize: fs(12), color: '#666', marginBottom: vs(2) },
+  historyDate:     { fontSize: fs(12), fontWeight: '700', flex: 1 },
+  historyDuration: { fontSize: fs(12), marginBottom: vs(2) },
   historyWake:     { fontSize: fs(11), color: '#888', marginBottom: vs(2) },
   historyNote:     { fontSize: fs(11), color: '#999', fontStyle: 'italic', marginTop: vs(2) },
   qualityTag:      { borderRadius: 8, paddingVertical: vs(2), paddingHorizontal: s(8) },

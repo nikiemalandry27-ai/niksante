@@ -23,6 +23,7 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { alarmScheduler, ALARM_IDS } from '@/services/alarmScheduler';
+import * as Notifications from 'expo-notifications';
 
 import { useAuthStore }    from '@/store/authStore';
 import { useGlucoseStore } from '@/store/glucoseStore';
@@ -87,17 +88,16 @@ const EXACT_ALARM_KEY       = '@niksante_exact_alarm_requested';
 
 async function setupNotifications(): Promise<void> {
   try {
-    const Notifs = require('expo-notifications');
-    await Notifs.setNotificationChannelAsync(NOTIF_CHANNEL_ID, {
+    await Notifications.setNotificationChannelAsync(NOTIF_CHANNEL_ID, {
       name:                 'Rappels glycémie',
-      importance:           Notifs.AndroidImportance.MAX,
+      importance:           Notifications.AndroidImportance.MAX,
       vibrationPattern:     [0, 250, 250, 250],
       lightColor:           '#388E3C',
       sound:                true,
       enableVibrate:        true,
       enableLights:         true,
       showBadge:            false,
-      lockscreenVisibility: Notifs.AndroidNotificationVisibility.PUBLIC,
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       bypassDnd:            false,
     });
   } catch (e) {
@@ -108,12 +108,10 @@ async function setupNotifications(): Promise<void> {
 async function scheduleReminder(key: ReminderKey, hour: number, minute: number): Promise<number | null> {
   const def = REMINDER_DEFS[key];
   try {
-    const Notifs = require('expo-notifications');
-
     // 1. Permission POST_NOTIFICATIONS (Android 13+)
-    const perms = await Notifs.getPermissionsAsync();
+    const perms = await Notifications.getPermissionsAsync();
     if (perms.status !== 'granted') {
-      const { status } = await Notifs.requestPermissionsAsync();
+      const { status } = await Notifications.requestPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert(
           'Permission requise',
@@ -293,8 +291,7 @@ export default function ProfileScreen() {
       if (!migrated) {
         try {
           // Annule toutes les anciennes notifications expo-notifications
-          const Notifs = require('expo-notifications');
-          await Notifs.cancelAllScheduledNotificationsAsync();
+          await Notifications.cancelAllScheduledNotificationsAsync();
         } catch { /* silencieux si expo-notifications indisponible */ }
 
         // Remet tous les rappels à zéro (les heures perso sont conservées)
@@ -1165,12 +1162,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: s(16),
     paddingVertical:  vs(14),
     borderTopWidth:   1,
-    borderTopColor:   '#f5f5f5',
+    borderTopColor:   'rgba(128,128,128,0.15)',
     gap:              s(12),
   },
   actionRowLast: {
     borderBottomWidth: 1,
-    borderBottomColor: '#f5f5f5',
+    borderBottomColor: 'rgba(128,128,128,0.15)',
     borderRadius: 14,
   },
   actionIcon: {
@@ -1182,7 +1179,6 @@ const styles = StyleSheet.create({
   actionLabel: {
     fontSize:   fs(15),
     fontWeight: '600',
-    color:      '#222',
   },
   actionDesc: {
     fontSize:  fs(12),
@@ -1191,7 +1187,7 @@ const styles = StyleSheet.create({
   },
   actionChevron: {
     fontSize: fs(22),
-    color:    '#ccc',
+    color:    '#888',
     fontWeight: '300',
   },
   soonBadge: {

@@ -209,15 +209,29 @@ export function getDailyTip(entries: SleepEntry[], debt: SleepDebt | null): Dail
     };
   }
 
-  // Conseil générique selon le jour de la semaine
+  // Conseil générique — 21 conseils = 3 semaines sans répétition
   const tips: DailyTip[] = [
     { icon: '📱', color: '#F57C00', text: 'Éteignez les écrans 30 min avant de dormir : la lumière bleue retarde la mélatonine de 1 à 3h.' },
     { icon: '🌡️', color: '#1565C0', text: 'La température idéale pour dormir est 17–19 °C — une chambre fraîche favorise le sommeil profond.' },
-    { icon: '☕', color: '#795548', text: 'La caféine reste active 6–8h dans l\'organisme. Évitez-la après 14h pour ne pas perturber l\'endormissement.' },
+    { icon: '☕', color: '#795548', text: 'La caféine reste active 6–8h. Évitez-la après 14h pour ne pas perturber votre endormissement.' },
     { icon: '🧘', color: '#388E3C', text: '5 min de respiration profonde avant de dormir (4 s inspire, 6 s expire) réduisent le cortisol et facilitent l\'endormissement.' },
-    { icon: '💧', color: '#1565C0', text: 'Une bonne hydratation dans la journée (1,5 L) améliore la qualité du sommeil profond. Évitez de boire après 20h.' },
-    { icon: '🏃', color: '#388E3C', text: 'L\'exercice physique améliore le sommeil profond de 10–15 %. Mais évitez l\'effort intense dans les 2h avant de dormir.' },
+    { icon: '💧', color: '#1565C0', text: 'Une bonne hydratation dans la journée (1,5 L) améliore le sommeil profond. Évitez de boire après 20h.' },
+    { icon: '🏃', color: '#388E3C', text: 'L\'exercice améliore le sommeil profond de 10–15 %. Évitez l\'effort intense dans les 2h avant de dormir.' },
     { icon: '🌙', color: '#7B1FA2', text: 'Une routine pré-sommeil fixe (lecture, douche tiède, obscurité) conditionne le cerveau à s\'endormir plus vite.' },
+    { icon: '🍽️', color: '#E65100', text: 'Évitez les repas copieux 2–3h avant de dormir — la digestion active perturbe le sommeil et peut faire fluctuer la glycémie nocturne.' },
+    { icon: '🌅', color: '#F9A825', text: 'Exposez-vous à la lumière naturelle le matin : elle synchronise votre horloge interne et améliore la qualité du sommeil la nuit suivante.' },
+    { icon: '📝', color: '#1565C0', text: 'Notez 3 tâches pour demain avant de vous coucher — vider l\'esprit réduit les pensées intrusives nocturnes et raccourcit l\'endormissement.' },
+    { icon: '🚿', color: '#0277BD', text: 'Une douche tiède 1–2h avant de dormir abaisse la température corporelle, déclenchant naturellement la somnolence.' },
+    { icon: '🩺', color: '#7B1FA2', text: 'Pour les diabétiques, une glycémie stable au coucher (1,2–1,8 g/L) favorise un sommeil sans réveil nocturne lié à une hypoglycémie.' },
+    { icon: '🍌', color: '#F9A825', text: 'Une collation légère à faible IG (amandes, fromage blanc) avant le coucher peut stabiliser la glycémie nocturne et éviter les hypoglycémies.' },
+    { icon: '😴', color: '#512DA8', text: 'Le sommeil paradoxal (REM) — crucial pour la mémoire et les hormones — se concentre en 2e moitié de nuit. Ne raccourcissez pas vos nuits.' },
+    { icon: '🌿', color: '#2E7D32', text: 'L\'obscurité totale décuple la production de mélatonine. Des rideaux occultants peuvent augmenter votre durée de sommeil profond.' },
+    { icon: '⏰', color: '#F57C00', text: 'Même le week-end, décalez votre réveil de 1h max. Plus de variation crée un "jet lag social" qui perturbe la régulation glycémique.' },
+    { icon: '🫁', color: '#B71C1C', text: 'L\'apnée du sommeil touche 2× plus les diabétiques. Si vous ronflez et êtes fatigué malgré 8h de sommeil, consultez votre médecin.' },
+    { icon: '🍷', color: '#880E4F', text: 'L\'alcool aide à s\'endormir mais détériore le sommeil profond et augmente le risque d\'hypoglycémie nocturne. À éviter la veille.' },
+    { icon: '💪', color: '#1B5E20', text: 'Le magnésium (amandes, épinards, banane) favorise la relaxation musculaire et améliore la qualité du sommeil — une petite portion en soirée.' },
+    { icon: '🎯', color: '#1565C0', text: 'Dormir et se lever à la même heure chaque jour réduit la résistance à l\'insuline et stabilise la glycémie à jeun du lendemain matin.' },
+    { icon: '🎵', color: '#6A1B9A', text: 'Musique douce ou bruit blanc avant de dormir : ces sons peuvent réduire le temps d\'endormissement de 10–15 min en calmant le système nerveux.' },
   ];
 
   return tips[today.getDate() % tips.length];

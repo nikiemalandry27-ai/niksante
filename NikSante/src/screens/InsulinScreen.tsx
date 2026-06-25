@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  View, ScrollView, TouchableOpacity, TextInput, Text,
+  View, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Alert, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -174,17 +174,17 @@ export default function InsulinScreen() {
               style={styles.doseBtn}
               onPress={() => setDose(d => Math.max(0.5, d - 0.5))}
             >
-              <Text style={styles.doseBtnText}>−</Text>
+              <ThemedText style={styles.doseBtnText}>−</ThemedText>
             </TouchableOpacity>
-            <View style={styles.doseDisplay}>
-              <Text style={styles.doseValue}>{dose}</Text>
-              <Text style={styles.doseUnit}>u</Text>
+            <View style={[styles.doseDisplay, { backgroundColor: theme.card }]}>
+              <ThemedText style={[styles.doseValue, { color: theme.text }]}>{dose}</ThemedText>
+              <ThemedText style={[styles.doseUnit, { color: theme.muted }]}>u</ThemedText>
             </View>
             <TouchableOpacity
               style={styles.doseBtn}
               onPress={() => setDose(d => Math.min(300, d + 0.5))}
             >
-              <Text style={styles.doseBtnText}>+</Text>
+              <ThemedText style={styles.doseBtnText}>+</ThemedText>
             </TouchableOpacity>
           </View>
 
@@ -196,18 +196,18 @@ export default function InsulinScreen() {
               <TouchableOpacity onPress={() => setHour(h => (h + 1) % 24)} style={styles.timeArrowBtn}>
                 <ThemedText style={styles.timeArrow}>▲</ThemedText>
               </TouchableOpacity>
-              <ThemedText style={styles.timeDigit}>{String(hour).padStart(2, '0')}</ThemedText>
+              <ThemedText style={[styles.timeDigit, { color: theme.text }]}>{String(hour).padStart(2, '0')}</ThemedText>
               <TouchableOpacity onPress={() => setHour(h => (h - 1 + 24) % 24)} style={styles.timeArrowBtn}>
                 <ThemedText style={styles.timeArrow}>▼</ThemedText>
               </TouchableOpacity>
             </View>
-            <ThemedText style={styles.timeColon}>:</ThemedText>
+            <ThemedText style={[styles.timeColon, { color: theme.text }]}>:</ThemedText>
             {/* Minutes */}
             <View style={styles.timeCol}>
               <TouchableOpacity onPress={() => setMinute(m => (m + 5) % 60)} style={styles.timeArrowBtn}>
                 <ThemedText style={styles.timeArrow}>▲</ThemedText>
               </TouchableOpacity>
-              <ThemedText style={styles.timeDigit}>{String(minute).padStart(2, '0')}</ThemedText>
+              <ThemedText style={[styles.timeDigit, { color: theme.text }]}>{String(minute).padStart(2, '0')}</ThemedText>
               <TouchableOpacity onPress={() => setMinute(m => (m - 5 + 60) % 60)} style={styles.timeArrowBtn}>
                 <ThemedText style={styles.timeArrow}>▼</ThemedText>
               </TouchableOpacity>
