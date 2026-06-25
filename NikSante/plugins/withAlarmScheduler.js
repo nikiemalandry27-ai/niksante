@@ -48,17 +48,6 @@ module.exports = function withAlarmScheduler(config) {
       });
     }
 
-    if (!app.service) app.service = [];
-    if (!app.service.some(s => s.$?.['android:name'] === '.AlarmForegroundService')) {
-      app.service.push({
-        $: {
-          'android:name': '.AlarmForegroundService',
-          'android:foregroundServiceType': 'shortService',
-          'android:exported': 'false',
-        },
-      });
-    }
-
     return config;
   });
 

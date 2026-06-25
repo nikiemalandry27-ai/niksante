@@ -339,7 +339,7 @@ export default function ProfileScreen() {
         const parsed = JSON.parse(rawReminders) as Record<ReminderKey, boolean>;
         setReminders(parsed);
         if (Object.values(parsed).some(Boolean)) {
-          alarmScheduler.startKeepaliveService().catch(() => {});
+          // keepalive service supprimé — setAlarmClock() est déjà exempt de battery optimization
         }
       }
       if (rawIds) {
@@ -399,8 +399,6 @@ export default function ProfileScreen() {
 
       // Ne marquer actif QUE si la planification a réussi
       if (!id) return;
-
-      alarmScheduler.startKeepaliveService().catch(() => {});
 
       const updatedIds = { ...notifIds, [key]: id };
       setNotifIds(updatedIds);
@@ -485,7 +483,7 @@ export default function ProfileScreen() {
       const updated = { ...reminders, [key]: false };
       const anyActive = Object.values(updated).some(Boolean);
       if (!anyActive) {
-        alarmScheduler.stopKeepaliveService().catch(() => {});
+        // keepalive service supprimé — aucune action nécessaire
       }
       setReminders(updated);
       await AsyncStorage.setItem(REMINDER_STORAGE_KEY, JSON.stringify(updated));

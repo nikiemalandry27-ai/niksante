@@ -100,15 +100,6 @@ class AlarmSchedulerModule : Module() {
             }
         }
 
-        AsyncFunction("startKeepaliveService") {
-            val ctx = this@AlarmSchedulerModule.appContext.reactContext
-            if (ctx != null) AlarmForegroundService.start(ctx)
-        }
-
-        AsyncFunction("stopKeepaliveService") {
-            val ctx = this@AlarmSchedulerModule.appContext.reactContext
-            if (ctx != null) AlarmForegroundService.stop(ctx)
-        }
     }
 
     companion object {

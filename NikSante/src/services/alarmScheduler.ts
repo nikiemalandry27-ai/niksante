@@ -10,8 +10,6 @@ type AlarmSchedulerNative = {
   openBatteryOptimizationSettings(): Promise<void>;
   getManufacturer(): Promise<string>;
   openAppSettings(): Promise<void>;
-  startKeepaliveService(): Promise<void>;
-  stopKeepaliveService(): Promise<void>;
 };
 
 const Native = requireOptionalNativeModule<AlarmSchedulerNative>('AlarmScheduler');
@@ -67,13 +65,4 @@ export const alarmScheduler = {
     return Native.openAppSettings();
   },
 
-  startKeepaliveService: async (): Promise<void> => {
-    if (Platform.OS !== 'android' || !Native) return;
-    return Native.startKeepaliveService();
-  },
-
-  stopKeepaliveService: async (): Promise<void> => {
-    if (Platform.OS !== 'android' || !Native) return;
-    return Native.stopKeepaliveService();
-  },
 };
