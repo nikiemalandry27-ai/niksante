@@ -5,7 +5,8 @@
  */
 
 import { Tabs } from 'expo-router';
-import { Image, Platform, Text, useColorScheme } from 'react-native';
+import { Image, Platform, Text } from 'react-native';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabsLayout() {

@@ -87,14 +87,6 @@ const EXACT_ALARM_KEY       = '@niksante_exact_alarm_requested';
 async function setupNotifications(): Promise<void> {
   try {
     const Notifs = require('expo-notifications');
-    Notifs.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge:  false,
-        priority:        Notifs.AndroidNotificationPriority.MAX,
-      }),
-    });
     await Notifs.setNotificationChannelAsync(NOTIF_CHANNEL_ID, {
       name:                 'Rappels glycémie',
       importance:           Notifs.AndroidImportance.MAX,

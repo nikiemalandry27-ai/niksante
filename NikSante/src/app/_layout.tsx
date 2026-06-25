@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { ThemeProvider, DefaultTheme, DarkTheme } from 'expo-router';
 import {
-  useColorScheme, View, Text, Animated,
+  View, Text, Animated,
   StyleSheet, Dimensions,
 } from 'react-native';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import * as SplashScreen from 'expo-splash-screen';
 
 import { useAuthStore }     from '@/store/authStore';
