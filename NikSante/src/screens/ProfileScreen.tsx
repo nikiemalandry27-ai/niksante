@@ -31,6 +31,7 @@ import { getGlucoseStatus, getStatusColor, formatGlucose, unitLabel } from '@/ut
 import { GLUCOSE_THRESHOLDS } from '@/utils/constants';
 import { getTimeInRange, getConsistencyScore } from '@/utils/glucoseAnalysis';
 import { ThemedText } from '@/components/themed-text';
+import { useTheme } from '@/hooks/use-theme';
 import { s, fs, vs } from '@/utils/responsive';
 
 // ---------------------------------------------------------------------------
@@ -266,6 +267,7 @@ export default function ProfileScreen() {
   const setGlucoseUnit = useSettingsStore((s) => s.setGlucoseUnit);
   const colorTheme     = useSettingsStore((s) => s.colorTheme);
   const setColorTheme  = useSettingsStore((s) => s.setColorTheme);
+  const theme          = useTheme();
 
   // ── Rappels ──────────────────────────────────────────────────────────────
   const [reminderModal, setReminderModal] = useState(false);
@@ -567,11 +569,11 @@ export default function ProfileScreen() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.screenBg }]}>
       <ScrollView showsVerticalScrollIndicator={false}>
 
         {/* ── Avatar + nom ── */}
-        <View style={styles.heroSection}>
+        <View style={[styles.heroSection, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
           <View style={styles.avatar}>
             <ThemedText style={styles.avatarText}>
               {user?.name?.charAt(0).toUpperCase() ?? '?'}
@@ -623,7 +625,7 @@ export default function ProfileScreen() {
         {glucoseHistory.length > 0 && (
           <View style={styles.section}>
             <ThemedText style={styles.sectionTitle}>Contrôle glycémique</ThemedText>
-            <View style={styles.card}>
+            <View style={[styles.card, { backgroundColor: theme.card }]}>
               {/* Score badge + label */}
               <View style={styles.tirScoreRow}>
                 <View>
@@ -660,7 +662,7 @@ export default function ProfileScreen() {
         {glucoseHistory.length > 0 && (
           <View style={styles.section}>
             <ThemedText style={styles.sectionTitle}>Répartition des mesures</ThemedText>
-            <View style={styles.card}>
+            <View style={[styles.card, { backgroundColor: theme.card }]}>
               <RepartitionRow
                 label="Hypoglycémies"
                 count={hypoCount}
@@ -696,7 +698,7 @@ export default function ProfileScreen() {
           ].map((item) => (
             <TouchableOpacity
               key={item.route}
-              style={styles.actionRow}
+              style={[styles.actionRow, { backgroundColor: theme.card }]}
               onPress={() => router.push(item.route as any)}
             >
               <ThemedText style={styles.actionIcon}>{item.icon}</ThemedText>
@@ -712,7 +714,7 @@ export default function ProfileScreen() {
         {/* ── Unité de mesure ── */}
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Unité de mesure</ThemedText>
-          <View style={[styles.actionRow, styles.actionRowLast]}>
+          <View style={[styles.actionRow, styles.actionRowLast, { backgroundColor: theme.card }]}>
             <ThemedText style={styles.actionIcon}>📏</ThemedText>
             <View style={styles.actionInfo}>
               <ThemedText style={styles.actionLabel}>Unité glycémie</ThemedText>
@@ -736,7 +738,7 @@ export default function ProfileScreen() {
         {/* ── Apparence ── */}
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Apparence</ThemedText>
-          <View style={[styles.actionRow, styles.actionRowLast]}>
+          <View style={[styles.actionRow, styles.actionRowLast, { backgroundColor: theme.card }]}>
             <ThemedText style={styles.actionIcon}>
               {colorTheme === 'dark' ? '🌙' : '☀️'}
             </ThemedText>
@@ -762,7 +764,7 @@ export default function ProfileScreen() {
         {/* ── Communauté ── */}
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Communauté</ThemedText>
-          <TouchableOpacity style={styles.actionRow} onPress={handleShare}>
+          <TouchableOpacity style={[styles.actionRow, { backgroundColor: theme.card }]} onPress={handleShare}>
             <ThemedText style={styles.actionIcon}>📤</ThemedText>
             <View style={styles.actionInfo}>
               <ThemedText style={styles.actionLabel}>Partager avec des amis</ThemedText>
@@ -770,7 +772,7 @@ export default function ProfileScreen() {
             </View>
             <ThemedText style={styles.actionChevron}>›</ThemedText>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionRow, styles.actionRowLast]} onPress={handleRate}>
+          <TouchableOpacity style={[styles.actionRow, styles.actionRowLast, { backgroundColor: theme.card }]} onPress={handleRate}>
             <ThemedText style={styles.actionIcon}>⭐</ThemedText>
             <View style={styles.actionInfo}>
               <ThemedText style={styles.actionLabel}>Noter l'application</ThemedText>
@@ -783,7 +785,7 @@ export default function ProfileScreen() {
         {/* ── Légal ── */}
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Informations légales</ThemedText>
-          <TouchableOpacity style={styles.actionRow} onPress={() => setLegalModal('privacy')}>
+          <TouchableOpacity style={[styles.actionRow, { backgroundColor: theme.card }]} onPress={() => setLegalModal('privacy')}>
             <ThemedText style={styles.actionIcon}>🔒</ThemedText>
             <View style={styles.actionInfo}>
               <ThemedText style={styles.actionLabel}>Politique de confidentialité</ThemedText>
@@ -791,7 +793,7 @@ export default function ProfileScreen() {
             </View>
             <ThemedText style={styles.actionChevron}>›</ThemedText>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionRow, styles.actionRowLast]} onPress={() => setLegalModal('terms')}>
+          <TouchableOpacity style={[styles.actionRow, styles.actionRowLast, { backgroundColor: theme.card }]} onPress={() => setLegalModal('terms')}>
             <ThemedText style={styles.actionIcon}>📄</ThemedText>
             <View style={styles.actionInfo}>
               <ThemedText style={styles.actionLabel}>Conditions d'utilisation</ThemedText>
@@ -805,7 +807,7 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Gestion du compte</ThemedText>
 
-          <TouchableOpacity style={styles.actionRow} onPress={handleClearHistory}>
+          <TouchableOpacity style={[styles.actionRow, { backgroundColor: theme.card }]} onPress={handleClearHistory}>
             <ThemedText style={styles.actionIcon}>🗑️</ThemedText>
             <View style={styles.actionInfo}>
               <ThemedText style={styles.actionLabel}>Vider l'historique</ThemedText>
@@ -816,7 +818,7 @@ export default function ProfileScreen() {
             <ThemedText style={styles.actionChevron}>›</ThemedText>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.actionRow, styles.actionRowLast]} onPress={() => setReminderModal(true)}>
+          <TouchableOpacity style={[styles.actionRow, styles.actionRowLast, { backgroundColor: theme.card }]} onPress={() => setReminderModal(true)}>
             <ThemedText style={styles.actionIcon}>🔔</ThemedText>
             <View style={styles.actionInfo}>
               <ThemedText style={styles.actionLabel}>Rappels de mesure</ThemedText>
@@ -897,7 +899,7 @@ export default function ProfileScreen() {
           activeOpacity={1}
           onPress={() => setLegalModal(null)}
         />
-        <View style={[modalStyles.sheet, { maxHeight: '80%' }]}>
+        <View style={[modalStyles.sheet, { maxHeight: '80%', backgroundColor: theme.card }]}>
           <View style={modalStyles.handle} />
           <ThemedText style={modalStyles.title}>
             {legalModal === 'privacy' ? '🔒  Politique de confidentialité' : '📄  Conditions d\'utilisation'}
@@ -928,7 +930,7 @@ export default function ProfileScreen() {
           activeOpacity={1}
           onPress={() => setReminderModal(false)}
         />
-        <View style={[modalStyles.sheet, { maxHeight: '90%' }]}>
+        <View style={[modalStyles.sheet, { maxHeight: '90%', backgroundColor: theme.card }]}>
           <View style={modalStyles.handle} />
           <ThemedText style={modalStyles.title}>🔔  Rappels de mesure</ThemedText>
           <ThemedText style={modalStyles.subtitle}>

@@ -38,6 +38,7 @@ import {
 } from '@/utils/glucoseAnalysis';
 import GlucoseChart from '@/components/glucose-chart';
 import { ThemedText } from '@/components/themed-text';
+import { useTheme } from '@/hooks/use-theme';
 import { s, fs, vs } from '@/utils/responsive';
 
 // ---------------------------------------------------------------------------
@@ -108,6 +109,7 @@ function sleepScoreColor(score: number): string {
 
 export default function DashboardScreen() {
   const router = useRouter();
+  const theme  = useTheme();
 
   // ── Stores ──
   const user             = useAuthStore((state) => state.user);
@@ -167,7 +169,7 @@ export default function DashboardScreen() {
   // ---------------------------------------------------------------------------
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.screenBg }]}>
       <ScrollView showsVerticalScrollIndicator={false}>
 
         {/* ── Header ── */}
@@ -183,7 +185,7 @@ export default function DashboardScreen() {
         </View>
 
         {/* ── Carte glycémie ── */}
-        <View style={[styles.glucoseCard, { borderLeftColor: statusColor }]}>
+        <View style={[styles.glucoseCard, { borderLeftColor: statusColor, backgroundColor: theme.card }]}>
           <ThemedText style={styles.cardLabel}>GLYCÉMIE ACTUELLE</ThemedText>
 
           {isLoadingHistory ? (
@@ -269,7 +271,7 @@ export default function DashboardScreen() {
 
         {/* ── Time In Range ── */}
         {glucoseHistory.length > 0 && (
-          <View style={styles.tirCard}>
+          <View style={[styles.tirCard, { backgroundColor: theme.card }]}>
             <View style={styles.tirHeader}>
               <ThemedText style={styles.tirTitle}>TEMPS DANS LA CIBLE (TIR)</ThemedText>
               <View style={[styles.scoreBadge, { backgroundColor: score.color + '20', borderColor: score.color }]}>
@@ -318,7 +320,7 @@ export default function DashboardScreen() {
 
         {/* ── HbA1c estimé ── */}
         {hba1c ? (
-          <View style={styles.hba1cCard}>
+          <View style={[styles.hba1cCard, { backgroundColor: theme.card }]}>
             <View style={styles.hba1cHeader}>
               <ThemedText style={styles.hba1cTitle}>HbA1c ESTIMÉ</ThemedText>
               <View style={[styles.hba1cBadge, { backgroundColor: hba1c.color + '20', borderColor: hba1c.color }]}>
@@ -335,7 +337,7 @@ export default function DashboardScreen() {
             </ThemedText>
           </View>
         ) : glucoseHistory.length > 0 && glucoseHistory.length < 14 && (
-          <View style={styles.hba1cCard}>
+          <View style={[styles.hba1cCard, { backgroundColor: theme.card }]}>
             <ThemedText style={styles.hba1cTitle}>HbA1c ESTIMÉ</ThemedText>
             <ThemedText style={styles.hba1cBase}>
               Données insuffisantes — il faut au moins 14 mesures sur 90 jours ({glucoseHistory.length} enregistrée{glucoseHistory.length > 1 ? 's' : ''}).
@@ -429,7 +431,7 @@ export default function DashboardScreen() {
               const color = getStatusColor(s);
               const ctx   = entry.mealContext as NonNullable<MealContext> | null;
               return (
-                <View key={entry.id} style={[styles.historyItem, { borderLeftColor: color }]}>
+                <View key={entry.id} style={[styles.historyItem, { borderLeftColor: color, backgroundColor: theme.card }]}>
                   <View style={styles.historyLeft}>
                     <View style={styles.historyTopRow}>
                       <ThemedText style={[styles.historyValue, { color }]}>
@@ -480,7 +482,7 @@ export default function DashboardScreen() {
       </ScrollView>
 
       {/* ── Barre d'action ── */}
-      <View style={styles.actionBar}>
+      <View style={[styles.actionBar, { backgroundColor: theme.card, borderTopColor: theme.border }]}>
         <TouchableOpacity style={styles.emergencyBtn} onPress={handleEmergency}>
           <ThemedText style={styles.emergencyBtnText}>🆘 Hypo/{'\n'}Hyperglycémie</ThemedText>
         </TouchableOpacity>
@@ -497,8 +499,9 @@ export default function DashboardScreen() {
 // ---------------------------------------------------------------------------
 
 function StatBox({ label, value, unit }: { label: string; value: string; unit: string }) {
+  const theme = useTheme();
   return (
-    <View style={styles.statBox}>
+    <View style={[styles.statBox, { backgroundColor: theme.card }]}>
       <ThemedText style={styles.statLabel}>{label}</ThemedText>
       <ThemedText style={styles.statValue}>{value}</ThemedText>
       <ThemedText style={styles.statUnit}>{unit}</ThemedText>

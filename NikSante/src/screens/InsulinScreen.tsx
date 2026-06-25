@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useInsulinStore } from '@/store/insulinStore';
 import { InsulinType, InsulinEntry } from '@/services/api';
 import { ThemedText } from '@/components/themed-text';
+import { useTheme } from '@/hooks/use-theme';
 import { s, fs, vs } from '@/utils/responsive';
 
 // ---------------------------------------------------------------------------
@@ -40,6 +41,7 @@ function formatDateShort(d: Date): string {
 // ---------------------------------------------------------------------------
 
 export default function InsulinScreen() {
+  const theme        = useTheme();
   const fetchHistory = useInsulinStore(s => s.fetchHistory);
   const addEntry     = useInsulinStore(s => s.addEntry);
   const deleteEntry  = useInsulinStore(s => s.deleteEntry);
@@ -98,7 +100,7 @@ export default function InsulinScreen() {
   const todayKey = new Date().toISOString().split('T')[0];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.screenBg }]}>
       <ScrollView showsVerticalScrollIndicator={false}>
 
         {/* ── Header ── */}
@@ -116,7 +118,7 @@ export default function InsulinScreen() {
         </View>
 
         {/* ── Totaux du jour ── */}
-        <View style={styles.totalsCard}>
+        <View style={[styles.totalsCard, { backgroundColor: theme.card }]}>
           <ThemedText style={styles.totalsLabel}>AUJOURD'HUI — doses en unités (u)</ThemedText>
           <View style={styles.totalsRow}>
             {(Object.keys(TYPE_META) as InsulinType[]).map(t => (
@@ -132,7 +134,7 @@ export default function InsulinScreen() {
         </View>
 
         {/* ── Formulaire ── */}
-        <View style={styles.formCard}>
+        <View style={[styles.formCard, { backgroundColor: theme.card }]}>
           <ThemedText style={styles.sectionLabel}>NOUVELLE INJECTION</ThemedText>
 
           {/* Sélecteur de type */}
@@ -259,7 +261,7 @@ export default function InsulinScreen() {
                   {entries.map(e => (
                     <TouchableOpacity
                       key={e.id}
-                      style={[styles.entryItem, { borderLeftColor: TYPE_META[e.type].color }]}
+                      style={[styles.entryItem, { borderLeftColor: TYPE_META[e.type].color, backgroundColor: theme.card }]}
                       onLongPress={() => handleDelete(e)}
                       activeOpacity={0.7}
                     >

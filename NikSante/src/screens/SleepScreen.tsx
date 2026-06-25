@@ -24,6 +24,7 @@ import {
   getDailyTip,
 } from '@/utils/insightEngine';
 import { ThemedText } from '@/components/themed-text';
+import { useTheme } from '@/hooks/use-theme';
 import { s, fs, vs } from '@/utils/responsive';
 
 // ---------------------------------------------------------------------------
@@ -123,6 +124,7 @@ const tp = StyleSheet.create({
 // ---------------------------------------------------------------------------
 
 export default function SleepScreen() {
+  const theme          = useTheme();
   const entries        = useSleepStore(s => s.entries);
   const initSleep      = useSleepStore(s => s.initSleep);
   const addSleep       = useSleepStore(s => s.addSleep);
@@ -219,7 +221,7 @@ export default function SleepScreen() {
   // ---------------------------------------------------------------------------
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.screenBg }]}>
       <ScrollView showsVerticalScrollIndicator={false}>
 
         {/* ── Header ── */}
@@ -236,7 +238,7 @@ export default function SleepScreen() {
         </View>
 
         {/* ── Objectif de sommeil ── */}
-        <View style={styles.goalCard}>
+        <View style={[styles.goalCard, { backgroundColor: theme.card }]}>
           <View style={styles.goalHeader}>
             <ThemedText style={styles.goalCardTitle}>OBJECTIF DE SOMMEIL</ThemedText>
             <TouchableOpacity onPress={() => setShowGoalInfo(v => !v)} style={styles.infoBtn}>
@@ -287,17 +289,17 @@ export default function SleepScreen() {
         </View>
 
         {/* ── Conseil du jour ── */}
-        <View style={[styles.tipCard, { borderLeftColor: dailyTip.color }]}>
+        <View style={[styles.tipCard, { borderLeftColor: dailyTip.color, backgroundColor: theme.card }]}>
           <ThemedText style={styles.tipTitle}>CONSEIL DU JOUR</ThemedText>
           <ThemedText style={styles.tipText}>{dailyTip.icon}  {dailyTip.text}</ThemedText>
         </View>
 
         {/* ── Formulaire ── */}
-        <View style={styles.formCard}>
+        <View style={[styles.formCard, { backgroundColor: theme.card }]}>
           <ThemedText style={styles.sectionTitle}>Enregistrer votre nuit</ThemedText>
 
           {/* Sélecteur de date */}
-          <View style={styles.dateNav}>
+          <View style={[styles.dateNav, { backgroundColor: theme.backgroundElement }]}>
             <TouchableOpacity onPress={goToPrevDay} style={styles.dateNavBtn}>
               <ThemedText style={styles.dateNavArrow}>‹</ThemedText>
             </TouchableOpacity>
@@ -447,7 +449,7 @@ export default function SleepScreen() {
             )}
 
             {insights.map(ins => (
-              <View key={ins.id} style={[styles.insightCard, { borderLeftColor: ins.color }]}>
+              <View key={ins.id} style={[styles.insightCard, { borderLeftColor: ins.color, backgroundColor: theme.card }]}>
                 <ThemedText style={[styles.insightTitle, { color: ins.color }]}>
                   {ins.icon}  {ins.title}
                 </ThemedText>
@@ -465,7 +467,7 @@ export default function SleepScreen() {
               const meta = SLEEP_QUALITY_META[entry.quality];
               const wf   = entry.wakeFeeling ? WAKE_FEELING_META[entry.wakeFeeling] : null;
               return (
-                <View key={entry.id} style={[styles.historyItem, { borderLeftColor: meta.color }]}>
+                <View key={entry.id} style={[styles.historyItem, { borderLeftColor: meta.color, backgroundColor: theme.card }]}>
                   <View style={{ flex: 1 }}>
                     <View style={styles.historyTop}>
                       <ThemedText style={styles.historyDate}>{formatDate(entry.date)}</ThemedText>
@@ -507,8 +509,9 @@ export default function SleepScreen() {
 // ---------------------------------------------------------------------------
 
 function StatBox({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  const theme = useTheme();
   return (
-    <View style={[styles.statBox, highlight && styles.statBoxHighlight]}>
+    <View style={[styles.statBox, { backgroundColor: theme.card }, highlight && styles.statBoxHighlight]}>
       <ThemedText style={styles.statLabel}>{label}</ThemedText>
       <ThemedText style={[styles.statValue, highlight && { color: '#1565C0' }]}>{value}</ThemedText>
     </View>
