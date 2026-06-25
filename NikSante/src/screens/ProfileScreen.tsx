@@ -110,7 +110,7 @@ async function setupNotifications(): Promise<void> {
       importance:           N.AndroidImportance.MAX,
       vibrationPattern:     [0, 250, 250, 250],
       lightColor:           '#388E3C',
-      sound:                true,
+      sound:                'default',
       enableVibrate:        true,
       enableLights:         true,
       showBadge:            false,

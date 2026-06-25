@@ -16,9 +16,16 @@ let Notifications: any = null;
 if (!IS_EXPO_GO) {
   try {
     Notifications = require('expo-notifications');
-    // setNotificationHandler a été supprimé dans expo-notifications 56.0.18
+    // Configure le comportement en premier plan (foreground)
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge:  false,
+      }),
+    });
   } catch {
-    // Silencieux — Expo Go ou module indisponible
+    // Silencieux — module indisponible
   }
 }
 
