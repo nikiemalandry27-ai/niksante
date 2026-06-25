@@ -23,19 +23,6 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { alarmScheduler, ALARM_IDS } from '@/services/alarmScheduler';
-
-// Lazy load — expo-notifications throws at import in Expo Go (SDK 53+)
-function loadNotifications(): typeof import('expo-notifications') | null {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const mod = require('expo-notifications');
-    if (!mod || typeof mod.setNotificationChannelAsync !== 'function') return null;
-    return mod as typeof import('expo-notifications');
-  } catch {
-    return null;
-  }
-}
-
 import { useAuthStore }    from '@/store/authStore';
 import { useGlucoseStore } from '@/store/glucoseStore';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -45,6 +32,18 @@ import { getTimeInRange, getConsistencyScore } from '@/utils/glucoseAnalysis';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 import { s, fs, vs } from '@/utils/responsive';
+
+// Lazy load expo-notifications — throws at static import in Expo Go SDK 53+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function loadNotifications(): any {
+  try {
+    const mod = require('expo-notifications'); // eslint-disable-line @typescript-eslint/no-var-requires
+    if (!mod || typeof mod.setNotificationChannelAsync !== 'function') return null;
+    return mod;
+  } catch {
+    return null;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Rappels de mesure (in-app via AppState — compatible Expo Go)
