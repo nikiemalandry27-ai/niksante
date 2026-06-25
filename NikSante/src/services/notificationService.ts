@@ -1,6 +1,6 @@
 import * as Device from 'expo-device';
 import { Platform, Linking, Alert } from 'react-native';
-import Constants, { ExecutionEnvironment } from 'expo-constants';
+import Constants from 'expo-constants';
 import api from './api';
 
 const EXPO_PROJECT_ID =
@@ -8,23 +8,17 @@ const EXPO_PROJECT_ID =
 const PLAY_STORE_URL  = 'market://details?id=com.niksante.app';
 const PLAY_STORE_WEB  = 'https://play.google.com/store/apps/details?id=com.niksante.app';
 
-// expo-notifications plante dans Expo Go SDK 53+ (DevicePushTokenAutoRegistration)
-const IS_EXPO_GO = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+// appOwnership === 'expo' est le seul check fiable pour Expo Go en SDK 53+
+// ExecutionEnvironment.StoreClient ne fonctionne plus correctement
+const IS_EXPO_GO = Constants.appOwnership === 'expo';
 
 let Notifications: any = null;
 if (!IS_EXPO_GO) {
   try {
     Notifications = require('expo-notifications');
-    Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge:  false,
-        priority:        Notifications.AndroidNotificationPriority.MAX,
-      }),
-    });
+    // setNotificationHandler a été supprimé dans expo-notifications 56.0.18
   } catch {
-    // Silencieux
+    // Silencieux — Expo Go ou module indisponible
   }
 }
 

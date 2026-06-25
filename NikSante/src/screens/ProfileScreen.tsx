@@ -33,10 +33,11 @@ import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 import { s, fs, vs } from '@/utils/responsive';
 
-// Lazy load expo-notifications — throws at static import in Expo Go SDK 53+
+// Lazy load expo-notifications uniquement si pas Expo Go (SDK 53+ incompatible)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function loadNotifications(): any {
   try {
+    if (Constants.appOwnership === 'expo') return null; // Expo Go — skip
     const mod = require('expo-notifications'); // eslint-disable-line @typescript-eslint/no-var-requires
     if (!mod || typeof mod.setNotificationChannelAsync !== 'function') return null;
     return mod;
@@ -53,7 +54,7 @@ type ReminderKey = 'morning' | 'afternoon' | 'evening';
 
 const REMINDER_DEFS: Record<ReminderKey, { label: string; hour: number; minute: number; icon: string; desc: string }> = {
   morning:   { label: 'Matin',      hour: 8,  minute: 0, icon: '🌅', desc: '08h00 — Mesure à jeun'  },
-  afternoon: { label: 'Après-midi', hour: 13, minute: 0, icon: '☀️', desc: '13h00 — Après le repas' },
+  afternoon: { label: 'Après-midi', hour: 13, minute: 0, icon: '☀', desc: '13h00 — Après le repas' },
   evening:   { label: 'Soir',       hour: 19, minute: 0, icon: '🌙', desc: '19h00 — Avant le dîner' },
 };
 
