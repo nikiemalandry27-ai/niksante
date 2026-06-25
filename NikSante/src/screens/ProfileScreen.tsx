@@ -61,15 +61,19 @@ function clampTimes(
     afternoon: { hour: REMINDER_DEFS.afternoon.hour, minute: REMINDER_DEFS.afternoon.minute },
     evening:   { hour: REMINDER_DEFS.evening.hour,   minute: REMINDER_DEFS.evening.minute   },
   };
-  (Object.keys(HOUR_BOUNDS) as ReminderKey[]).forEach(key => {
-    if (raw[key]) {
-      const { min, max } = HOUR_BOUNDS[key];
-      result[key] = {
-        hour:   Math.min(max, Math.max(min, raw[key].hour)),
-        minute: raw[key].minute,
-      };
-    }
-  });
+  if (raw && typeof raw === 'object') {
+    (Object.keys(HOUR_BOUNDS) as ReminderKey[]).forEach(key => {
+      const entry = (raw as Record<string, unknown>)[key];
+      if (entry && typeof entry === 'object' && 'hour' in entry && 'minute' in entry) {
+        const { min, max } = HOUR_BOUNDS[key];
+        const { hour, minute } = entry as { hour: number; minute: number };
+        result[key] = {
+          hour:   Math.min(max, Math.max(min, Number(hour))),
+          minute: Number(minute),
+        };
+      }
+    });
+  }
   return result;
 }
 
@@ -305,7 +309,7 @@ export default function ProfileScreen() {
 
         // Charge quand même les heures perso
         const rawTimes = await AsyncStorage.getItem(REMINDER_TIMES_KEY);
-        if (rawTimes) setReminderTimes(clampTimes(JSON.parse(rawTimes)));
+        if (rawTimes) { try { setReminderTimes(clampTimes(JSON.parse(rawTimes))); } catch {} }
         return;
       }
 
