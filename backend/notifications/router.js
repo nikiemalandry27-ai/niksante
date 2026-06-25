@@ -1,8 +1,18 @@
-const express = require('express');
-const router  = express.Router();
-const jwt     = require('jsonwebtoken');
+const express    = require('express');
+const router     = express.Router();
+const jwt        = require('jsonwebtoken');
+const rateLimit  = require('express-rate-limit');
 const { pool } = require('../config/database');
 const authMiddleware = require('../middleware/auth');
+
+// 5 envois push par heure — protège contre les boucles accidentelles et les admins compromis
+const sendUpdateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: { error: 'Limite d\'envoi atteinte. Réessayez dans 1 heure.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 const SECRET = process.env.JWT_SECRET || 'niksante_dev_secret';
 
@@ -86,7 +96,7 @@ router.get('/stats', adminOrKey, async (req, res) => {
 //     -H "X-Admin-Key: votre-cle-secrete" \
 //     -d '{"version":"1.1.0","changelog":"Mesure cardiaque PPG, conversion mmol/L..."}'
 
-router.post('/send-update', adminOrKey, async (req, res) => {
+router.post('/send-update', adminOrKey, sendUpdateLimiter, async (req, res) => {
 
   if (!expo) {
     return res.status(503).json({ error: 'expo-server-sdk non installé sur le serveur' });

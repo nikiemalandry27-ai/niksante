@@ -66,6 +66,12 @@ async function createTables() {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS push_token VARCHAR(255);
   `);
 
+  // Index partiel pour accélérer SELECT push_token FROM users WHERE push_token IS NOT NULL
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_users_push_token
+      ON users(push_token) WHERE push_token IS NOT NULL;
+  `);
+
   // Migration : ajout colonne product_name sur insulin_entries (idempotent)
   await pool.query(`
     ALTER TABLE insulin_entries ADD COLUMN IF NOT EXISTS product_name VARCHAR(100);
