@@ -23,7 +23,18 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { alarmScheduler, ALARM_IDS } from '@/services/alarmScheduler';
-import * as Notifications from 'expo-notifications';
+
+// Lazy load — expo-notifications throws at import in Expo Go (SDK 53+)
+function loadNotifications(): typeof import('expo-notifications') | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const mod = require('expo-notifications');
+    if (!mod || typeof mod.setNotificationChannelAsync !== 'function') return null;
+    return mod as typeof import('expo-notifications');
+  } catch {
+    return null;
+  }
+}
 
 import { useAuthStore }    from '@/store/authStore';
 import { useGlucoseStore } from '@/store/glucoseStore';
@@ -92,16 +103,18 @@ const EXACT_ALARM_KEY       = '@niksante_exact_alarm_requested';
 
 async function setupNotifications(): Promise<void> {
   try {
-    await Notifications.setNotificationChannelAsync(NOTIF_CHANNEL_ID, {
+    const N = loadNotifications();
+    if (!N) return;
+    await N.setNotificationChannelAsync(NOTIF_CHANNEL_ID, {
       name:                 'Rappels glycémie',
-      importance:           Notifications.AndroidImportance.MAX,
+      importance:           N.AndroidImportance.MAX,
       vibrationPattern:     [0, 250, 250, 250],
       lightColor:           '#388E3C',
       sound:                true,
       enableVibrate:        true,
       enableLights:         true,
       showBadge:            false,
-      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      lockscreenVisibility: N.AndroidNotificationVisibility.PUBLIC,
       bypassDnd:            false,
     });
   } catch (e) {
@@ -113,16 +126,19 @@ async function scheduleReminder(key: ReminderKey, hour: number, minute: number):
   const def = REMINDER_DEFS[key];
   try {
     // 1. Permission POST_NOTIFICATIONS (Android 13+)
-    const perms = await Notifications.getPermissionsAsync();
-    if (perms.status !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(
-          'Permission requise',
-          'Activez les notifications pour NikSanté dans les paramètres de votre téléphone.',
-          [{ text: 'OK' }],
-        );
-        return null;
+    const N = loadNotifications();
+    if (N) {
+      const perms = await N.getPermissionsAsync();
+      if (perms.status !== 'granted') {
+        const { status } = await N.requestPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert(
+            'Permission requise',
+            'Activez les notifications pour NikSanté dans les paramètres de votre téléphone.',
+            [{ text: 'OK' }],
+          );
+          return null;
+        }
       }
     }
 
@@ -295,7 +311,7 @@ export default function ProfileScreen() {
       if (!migrated) {
         try {
           // Annule toutes les anciennes notifications expo-notifications
-          await Notifications.cancelAllScheduledNotificationsAsync();
+          await loadNotifications()?.cancelAllScheduledNotificationsAsync();
         } catch { /* silencieux si expo-notifications indisponible */ }
 
         // Remet tous les rappels à zéro (les heures perso sont conservées)
